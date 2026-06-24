@@ -1,1 +1,376 @@
-# it-center-security-cloud
+# IT Center Security Cloud
+
+> Plataforma full stack para monitoramento, inventário, observabilidade e segurança de máquinas Windows, com agente PowerShell, API FastAPI, PostgreSQL, dashboard web e práticas iniciais de SOC/Blue Team.
+
+Status: Em planejamento técnico | Documentação base criada | MVP em preparação.
+
+---
+
+## Índice
+
+* Sobre o Projeto
+* Objetivo
+* Arquitetura
+* Fluxo do Sistema
+* Funcionalidades Planejadas
+* Stack
+* Estrutura do Projeto
+* Segurança
+* SOC Light
+* Deploy
+* Como Executar
+* Documentação
+* Roadmap
+* Autor
+
+---
+
+## Sobre o Projeto
+
+O IT Center Security Cloud é uma plataforma criada para monitorar computadores e servidores Windows por meio de agentes leves.
+
+A proposta é centralizar informações de inventário, desempenho e segurança em um dashboard web, permitindo maior visibilidade sobre ativos corporativos.
+
+O projeto nasceu com foco em:
+
+* Infraestrutura de TI
+* Monitoramento
+* Inventário
+* Observabilidade
+* Segurança defensiva
+* SOC Light
+* DevOps
+* Cloud gratuita
+
+---
+
+## Objetivo
+
+Criar uma solução simples, gratuita e escalável para:
+
+* Cadastrar máquinas automaticamente.
+* Coletar métricas de CPU, RAM e disco.
+* Registrar inventário básico.
+* Monitorar status online/offline.
+* Detectar eventos de segurança.
+* Gerar alertas iniciais de SOC.
+* Hospedar tudo em ambiente gratuito.
+
+---
+
+## Arquitetura
+
+```text
+Máquina Windows
+      ↓
+Agente PowerShell
+      ↓
+API FastAPI
+      ↓
+PostgreSQL
+      ↓
+Dashboard Web
+```
+
+| Camada          | Responsabilidade                                          |
+| --------------- | --------------------------------------------------------- |
+| Agente Windows  | Coleta inventário, métricas e eventos de segurança        |
+| Backend FastAPI | Recebe check-ins, processa dados e expõe endpoints        |
+| PostgreSQL      | Armazena máquinas, métricas, programas, eventos e alertas |
+| Dashboard Web   | Exibe máquinas, métricas, inventário e alertas            |
+| Nginx           | Proxy reverso, HTTPS e exposição segura                   |
+| Docker Compose  | Orquestra os containers do MVP                            |
+
+---
+
+## Fluxo do Sistema
+
+```text
+1. O agente PowerShell roda na máquina Windows.
+2. Ele coleta hostname, usuário, IP, CPU, RAM, disco e dados de segurança.
+3. Os dados são enviados para a API.
+4. A API salva as informações no PostgreSQL.
+5. O dashboard consulta a API.
+6. O usuário visualiza máquinas, métricas e alertas.
+```
+
+---
+
+## Funcionalidades Planejadas
+
+### Inventário
+
+* Hostname
+* Usuário logado
+* IP
+* Sistema operacional
+* Versão do Windows
+* Programas instalados
+
+### Monitoramento
+
+* CPU
+* RAM
+* Disco
+* Uptime
+* Último check-in
+* Status online/offline
+
+### Segurança
+
+* Firewall
+* Windows Defender
+* RDP
+* Usuários administradores locais
+* Dispositivos USB
+* Ferramentas de acesso remoto
+
+### SOC Light
+
+* Falhas de login
+* Novo administrador local
+* Firewall desativado
+* Defender desativado
+* RDP habilitado sem autorização
+* Software remoto não autorizado
+* Torrent detectado
+* Máquina desconhecida
+
+---
+
+## Stack
+
+| Camada           | Tecnologia             |
+| ---------------- | ---------------------- |
+| Backend          | Python, FastAPI        |
+| Banco de Dados   | PostgreSQL             |
+| Frontend         | Next.js, TypeScript    |
+| Agente           | PowerShell             |
+| Infraestrutura   | Docker, Docker Compose |
+| Proxy            | Nginx                  |
+| Hospedagem       | Oracle Cloud Free Tier |
+| Segurança futura | Wazuh, OpenVAS         |
+
+---
+
+## Estrutura do Projeto
+
+```text
+it-center-security-cloud/
+│
+├── README.md
+├── PROJECT_PLAN.md
+├── .gitignore
+├── .env.example
+│
+├── backend/
+│   └── app/
+│
+├── frontend/
+│   └── dashboard/
+│
+├── agent-windows/
+│   ├── itcenter-agent.ps1
+│   └── config.json
+│
+├── infra/
+│   ├── docker-compose.yml
+│   └── nginx.conf
+│
+└── docs/
+    ├── ARCHITECTURE.md
+    ├── DATABASE.md
+    ├── API.md
+    ├── AGENT.md
+    ├── SECURITY.md
+    ├── SOC_RULES.md
+    ├── ASSET_POLICY.md
+    ├── DECISIONS.md
+    ├── TASKS.md
+    ├── ROADMAP.md
+    ├── DEPLOYMENT.md
+    └── CONTRIBUTING.md
+```
+
+---
+
+## Segurança
+
+O projeto seguirá princípios de segurança desde o início:
+
+* Não coletar senhas.
+* Não coletar histórico de navegação.
+* Não coletar conteúdo de arquivos pessoais.
+* Não armazenar secrets no GitHub.
+* Utilizar `.env` para variáveis sensíveis.
+* Utilizar HTTPS no deploy.
+* Bloquear acesso externo ao PostgreSQL.
+* Validar payloads recebidos dos agentes.
+
+---
+
+## SOC Light
+
+O projeto terá uma camada inicial de práticas SOC/Blue Team.
+
+As regras serão baseadas em contexto e política de ativos.
+
+Exemplo:
+
+```text
+RustDesk instalado em máquina autorizada:
+    registrar evento
+
+RustDesk instalado em máquina não autorizada:
+    gerar alerta
+
+Torrent detectado:
+    gerar alerta imediato
+```
+
+A fonte de verdade para softwares autorizados será:
+
+```text
+docs/ASSET_POLICY.md
+```
+
+As regras de detecção estarão em:
+
+```text
+docs/SOC_RULES.md
+```
+
+---
+
+## Deploy
+
+Ambiente planejado:
+
+```text
+Oracle Cloud Free Tier
+Ubuntu Server LTS
+Docker
+Docker Compose
+Nginx
+PostgreSQL
+FastAPI
+Next.js
+```
+
+Objetivo:
+
+Manter o MVP com custo zero.
+
+---
+
+## Como Executar
+
+Em desenvolvimento.
+
+Fluxo planejado:
+
+```bash
+git clone <repo-url>
+cd it-center-security-cloud
+cp .env.example .env
+docker compose up -d
+```
+
+Backend previsto:
+
+```text
+http://localhost:8000
+```
+
+Health check previsto:
+
+```text
+GET /api/v1/health
+```
+
+Dashboard previsto:
+
+```text
+http://localhost:3000
+```
+
+---
+
+## Documentação
+
+| Arquivo              | Função                                     |
+| -------------------- | ------------------------------------------ |
+| PROJECT_PLAN.md      | Visão estratégica do projeto               |
+| docs/ARCHITECTURE.md | Arquitetura técnica                        |
+| docs/DATABASE.md     | Modelagem do banco                         |
+| docs/API.md          | Contrato da API                            |
+| docs/AGENT.md        | Contrato do agente Windows                 |
+| docs/SECURITY.md     | Segurança da aplicação                     |
+| docs/SOC_RULES.md    | Regras de detecção SOC                     |
+| docs/ASSET_POLICY.md | Política de ativos e softwares autorizados |
+| docs/DECISIONS.md    | Registro de decisões arquiteturais         |
+| docs/TASKS.md        | Backlog técnico                            |
+| docs/ROADMAP.md      | Evolução do produto                        |
+| docs/DEPLOYMENT.md   | Estratégia de deploy                       |
+| docs/CONTRIBUTING.md | Guia de contribuição                       |
+
+---
+
+## Roadmap
+
+### Fase 0 - Planejamento
+
+* Documentação base
+* Arquitetura
+* Banco
+* API
+* Agente
+* Segurança
+* Regras SOC
+
+### Fase 1 - Backend MVP
+
+* FastAPI
+* Health check
+* Endpoint de check-in
+* PostgreSQL
+
+### Fase 2 - Agente Windows
+
+* Coleta de inventário
+* Coleta de métricas
+* Envio para API
+
+### Fase 3 - Dashboard
+
+* Máquinas online/offline
+* Último check-in
+* CPU/RAM/Disco
+
+### Fase 4 - SOC Light
+
+* Eventos de segurança
+* Alertas básicos
+* Políticas de ativos
+
+### Fase 5 - Deploy Cloud
+
+* Oracle Cloud
+* Docker Compose
+* Nginx
+* HTTPS
+
+### Fase 6 - Evolução
+
+* Login
+* API Key por agente
+* Wazuh
+* OpenVAS
+* Multiempresa
+* SaaS
+
+---
+
+## Autor
+
+Desenvolvido por Daniel da Silva Azevedo como projeto de portfólio e aprendizado prático em Infraestrutura, DevOps, Cloud, Observabilidade e Cyber Security.
