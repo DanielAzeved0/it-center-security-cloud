@@ -50,7 +50,7 @@ Novo Administrador Local
 
 Evento:
 
-new_admin
+new_admin_user
 
 Severidade:
 

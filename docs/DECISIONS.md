@@ -380,6 +380,46 @@ Repositório privado inicialmente.
 
 # Modelo para Novas Decisões
 
+---
+
+# ADR-013
+
+## Data
+
+2026-06-24
+
+## Decisão
+
+Integrar a API FastAPI diretamente ao PostgreSQL usando o driver psycopg.
+
+## Motivo
+
+O projeto já concluiu a criação do banco e das tabelas iniciais.
+
+Manter repositórios em memória impediria o MVP de cumprir o critério de sucesso:
+
+* A API salvar dados.
+* O PostgreSQL armazenar dados.
+* O dashboard consultar dados persistidos futuramente.
+
+## Alternativas Avaliadas
+
+* Continuar com repositórios em memória temporários.
+* Usar SQLAlchemy desde o início.
+* Usar psycopg diretamente.
+
+## Resultado
+
+Usar psycopg diretamente no MVP.
+
+Impactos:
+
+* Menos dependências e menor complexidade inicial.
+* Queries SQL explícitas e alinhadas ao DATABASE.md.
+* Possibilidade de migrar para SQLAlchemy futuramente se o domínio crescer.
+
+---
+
 ## ADR-XXX
 
 ### Data

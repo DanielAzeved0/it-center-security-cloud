@@ -117,6 +117,80 @@ Registrar log
 
 ---
 
+# Estado Atual da Implementação
+
+O agente PowerShell já possui as primeiras coletas locais do EPIC 4.
+
+## Coletas implementadas
+
+```text
+Hostname
+Usuário em execução
+IPv4 local
+Sistema operacional
+Programas instalados
+Uso de CPU
+Uso de RAM
+Uso de disco
+Uptime em segundos
+JSON de check-in
+```
+
+## JSON atual
+
+O JSON gerado deve seguir o contrato do endpoint:
+
+```text
+POST /api/v1/agent/checkin
+```
+
+Campos gerados:
+
+```text
+hostname
+username
+ip_address
+operating_system
+os_version
+cpu_usage
+ram_usage
+disk_usage
+uptime_seconds
+installed_programs
+security
+```
+
+Observações:
+
+* `installed_programs` ainda é enviado como lista vazia.
+* `installed_programs` agora é preenchido com o snapshot local dos programas instalados.
+* `security` usa valores padrão temporários até as coletas do EPIC 6.
+* O agente já envia o check-in para `POST /api/v1/agent/checkin`.
+* Se a API falhar, o agente registra aviso e mantém o JSON local.
+* O agente já registra as coletas em `agent-windows/logs/itcenter-agent.log`.
+
+## Testes atuais
+
+Os testes do agente ficam em:
+
+```text
+agent-windows/tests/run-agent-tests.ps1
+```
+
+Eles validam:
+
+```text
+CPU entre 0 e 100
+RAM entre 0 e 100
+Disco entre 0 e 100
+Payload com campos obrigatórios
+JSON válido e parseável
+Requisicao POST com header X-Agent-Api-Key
+Body JSON enviado para /api/v1/agent/checkin
+```
+
+---
+
 # Cache Offline
 
 Caso a API esteja indisponível:

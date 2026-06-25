@@ -68,16 +68,16 @@ Armazena os computadores e servidores cadastrados.
 ## Campos
 
 ```text
-id
-hostname
-username
-ip_address
-operating_system
-os_version
-status
-last_seen
-created_at
-updated_at
+id BIGSERIAL PRIMARY KEY
+hostname VARCHAR(255) NOT NULL UNIQUE
+username VARCHAR(255) NULL
+ip_address INET NULL
+operating_system VARCHAR(255) NULL
+os_version VARCHAR(100) NULL
+status VARCHAR(20) NOT NULL DEFAULT 'offline'
+last_seen TIMESTAMPTZ NULL
+created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 ```
 
 ## Regras
@@ -85,6 +85,8 @@ updated_at
 * Cada máquina deve ter um hostname único.
 * O status pode ser online ou offline.
 * last_seen será atualizado a cada check-in do agente.
+* status deve aceitar apenas: online, offline.
+* hostname deve ser normalizado antes da gravação para evitar duplicidade por diferença de caixa.
 
 ---
 
@@ -95,13 +97,13 @@ Armazena métricas de desempenho enviadas pelo agente.
 ## Campos
 
 ```text
-id
-machine_id
-cpu_usage
-ram_usage
-disk_usage
-uptime_seconds
-created_at
+id BIGSERIAL PRIMARY KEY
+machine_id BIGINT NOT NULL REFERENCES machines(id) ON DELETE CASCADE
+cpu_usage NUMERIC(5,2) NOT NULL
+ram_usage NUMERIC(5,2) NOT NULL
+disk_usage NUMERIC(5,2) NOT NULL
+uptime_seconds BIGINT NOT NULL
+created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 ```
 
 ## Regras
@@ -109,6 +111,8 @@ created_at
 * Cada registro representa uma coleta.
 * A tabela pode crescer bastante.
 * No futuro, pode ter limpeza automática de dados antigos.
+* cpu_usage, ram_usage e disk_usage devem aceitar valores entre 0 e 100.
+* uptime_seconds deve ser maior ou igual a 0.
 
 ---
 
@@ -119,20 +123,24 @@ Armazena os programas instalados nas máquinas.
 ## Campos
 
 ```text
-id
-machine_id
-name
-version
-publisher
-installed_at
-created_at
+id BIGSERIAL PRIMARY KEY
+machine_id BIGINT NOT NULL REFERENCES machines(id) ON DELETE CASCADE
+name VARCHAR(255) NOT NULL
+version VARCHAR(100) NULL
+publisher VARCHAR(255) NULL
+installed_at TIMESTAMPTZ NULL
+created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 ```
 
 ## Regras
 
 * Relacionada com a máquina.
-* Pode ser atualizada a cada inventário completo.
-* Será usada para detectar softwares suspeitos.
+* No MVP, representa o estado atual conhecido dos programas instalados.
+* A cada inventário completo, a API deve substituir o conjunto de programas da máquina por um novo snapshot.
+* A data installed_at é opcional porque nem todo Windows informa essa data de forma confiável.
+* Será usada para detectar softwares monitorados conforme ASSET_POLICY.md e SOC_RULES.md.
+* Não deve existir duplicidade de name e version para a mesma máquina.
 
 ---
 
@@ -143,14 +151,14 @@ Armazena eventos de segurança coletados ou gerados pelo sistema.
 ## Campos
 
 ```text
-id
-machine_id
-event_type
-severity
-source
-description
-raw_data
-created_at
+id BIGSERIAL PRIMARY KEY
+machine_id BIGINT NULL REFERENCES machines(id) ON DELETE SET NULL
+event_type VARCHAR(100) NOT NULL
+severity VARCHAR(20) NOT NULL
+source VARCHAR(50) NOT NULL
+description TEXT NOT NULL
+raw_data JSONB NULL
+created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 ```
 
 ## Exemplos de event_type
@@ -162,7 +170,10 @@ new_admin_user
 firewall_disabled
 defender_disabled
 rdp_enabled
-suspicious_software
+remote_access_tool_detected
+unauthorized_remote_access_tool
+unauthorized_vpn_tool
+torrent_software_detected
 ```
 
 ## Exemplos de severity
@@ -174,6 +185,12 @@ high
 critical
 ```
 
+## Regras
+
+* severity deve aceitar apenas: low, medium, high, critical.
+* source deve aceitar inicialmente: agent, api, system.
+* raw_data deve guardar apenas metadados técnicos permitidos, nunca senhas, cookies, arquivos pessoais ou conteúdo de documentos.
+
 ---
 
 # Tabela: alerts
@@ -183,15 +200,15 @@ Armazena alertas criados a partir de eventos ou regras.
 ## Campos
 
 ```text
-id
-machine_id
-alert_type
-severity
-status
-title
-description
-created_at
-resolved_at
+id BIGSERIAL PRIMARY KEY
+machine_id BIGINT NULL REFERENCES machines(id) ON DELETE SET NULL
+alert_type VARCHAR(100) NOT NULL
+severity VARCHAR(20) NOT NULL
+status VARCHAR(20) NOT NULL DEFAULT 'open'
+title VARCHAR(255) NOT NULL
+description TEXT NOT NULL
+created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+resolved_at TIMESTAMPTZ NULL
 ```
 
 ## Exemplos de status
@@ -203,6 +220,12 @@ resolved
 ignored
 ```
 
+## Regras
+
+* severity deve aceitar apenas: low, medium, high, critical.
+* status deve aceitar apenas: open, investigating, resolved, ignored.
+* resolved_at só deve ser preenchido quando status for resolved ou ignored.
+
 ---
 
 # Tabela: agent_configs
@@ -212,16 +235,22 @@ Armazena configurações específicas dos agentes.
 ## Campos
 
 ```text
-id
-machine_id
-agent_version
-checkin_interval_minutes
-collect_inventory
-collect_security
-collect_metrics
-created_at
-updated_at
+id BIGSERIAL PRIMARY KEY
+machine_id BIGINT NOT NULL UNIQUE REFERENCES machines(id) ON DELETE CASCADE
+agent_version VARCHAR(50) NULL
+checkin_interval_minutes INTEGER NOT NULL DEFAULT 5
+collect_inventory BOOLEAN NOT NULL DEFAULT true
+collect_security BOOLEAN NOT NULL DEFAULT true
+collect_metrics BOOLEAN NOT NULL DEFAULT true
+created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 ```
+
+## Regras
+
+* Cada máquina pode ter no máximo uma configuração ativa de agente.
+* checkin_interval_minutes deve ser maior que 0.
+* A API Key do agente não deve ser armazenada nesta tabela em texto plano.
 
 ---
 
@@ -230,34 +259,47 @@ updated_at
 ## machines
 
 ```text
-hostname
-status
-last_seen
+UNIQUE hostname
+INDEX status
+INDEX last_seen
 ```
 
 ## metrics
 
 ```text
-machine_id
-created_at
+INDEX machine_id
+INDEX created_at
+INDEX machine_id, created_at
+CHECK cpu_usage BETWEEN 0 AND 100
+CHECK ram_usage BETWEEN 0 AND 100
+CHECK disk_usage BETWEEN 0 AND 100
+```
+
+## installed_programs
+
+```text
+INDEX machine_id
+UNIQUE machine_id, name, version
 ```
 
 ## security_events
 
 ```text
-machine_id
-event_type
-severity
-created_at
+INDEX machine_id
+INDEX event_type
+INDEX severity
+INDEX created_at
+INDEX machine_id, created_at
 ```
 
 ## alerts
 
 ```text
-machine_id
-status
-severity
-created_at
+INDEX machine_id
+INDEX status
+INDEX severity
+INDEX created_at
+INDEX status, severity
 ```
 
 ---
@@ -311,6 +353,52 @@ Uma máquina pode ter uma configuração de agente.
 ```text
 machines.id = agent_configs.machine_id
 ```
+
+---
+
+# Integração API e Banco
+
+O backend acessa o PostgreSQL pela camada `repositories`.
+
+## Check-in do Agente
+
+Quando `POST /api/v1/agent/checkin` recebe payload válido:
+
+```text
+1. Normaliza hostname para caixa alta.
+2. Cria ou atualiza machines usando hostname como chave única.
+3. Define status como online.
+4. Atualiza last_seen com now().
+5. Insere uma nova coleta em metrics.
+6. Remove os programas anteriores da máquina em installed_programs.
+7. Insere o snapshot atual de installed_programs recebido no payload.
+```
+
+## Consultas
+
+```text
+GET /api/v1/machines lê machines.
+GET /api/v1/alerts lê alerts.
+GET /api/v1/security-events lê security_events.
+```
+
+## Configuração
+
+O backend usa a variável:
+
+```text
+DATABASE_URL
+```
+
+Valor local padrão:
+
+```text
+postgresql://itcenter:change-me@127.0.0.1:5432/it_center_security_cloud
+```
+
+## Testes
+
+Os testes de backend limpam as tabelas com `TRUNCATE ... RESTART IDENTITY CASCADE` antes de cada cenário.
 
 ---
 

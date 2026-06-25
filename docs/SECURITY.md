@@ -48,12 +48,16 @@ Toda ação crítica deverá gerar logs.
 
 MVP:
 
-* API Key
+* API Key obrigatória para agentes
+* Validação de payloads
+* Erros sem detalhes internos
 
 Futuro:
 
 * JWT
 * RBAC
+* Rate limit
+* Logs de auditoria completos
 
 ---
 
@@ -69,14 +73,22 @@ Futuro:
 
 * Comunicação HTTPS
 * API Key obrigatória
+* Header oficial: X-Agent-Api-Key
 * Validação de payload
+* Cache offline sem dados sensíveis
 
 ---
 
 ## Segurança do Dashboard
 
+MVP local/laboratório:
+
+* Pode operar sem login apenas enquanto não estiver exposto na internet
+
+Antes de exposição externa:
+
 * Login obrigatório
-* Sessões expiram
+* Sessões com expiração
 * Controle de acesso
 
 ---
@@ -89,3 +101,4 @@ Não serão aceitos:
 * Secrets no GitHub
 * Banco exposto na internet
 * HTTP sem TLS
+* Check-in de agente sem API Key

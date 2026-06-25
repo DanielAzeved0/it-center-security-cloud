@@ -64,6 +64,12 @@ Recebe os dados enviados pelo agente PowerShell.
 POST /api/v1/agent/checkin
 ```
 
+Autenticação obrigatória:
+
+```http
+X-Agent-Api-Key: <agent_api_key>
+```
+
 Exemplo de envio:
 
 ```json
@@ -108,6 +114,29 @@ Resposta:
 }
 ```
 
+Efeitos de persistência:
+
+```text
+Cria ou atualiza a máquina em machines.
+Registra uma nova linha em metrics.
+Substitui o snapshot atual de installed_programs da máquina.
+Atualiza last_seen e status online da máquina.
+```
+
+Erros esperados:
+
+```json
+{
+  "detail": "Invalid or missing agent API key"
+}
+```
+
+```json
+{
+  "detail": "Invalid check-in payload"
+}
+```
+
 ---
 
 # Machines
@@ -133,6 +162,12 @@ Resposta:
     "last_seen": "2026-06-24T20:00:00"
   }
 ]
+```
+
+Origem dos dados:
+
+```text
+Tabela machines no PostgreSQL.
 ```
 
 ---
@@ -239,13 +274,19 @@ Resposta:
   {
     "id": 1,
     "machine_id": 1,
-    "event_type": "suspicious_software",
+    "event_type": "unauthorized_remote_access_tool",
     "severity": "medium",
     "source": "agent",
-    "description": "Software suspeito detectado: AnyDesk",
+    "description": "Ferramenta remota não autorizada detectada: AnyDesk",
     "created_at": "2026-06-24T20:00:00"
   }
 ]
+```
+
+Origem dos dados:
+
+```text
+Tabela security_events no PostgreSQL.
 ```
 
 ---
@@ -267,14 +308,20 @@ Resposta:
   {
     "id": 1,
     "machine_id": 1,
-    "alert_type": "suspicious_software",
+    "alert_type": "unauthorized_remote_access_tool",
     "severity": "medium",
     "status": "open",
-    "title": "Software suspeito detectado",
+    "title": "Ferramenta remota não autorizada",
     "description": "AnyDesk foi encontrado na máquina PC-FINANCEIRO-01",
     "created_at": "2026-06-24T20:00:00"
   }
 ]
+```
+
+Origem dos dados:
+
+```text
+Tabela alerts no PostgreSQL.
 ```
 
 ---
@@ -302,12 +349,19 @@ Resposta:
 
 ## Segurança
 
-No MVP inicial, a API pode funcionar sem login apenas em ambiente local/laboratório.
+No MVP inicial, endpoints administrativos podem funcionar sem login apenas em ambiente local/laboratório.
+
+O endpoint de check-in do agente deverá exigir API Key desde a primeira implementação.
+
+Header oficial:
+
+```text
+X-Agent-Api-Key
+```
 
 Antes de expor na internet, será obrigatório implementar:
 
 ```text
-API Key para agentes
 Autenticação no dashboard
 HTTPS
 Rate limit básico
@@ -335,7 +389,10 @@ Se last_seen for maior que 10 minutos:
 A API poderá gerar eventos quando detectar:
 
 ```text
-Software suspeito
+Ferramenta monitorada instalada
+Ferramenta remota não autorizada
+VPN não autorizada
+Torrent detectado
 Firewall desativado
 Defender desativado
 RDP habilitado
@@ -346,7 +403,11 @@ USB conectado
 
 ---
 
-# Softwares Suspeitos Iniciais
+# Softwares Monitorados Iniciais
+
+A classificação deve respeitar ASSET_POLICY.md antes de gerar alertas.
+
+Ferramentas de acesso remoto autorizadas devem gerar evento informativo, não alerta automático.
 
 ```text
 AnyDesk
@@ -354,8 +415,11 @@ TeamViewer
 UltraViewer
 RustDesk
 Hamachi
+ZeroTier
+Radmin VPN
 uTorrent
 BitTorrent
+qBittorrent
 ```
 
 ---
@@ -364,10 +428,10 @@ BitTorrent
 
 A API estará pronta para o MVP quando:
 
-* GET /health funcionar.
-* POST /agent/checkin receber dados.
+* GET /api/v1/health funcionar.
+* POST /api/v1/agent/checkin receber dados com API Key válida.
 * Dados forem salvos no PostgreSQL.
-* GET /machines listar máquinas.
-* GET /machines/{id} detalhar máquina.
-* GET /security-events listar eventos.
-* GET /alerts listar alertas.
+* GET /api/v1/machines listar máquinas.
+* GET /api/v1/machines/{id} detalhar máquina.
+* GET /api/v1/security-events listar eventos.
+* GET /api/v1/alerts listar alertas.

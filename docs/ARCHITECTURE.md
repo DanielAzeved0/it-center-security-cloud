@@ -202,6 +202,39 @@ Persistência
 
 ---
 
+# Persistência Atual
+
+O backend deve persistir dados no PostgreSQL por meio da camada `repositories`.
+
+No estágio atual:
+
+```text
+POST /api/v1/agent/checkin
+        ↓
+routes/agent.py
+        ↓
+services/agent.py
+        ↓
+repositories/machines.py
+        ↓
+PostgreSQL
+```
+
+Responsabilidades da integração:
+
+```text
+Atualizar ou criar máquina em machines
+Salvar coleta em metrics
+Substituir snapshot atual de installed_programs
+Ler máquinas em GET /api/v1/machines
+Ler alertas em GET /api/v1/alerts
+Ler eventos em GET /api/v1/security-events
+```
+
+Os repositórios em memória foram removidos da implementação principal.
+
+---
+
 ## Models
 
 Responsável por:

@@ -56,19 +56,27 @@ Criar API funcional.
 
 ### Tarefas
 
-[ ] Criar projeto FastAPI
+[x] Criar projeto FastAPI
 
-[ ] Configurar ambiente Python
+[x] Configurar ambiente Python
 
-[ ] Criar endpoint /health
+[x] Criar endpoint /health
 
-[ ] Criar endpoint /agent/checkin
+[x] Criar endpoint /agent/checkin
 
-[ ] Criar endpoint /machines
+[x] Criar endpoint /machines
 
-[ ] Criar endpoint /alerts
+[ ] Criar endpoint /machines/{id}
 
-[ ] Criar endpoint /security-events
+[ ] Criar endpoint /machines/{id}/metrics
+
+[ ] Criar endpoint /machines/{id}/programs
+
+[x] Criar endpoint /alerts
+
+[ ] Criar endpoint /alerts/{id}/resolve
+
+[x] Criar endpoint /security-events
 
 ---
 
@@ -80,21 +88,31 @@ Persistência de dados.
 
 ### Tarefas
 
-[ ] Criar PostgreSQL
+[x] Criar PostgreSQL
 
-[ ] Criar Docker para PostgreSQL
+[x] Criar Docker para PostgreSQL
 
-[ ] Criar tabela machines
+[x] Criar tabela machines
 
-[ ] Criar tabela metrics
+[x] Criar tabela metrics
 
-[ ] Criar tabela installed_programs
+[x] Criar tabela installed_programs
 
-[ ] Criar tabela security_events
+[x] Criar tabela security_events
 
-[ ] Criar tabela alerts
+[x] Criar tabela alerts
 
-[ ] Criar migrations
+[ ] Criar tabela agent_configs
+
+[x] Criar migrations
+
+[x] Integrar API ao PostgreSQL
+
+[x] Persistir check-in em machines, metrics e installed_programs
+
+[x] Ler machines, alerts e security_events do PostgreSQL
+
+[ ] Persistir agent_configs
 
 ---
 
@@ -106,25 +124,35 @@ Coleta de informações.
 
 ### Tarefas
 
-[ ] Criar estrutura do agente
+[x] Criar estrutura do agente
 
-[ ] Criar config.json
+[x] Criar config.json
 
-[ ] Coletar hostname
+[x] Coletar hostname
 
-[ ] Coletar usuário
+[x] Coletar usuário
 
-[ ] Coletar IP
+[x] Coletar IP
 
-[ ] Coletar CPU
+[x] Coletar sistema operacional
 
-[ ] Coletar RAM
+[x] Coletar programas instalados
 
-[ ] Coletar disco
+[ ] Coletar uptime
 
-[ ] Gerar JSON
+[x] Coletar CPU
 
-[ ] Enviar para API
+[x] Coletar RAM
+
+[x] Coletar disco
+
+[x] Gerar JSON
+
+[x] Enviar para API
+
+[ ] Cache offline
+
+[ ] Reenviar dados em caso de falha
 
 ---
 
