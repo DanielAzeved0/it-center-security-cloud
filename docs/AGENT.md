@@ -162,11 +162,12 @@ security
 
 Observações:
 
-* `installed_programs` ainda é enviado como lista vazia.
 * `installed_programs` agora é preenchido com o snapshot local dos programas instalados.
-* `security` usa valores padrão temporários até as coletas do EPIC 6.
+* O bloco `security` usa coletas reais do EPIC 6 para Firewall, Defender, RDP, administradores locais, USB e falhas de login.
 * O agente já envia o check-in para `POST /api/v1/agent/checkin`.
-* Se a API falhar, o agente registra aviso e mantém o JSON local.
+* O JSON do check-in é enviado como bytes UTF-8 para suportar nomes de programas com acentos e caracteres especiais.
+* Se a API falhar, o agente registra aviso e salva o JSON em `agent-windows/cache`.
+* No próximo ciclo, o agente tenta reenviar check-ins pendentes antes de enviar a coleta atual.
 * O agente já registra as coletas em `agent-windows/logs/itcenter-agent.log`.
 
 ## Testes atuais
@@ -187,6 +188,9 @@ Payload com campos obrigatórios
 JSON válido e parseável
 Requisicao POST com header X-Agent-Api-Key
 Body JSON enviado para /api/v1/agent/checkin
+Cache offline em arquivo JSON
+Reenvio de check-ins pendentes
+Coletas de seguranca do EPIC 6
 ```
 
 ---
@@ -208,3 +212,39 @@ O agente estará concluído quando:
 * Gerar JSON válido
 * Enviar para API
 * Operar offline temporariamente
+
+---
+
+# EPIC 6 - Coletas de Seguranca Implementadas
+
+Coletas implementadas:
+
+```text
+Firewall habilitado
+Windows Defender habilitado
+RDP habilitado
+Administradores locais
+Dispositivos USB de armazenamento
+Falhas de login na ultima hora
+```
+
+Campos enviados no bloco `security`:
+
+```text
+firewall_enabled
+defender_enabled
+rdp_enabled
+local_admins
+usb_devices
+failed_logins_last_hour
+```
+
+Estado atual:
+
+* `firewall_enabled` e coletado por `Get-NetFirewallProfile`.
+* `defender_enabled` e coletado por `Get-MpComputerStatus`.
+* `rdp_enabled` e coletado no registro `HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server`.
+* `local_admins` e coletado pelo grupo local de administradores via SID `S-1-5-32-544`.
+* `usb_devices` coleta metadados tecnicos de discos USB, sem ler conteudo de arquivos.
+* `failed_logins_last_hour` conta eventos 4625 no log Security da ultima hora; se o log nao estiver acessivel, retorna 0.
+* Os testes do agente validam as coletas do EPIC 6.

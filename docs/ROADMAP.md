@@ -50,6 +50,7 @@ installed_programs -> EPIC 3
 security_events -> EPIC 3
 alerts -> EPIC 3
 agent_configs -> EPIC 3
+machine_local_admins -> EPIC 6
 ```
 
 ## API
@@ -81,12 +82,26 @@ Envio para API -> EPIC 4
 Cache offline e reenvio -> EPIC 4
 ```
 
+## SOC Light
+
+`SOC_RULES.md`
+
+```text
+Firewall, Defender e RDP -> EPIC 6
+USB e falhas de login -> EPIC 6
+Administradores locais -> EPIC 6
+Ferramentas remotas, VPN e torrent -> EPIC 6
+Eventos e alertas -> EPIC 6
+```
+
 ## Decisões
 
 `DECISIONS.md`
 
 ```text
 ADR-013 -> mantém a integração direta FastAPI + PostgreSQL
+ADR-014 -> padroniza execução local integrada com Docker Compose
+ADR-015 -> padroniza gate de seguranca das imagens Docker
 ```
 
 ---
@@ -190,10 +205,18 @@ Entregas:
 * Defender
 * USB
 * RDP
+* Administradores locais
+* Ferramentas remotas
+* VPNs nao autorizadas
+* Torrent
 
 Resultado Esperado:
 
 Primeiros recursos SOC.
+
+Status:
+
+Concluido.
 
 ---
 

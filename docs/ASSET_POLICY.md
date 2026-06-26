@@ -52,17 +52,12 @@ Não fazem parte do padrão atual da operação.
 
 # VPNs
 
-## Em Avaliação
-
-* Tailscale
-
----
-
 ## Não Autorizadas
 
 * Hamachi
 * ZeroTier
 * Radmin VPN
+* Tailscale
 
 Motivo:
 

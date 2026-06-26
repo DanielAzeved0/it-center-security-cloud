@@ -34,6 +34,8 @@ $payload = New-AgentCheckinPayload
 $json = ConvertTo-AgentCheckinJson -Payload $payload
 $jsonPayload = $json | ConvertFrom-Json
 $capturedRequest = $null
+$resendRequestCount = 0
+$capturedResendRequests = @()
 $mockOsRegistry = [pscustomobject]@{
     ProductName = "Windows 11 Pro"
     DisplayVersion = "23H2"
@@ -57,6 +59,57 @@ $mockProgramRegistry = @(
     }
 )
 
+$mockFirewallProfilesEnabled = @(
+    [pscustomobject]@{ Name = "Domain"; Enabled = $true },
+    [pscustomobject]@{ Name = "Private"; Enabled = $true },
+    [pscustomobject]@{ Name = "Public"; Enabled = $true }
+)
+
+$mockFirewallProfilesDisabled = @(
+    [pscustomobject]@{ Name = "Domain"; Enabled = $true },
+    [pscustomobject]@{ Name = "Private"; Enabled = $false },
+    [pscustomobject]@{ Name = "Public"; Enabled = $true }
+)
+
+$mockDefenderEnabled = [pscustomobject]@{
+    AMServiceEnabled = $true
+    AntispywareEnabled = $true
+    RealTimeProtectionEnabled = $true
+}
+
+$mockDefenderDisabled = [pscustomobject]@{
+    AMServiceEnabled = $true
+    AntispywareEnabled = $true
+    RealTimeProtectionEnabled = $false
+}
+
+$mockRdpDisabledRegistry = [pscustomobject]@{
+    fDenyTSConnections = 1
+}
+
+$mockRdpEnabledRegistry = [pscustomobject]@{
+    fDenyTSConnections = 0
+}
+
+$mockLocalAdmins = @(
+    [pscustomobject]@{ Name = "DESKTOP\Administrator" },
+    [pscustomobject]@{ Name = "DOMAIN\Daniel" },
+    [pscustomobject]@{ Name = "DOMAIN\Daniel" }
+)
+
+$mockUsbDevices = @(
+    [pscustomobject]@{
+        Model = "Kingston DataTraveler"
+        Manufacturer = "Kingston"
+        SerialNumber = "USB123"
+    }
+)
+
+$mockFailedLogins = @(
+    [pscustomobject]@{ Id = 4625 },
+    [pscustomobject]@{ Id = 4625 }
+)
+
 function Invoke-TestRequest {
     param($RequestParams)
 
@@ -66,6 +119,19 @@ function Invoke-TestRequest {
         status = "success"
         message = "Check-in received"
         machine_id = 1
+    }
+}
+
+function Invoke-TestResendRequest {
+    param($RequestParams)
+
+    $script:resendRequestCount++
+    $script:capturedResendRequests += $RequestParams
+
+    [pscustomobject]@{
+        status = "success"
+        message = "Check-in received"
+        machine_id = $script:resendRequestCount
     }
 }
 
@@ -83,6 +149,46 @@ function Invoke-MockProgramRegistry {
     }
 
     @()
+}
+
+function Invoke-MockFirewallEnabled {
+    $script:mockFirewallProfilesEnabled
+}
+
+function Invoke-MockFirewallDisabled {
+    $script:mockFirewallProfilesDisabled
+}
+
+function Invoke-MockDefenderEnabled {
+    $script:mockDefenderEnabled
+}
+
+function Invoke-MockDefenderDisabled {
+    $script:mockDefenderDisabled
+}
+
+function Invoke-MockRdpDisabledRegistry {
+    param($Path)
+
+    $script:mockRdpDisabledRegistry
+}
+
+function Invoke-MockRdpEnabledRegistry {
+    param($Path)
+
+    $script:mockRdpEnabledRegistry
+}
+
+function Invoke-MockLocalAdmins {
+    $script:mockLocalAdmins
+}
+
+function Invoke-MockUsbDevices {
+    $script:mockUsbDevices
+}
+
+function Invoke-MockFailedLogins {
+    $script:mockFailedLogins
 }
 
 Assert-Percent -Value $cpuUsage -Name "CPU usage"
@@ -122,6 +228,26 @@ Assert-True -Condition ($programs.Count -eq 2) -Message "Installed programs must
 Assert-True -Condition ($programs[0].name -eq "AnyDesk" -or $programs[1].name -eq "AnyDesk") -Message "Installed programs must include AnyDesk."
 Assert-True -Condition ($programs[0].name -eq "Google Chrome" -or $programs[1].name -eq "Google Chrome") -Message "Installed programs must include Google Chrome."
 
+Assert-True -Condition (Get-AgentFirewallEnabled -FirewallProfileReader ${function:Invoke-MockFirewallEnabled}) -Message "Firewall must be enabled when all profiles are enabled."
+Assert-True -Condition (-not (Get-AgentFirewallEnabled -FirewallProfileReader ${function:Invoke-MockFirewallDisabled})) -Message "Firewall must be disabled when any profile is disabled."
+Assert-True -Condition (Get-AgentDefenderEnabled -DefenderStatusReader ${function:Invoke-MockDefenderEnabled}) -Message "Defender must be enabled when service, antispyware and realtime protection are enabled."
+Assert-True -Condition (-not (Get-AgentDefenderEnabled -DefenderStatusReader ${function:Invoke-MockDefenderDisabled})) -Message "Defender must be disabled when realtime protection is disabled."
+Assert-True -Condition (-not (Get-AgentRdpEnabled -RegistryReader ${function:Invoke-MockRdpDisabledRegistry})) -Message "RDP must be disabled when fDenyTSConnections is 1."
+Assert-True -Condition (Get-AgentRdpEnabled -RegistryReader ${function:Invoke-MockRdpEnabledRegistry}) -Message "RDP must be enabled when fDenyTSConnections is 0."
+
+$localAdmins = @(Get-AgentLocalAdmins -LocalAdminReader ${function:Invoke-MockLocalAdmins})
+Assert-True -Condition ($localAdmins.Count -eq 2) -Message "Local admins must be de-duplicated."
+Assert-True -Condition ($localAdmins -contains "DESKTOP\Administrator") -Message "Local admins must include local Administrator."
+Assert-True -Condition ($localAdmins -contains "DOMAIN\Daniel") -Message "Local admins must include domain admin."
+
+$usbDevices = @(Get-AgentUsbDevices -UsbDeviceReader ${function:Invoke-MockUsbDevices})
+Assert-True -Condition ($usbDevices.Count -eq 1) -Message "USB devices must be collected."
+Assert-True -Condition ($usbDevices[0].name -eq "Kingston DataTraveler") -Message "USB device model must be collected."
+Assert-True -Condition ($usbDevices[0].serial_number -eq "USB123") -Message "USB device serial number must be collected."
+
+$failedLogins = Get-AgentFailedLoginsLastHour -FailedLoginReader ${function:Invoke-MockFailedLogins}
+Assert-True -Condition ($failedLogins -eq 2) -Message "Failed login count must match mocked events."
+
 $mockPayload = [pscustomobject]@{
     hostname = $payload.hostname
     username = $payload.username
@@ -152,9 +278,42 @@ Assert-True -Condition ($capturedRequest.Headers["X-Agent-Api-Key"] -eq "test-ke
 Assert-True -Condition ($capturedRequest.ContentType -eq "application/json") -Message "Request must send JSON content type."
 Assert-True -Condition (-not [string]::IsNullOrWhiteSpace($capturedRequest.Body)) -Message "Request body is required."
 
-$sentPayload = $capturedRequest.Body | ConvertFrom-Json
+$sentBody = if ($capturedRequest.Body -is [byte[]]) {
+    [System.Text.Encoding]::UTF8.GetString($capturedRequest.Body)
+}
+else {
+    [string]$capturedRequest.Body
+}
+
+$sentPayload = $sentBody | ConvertFrom-Json
 Assert-True -Condition ($sentPayload.hostname -eq $payload.hostname) -Message "Sent payload hostname must match."
 Assert-True -Condition ($sentPayload.cpu_usage -eq $payload.cpu_usage) -Message "Sent payload CPU usage must match."
 Assert-True -Condition ($response.status -eq "success") -Message "Send-AgentCheckin should return API response."
+
+$tempCacheDirectory = Join-Path ([System.IO.Path]::GetTempPath()) "itcenter-agent-tests-$([guid]::NewGuid().ToString('N'))"
+New-Item -ItemType Directory -Path $tempCacheDirectory | Out-Null
+
+try {
+    $cacheFile = Save-AgentOfflinePayload -Payload $payload -CacheDirectory $tempCacheDirectory
+    Assert-True -Condition (Test-Path -LiteralPath $cacheFile) -Message "Offline payload must be cached."
+
+    $cachedPayload = Get-Content -LiteralPath $cacheFile -Raw | ConvertFrom-Json
+    Assert-True -Condition ($cachedPayload.hostname -eq $payload.hostname) -Message "Cached payload hostname must match."
+
+    $resentCount = Send-PendingAgentCheckins -Config ([pscustomobject]@{
+        server_url = "http://127.0.0.1:8000/api/v1"
+        api_key = "test-key"
+    }) -CacheDirectory $tempCacheDirectory -RequestInvoker ${function:Invoke-TestResendRequest}
+
+    Assert-True -Condition ($resentCount -eq 1) -Message "Pending cache resend count must be 1."
+    Assert-True -Condition ($resendRequestCount -eq 1) -Message "Pending cache must invoke one request."
+    Assert-True -Condition ($capturedResendRequests[0].Headers["X-Agent-Api-Key"] -eq "test-key") -Message "Pending resend must include agent API key header."
+    Assert-True -Condition (-not (Test-Path -LiteralPath $cacheFile)) -Message "Cached payload must be removed after successful resend."
+}
+finally {
+    if (Test-Path -LiteralPath $tempCacheDirectory) {
+        Remove-Item -LiteralPath $tempCacheDirectory -Recurse -Force
+    }
+}
 
 Write-Output "Agent tests passed."

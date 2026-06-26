@@ -162,6 +162,18 @@ app/
 └── core/
 ```
 
+Arquivos de runtime do backend:
+
+```text
+backend/
+├── Dockerfile
+├── apply_migrations.py
+├── requirements.txt
+└── migrations/
+```
+
+Quando o backend roda via Docker, `apply_migrations.py` executa as migrations SQL antes do Uvicorn iniciar.
+
 ---
 
 # Camadas Backend
@@ -226,6 +238,10 @@ Responsabilidades da integração:
 Atualizar ou criar máquina em machines
 Salvar coleta em metrics
 Substituir snapshot atual de installed_programs
+Sincronizar baseline de machine_local_admins
+Criar agent_configs padrao no primeiro check-in
+Gerar security_events conforme SOC_RULES.md
+Gerar alerts conforme SOC_RULES.md
 Ler máquinas em GET /api/v1/machines
 Ler alertas em GET /api/v1/alerts
 Ler eventos em GET /api/v1/security-events
@@ -297,6 +313,18 @@ publisher
 
 ---
 
+## machine_local_admins
+
+```text
+id
+machine_id
+admin_name
+first_seen_at
+last_seen_at
+```
+
+---
+
 ## security_events
 
 ```text
@@ -304,7 +332,9 @@ id
 machine_id
 event_type
 severity
+source
 description
+raw_data
 created_at
 ```
 
@@ -316,8 +346,28 @@ created_at
 id
 machine_id
 alert_type
+severity
 status
+title
+description
 created_at
+resolved_at
+```
+
+---
+
+## agent_configs
+
+```text
+id
+machine_id
+agent_version
+checkin_interval_minutes
+collect_inventory
+collect_security
+collect_metrics
+created_at
+updated_at
 ```
 
 ---
@@ -344,7 +394,8 @@ Retorno:
 
 ```json
 {
-  "status": "healthy"
+  "status": "healthy",
+  "service": "it-center-security-cloud"
 }
 ```
 
@@ -423,7 +474,7 @@ Tecnologia:
 
 * Next.js
 * TypeScript
-* TailwindCSS
+* CSS global proprio
 
 ---
 
@@ -436,10 +487,33 @@ dashboard/
 
 ├── app/
 ├── components/
-├── services/
-├── hooks/
-├── types/
-└── pages/
+├── lib/
+├── public/
+├── Dockerfile
+├── package.json
+└── next.config.mjs
+```
+
+O dashboard consome o backend por um proxy interno:
+
+```text
+Browser
+    ->
+Next.js /api/backend/...
+    ->
+FastAPI /api/v1/...
+```
+
+Em Docker Compose, o proxy usa:
+
+```text
+ITCENTER_API_BASE_URL=http://backend:8000
+```
+
+Em execucao local fora do Docker, o valor padrao e:
+
+```text
+http://127.0.0.1:8000
 ```
 
 ---
@@ -536,14 +610,35 @@ Nginx
 
 # Docker Compose
 
-Containers iniciais:
+Containers locais:
 
 ```text
-backend
 postgres
+backend
 frontend
-nginx
 ```
+
+Fluxo local:
+
+```text
+docker compose
+    ->
+postgres fica healthy
+    ->
+backend aplica migrations e inicia FastAPI
+    ->
+frontend inicia Next.js apontando para backend
+```
+
+Portas locais:
+
+```text
+frontend: 127.0.0.1:3000
+backend: 127.0.0.1:8000
+postgres: 127.0.0.1:5432
+```
+
+Nginx permanece planejado para producao/cloud, conforme DEPLOYMENT.md.
 
 ---
 

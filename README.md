@@ -2,7 +2,7 @@
 
 > Plataforma full stack para monitoramento, inventário, observabilidade e segurança de máquinas Windows, com agente PowerShell, API FastAPI, PostgreSQL, dashboard web e práticas iniciais de SOC/Blue Team.
 
-Status: Em planejamento técnico | Documentação base criada | MVP em preparação.
+Status: EPICs 1 a 6 concluídos | Ambiente local Docker operacional | Próxima fase: EPIC 7 - Produção.
 
 ---
 
@@ -265,33 +265,54 @@ Manter o MVP com custo zero.
 
 ## Como Executar
 
-Em desenvolvimento.
-
-Fluxo planejado:
+Fluxo local recomendado:
 
 ```bash
 git clone <repo-url>
 cd it-center-security-cloud
 cp .env.example .env
-docker compose up -d
+docker compose -f infra/docker-compose.yml up --build
 ```
 
-Backend previsto:
+No Windows, se o terminal estiver em `C:\Users\Famili Azevedo`, entre na raiz do projeto antes:
 
-```text
-http://localhost:8000
+```powershell
+cd "C:\Users\Famili Azevedo\Desktop\it-center-security-cloud"
+docker compose -f infra/docker-compose.yml up --build
 ```
 
-Health check previsto:
+Em segundo plano:
 
-```text
-GET /api/v1/health
+```bash
+docker compose -f infra/docker-compose.yml up --build -d
 ```
 
-Dashboard previsto:
+Servicos iniciados:
 
 ```text
-http://localhost:3000
+postgres
+backend
+frontend
+```
+
+URLs locais:
+
+```text
+Dashboard: http://127.0.0.1:3000
+Backend:   http://127.0.0.1:8000/api/v1/health
+Postgres:  127.0.0.1:5432
+```
+
+Parar:
+
+```bash
+docker compose -f infra/docker-compose.yml down
+```
+
+Parar e apagar dados locais do banco:
+
+```bash
+docker compose -f infra/docker-compose.yml down -v
 ```
 
 ---

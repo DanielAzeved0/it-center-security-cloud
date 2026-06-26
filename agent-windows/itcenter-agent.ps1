@@ -286,6 +286,147 @@ function Get-InstalledPrograms {
         }
 }
 
+function Get-AgentFirewallEnabled {
+    param(
+        [scriptblock]$FirewallProfileReader = {
+            if (Get-Command -Name Get-NetFirewallProfile -ErrorAction SilentlyContinue) {
+                Get-NetFirewallProfile -ErrorAction SilentlyContinue
+            }
+        }
+    )
+
+    $profiles = @(& $FirewallProfileReader | Where-Object { $null -ne $_ })
+
+    if ($profiles.Count -eq 0) {
+        return $false
+    }
+
+    $disabledProfiles = @($profiles | Where-Object { $_.Enabled -ne $true })
+    $disabledProfiles.Count -eq 0
+}
+
+function Get-AgentDefenderEnabled {
+    param(
+        [scriptblock]$DefenderStatusReader = {
+            if (Get-Command -Name Get-MpComputerStatus -ErrorAction SilentlyContinue) {
+                Get-MpComputerStatus -ErrorAction SilentlyContinue
+            }
+        }
+    )
+
+    $status = & $DefenderStatusReader
+
+    if ($null -eq $status) {
+        return $false
+    }
+
+    $serviceEnabled = $status.AMServiceEnabled -eq $true
+    $antispywareEnabled = $status.AntispywareEnabled -eq $true
+    $realtimeEnabled = $status.RealTimeProtectionEnabled -eq $true
+
+    $serviceEnabled -and $antispywareEnabled -and $realtimeEnabled
+}
+
+function Get-AgentRdpEnabled {
+    param(
+        [scriptblock]$RegistryReader = {
+            param($Path)
+            Get-ItemProperty -Path $Path -ErrorAction SilentlyContinue
+        }
+    )
+
+    $terminalServer = & $RegistryReader "HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server"
+
+    if ($null -eq $terminalServer -or $null -eq $terminalServer.fDenyTSConnections) {
+        return $false
+    }
+
+    [int]$terminalServer.fDenyTSConnections -eq 0
+}
+
+function Get-AgentLocalAdmins {
+    param(
+        [scriptblock]$LocalAdminReader = {
+            $hasLocalGroup = $null -ne (Get-Command -Name Get-LocalGroup -ErrorAction SilentlyContinue)
+            $hasLocalGroupMember = $null -ne (Get-Command -Name Get-LocalGroupMember -ErrorAction SilentlyContinue)
+
+            if ($hasLocalGroup -and $hasLocalGroupMember) {
+                $adminGroup = Get-LocalGroup -SID "S-1-5-32-544" -ErrorAction SilentlyContinue
+
+                if ($null -ne $adminGroup) {
+                    Get-LocalGroupMember -Group $adminGroup.Name -ErrorAction SilentlyContinue
+                }
+            }
+        }
+    )
+
+    $admins = @(& $LocalAdminReader | Where-Object { $null -ne $_ })
+
+    $admins |
+        ForEach-Object {
+            if (-not [string]::IsNullOrWhiteSpace($_.Name)) {
+                [string]$_.Name
+            }
+            elseif (-not [string]::IsNullOrWhiteSpace($_)) {
+                [string]$_
+            }
+        } |
+        Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+        ForEach-Object { $_.Trim() } |
+        Sort-Object -Unique
+}
+
+function Get-AgentUsbDevices {
+    param(
+        [scriptblock]$UsbDeviceReader = {
+            Get-CimInstance -ClassName Win32_DiskDrive -ErrorAction SilentlyContinue |
+                Where-Object { $_.InterfaceType -eq "USB" }
+        }
+    )
+
+    $devices = @(& $UsbDeviceReader | Where-Object { $null -ne $_ })
+
+    $devices |
+        ForEach-Object {
+            [ordered]@{
+                name = if ([string]::IsNullOrWhiteSpace($_.Model)) { "USB storage device" } else { [string]$_.Model.Trim() }
+                manufacturer = if ([string]::IsNullOrWhiteSpace($_.Manufacturer)) { $null } else { [string]$_.Manufacturer.Trim() }
+                serial_number = if ([string]::IsNullOrWhiteSpace($_.SerialNumber)) { $null } else { [string]$_.SerialNumber.Trim() }
+            }
+        }
+}
+
+function Get-AgentFailedLoginsLastHour {
+    param(
+        [scriptblock]$FailedLoginReader = {
+            Get-WinEvent -FilterHashtable @{
+                LogName = "Security"
+                Id = 4625
+                StartTime = (Get-Date).AddHours(-1)
+            } -ErrorAction SilentlyContinue
+        }
+    )
+
+    try {
+        $events = @(& $FailedLoginReader | Where-Object { $null -ne $_ })
+        return $events.Count
+    }
+    catch {
+        return 0
+    }
+}
+
+function Get-AgentSecurityPayload {
+    [ordered]@{
+        firewall_enabled = Get-AgentFirewallEnabled
+        defender_enabled = Get-AgentDefenderEnabled
+        rdp_enabled = Get-AgentRdpEnabled
+        local_admins = @(Get-AgentLocalAdmins)
+        usb_devices = @(Get-AgentUsbDevices)
+        failed_logins_last_hour = Get-AgentFailedLoginsLastHour
+    }
+}
+
 function New-AgentCheckinPayload {
     $hostname = Get-AgentHostname
     $username = Get-AgentUsername
@@ -296,6 +437,7 @@ function New-AgentCheckinPayload {
     $diskUsage = Get-AgentDiskUsage
     $uptimeSeconds = Get-AgentUptimeSeconds
     $installedPrograms = @(Get-InstalledPrograms)
+    $securityPayload = Get-AgentSecurityPayload
 
     [ordered]@{
         hostname = $hostname
@@ -308,14 +450,7 @@ function New-AgentCheckinPayload {
         disk_usage = $diskUsage
         uptime_seconds = $uptimeSeconds
         installed_programs = $installedPrograms
-        security = [ordered]@{
-            firewall_enabled = $true
-            defender_enabled = $true
-            rdp_enabled = $false
-            local_admins = @()
-            usb_devices = @()
-            failed_logins_last_hour = 0
-        }
+        security = $securityPayload
     }
 }
 
@@ -326,6 +461,30 @@ function ConvertTo-AgentCheckinJson {
     )
 
     $Payload | ConvertTo-Json -Depth 8
+}
+
+function Get-AgentCacheDirectory {
+    Join-Path $PSScriptRoot "cache"
+}
+
+function Save-AgentOfflinePayload {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object]$Payload,
+        [string]$CacheDirectory = (Get-AgentCacheDirectory)
+    )
+
+    if (-not (Test-Path -LiteralPath $CacheDirectory)) {
+        New-Item -ItemType Directory -Path $CacheDirectory | Out-Null
+    }
+
+    $timestamp = (Get-Date).ToUniversalTime().ToString("yyyyMMddHHmmssfff")
+    $fileName = "checkin-$timestamp-$([guid]::NewGuid().ToString('N')).json"
+    $cacheFile = Join-Path $CacheDirectory $fileName
+
+    ConvertTo-AgentCheckinJson -Payload $Payload | Set-Content -LiteralPath $cacheFile -Encoding UTF8
+
+    $cacheFile
 }
 
 function Send-AgentCheckin {
@@ -349,6 +508,9 @@ function Send-AgentCheckin {
     }
 
     $baseUrl = $Config.server_url.TrimEnd("/")
+    $jsonBody = ConvertTo-AgentCheckinJson -Payload $Payload
+    $utf8Body = [System.Text.Encoding]::UTF8.GetBytes($jsonBody)
+
     $requestParams = @{
         Uri = "$baseUrl/agent/checkin"
         Method = "Post"
@@ -356,11 +518,45 @@ function Send-AgentCheckin {
             "X-Agent-Api-Key" = $Config.api_key
         }
         ContentType = "application/json"
-        Body = (ConvertTo-AgentCheckinJson -Payload $Payload)
+        Body = $utf8Body
         ErrorAction = "Stop"
     }
 
     & $RequestInvoker $requestParams
+}
+
+function Send-PendingAgentCheckins {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object]$Config,
+        [string]$CacheDirectory = (Get-AgentCacheDirectory),
+        [scriptblock]$RequestInvoker = {
+            param($RequestParams)
+            Invoke-RestMethod @RequestParams
+        }
+    )
+
+    if (-not (Test-Path -LiteralPath $CacheDirectory)) {
+        return 0
+    }
+
+    $sentCount = 0
+    $pendingFiles = @(Get-ChildItem -LiteralPath $CacheDirectory -Filter "checkin-*.json" -File | Sort-Object LastWriteTimeUtc, Name)
+
+    foreach ($pendingFile in $pendingFiles) {
+        try {
+            $pendingPayload = Get-Content -LiteralPath $pendingFile.FullName -Raw | ConvertFrom-Json
+            Send-AgentCheckin -Config $Config -Payload $pendingPayload -RequestInvoker $RequestInvoker | Out-Null
+            Remove-Item -LiteralPath $pendingFile.FullName
+            $sentCount++
+        }
+        catch {
+            Write-AgentLog -Message "Failed to resend cached check-in $($pendingFile.Name): $($_.Exception.Message)" -Level "WARN"
+            break
+        }
+    }
+
+    $sentCount
 }
 
 function Start-ItCenterAgent {
@@ -384,7 +580,18 @@ function Start-ItCenterAgent {
     Write-AgentLog -Message "RAM usage collected: $($payload.ram_usage)%"
     Write-AgentLog -Message "Disk usage collected: $($payload.disk_usage)%"
     Write-AgentLog -Message "Installed programs collected: $($payload.installed_programs.Count)"
+    Write-AgentLog -Message "Security posture collected. Firewall: $($payload.security.firewall_enabled), Defender: $($payload.security.defender_enabled), RDP: $($payload.security.rdp_enabled)"
     Write-AgentLog -Message "Check-in JSON generated."
+
+    try {
+        $resentCount = Send-PendingAgentCheckins -Config $config
+        if ($resentCount -gt 0) {
+            Write-AgentLog -Message "Cached check-ins resent: $resentCount"
+        }
+    }
+    catch {
+        Write-AgentLog -Message "Pending cached check-ins were not fully resent: $($_.Exception.Message)" -Level "WARN"
+    }
 
     try {
         $response = Send-AgentCheckin -Config $config -Payload $payload
@@ -393,6 +600,8 @@ function Start-ItCenterAgent {
     }
     catch {
         Write-AgentLog -Message "Failed to send check-in: $($_.Exception.Message)" -Level "WARN"
+        $cacheFile = Save-AgentOfflinePayload -Payload $payload
+        Write-AgentLog -Message "Check-in cached locally: $cacheFile" -Level "WARN"
         Write-Output (ConvertTo-AgentCheckinJson -Payload $payload)
     }
 }

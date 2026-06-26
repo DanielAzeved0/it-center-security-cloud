@@ -10,6 +10,7 @@ def clean_database():
             connection.execute(
                 """
                 TRUNCATE TABLE
+                    machine_local_admins,
                     agent_configs,
                     alerts,
                     security_events,

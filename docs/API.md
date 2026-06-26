@@ -104,6 +104,23 @@ Exemplo de envio:
 }
 ```
 
+Efeitos SOC atuais:
+
+```text
+security.firewall_enabled = false -> security_event firewall_disabled + alerta high
+security.defender_enabled = false -> security_event defender_disabled + alerta high
+security.rdp_enabled = true -> security_event rdp_enabled; alerta medium se a maquina nao estiver autorizada em ASSET_POLICY.md
+security.local_admins com novo admin apos baseline -> security_event new_admin_user + alerta high
+security.usb_devices preenchido -> security_event usb_detected low
+security.failed_logins_last_hour > 5 -> security_event failed_login + alerta medium
+installed_programs com RustDesk -> security_event remote_access_tool_detected low
+installed_programs com AnyDesk, TeamViewer ou UltraViewer -> security_event unauthorized_remote_access_tool + alerta medium
+installed_programs com Hamachi, ZeroTier, Radmin VPN ou Tailscale -> security_event unauthorized_vpn_tool + alerta high
+installed_programs com uTorrent, BitTorrent ou qBittorrent -> security_event torrent_software_detected + alerta high
+```
+
+Alertas abertos nao sao duplicados para a mesma maquina e mesmo tipo. Novos eventos continuam sendo registrados a cada check-in que mantiver o estado de risco.
+
 Resposta:
 
 ```json
@@ -120,6 +137,7 @@ Efeitos de persistência:
 Cria ou atualiza a máquina em machines.
 Registra uma nova linha em metrics.
 Substitui o snapshot atual de installed_programs da máquina.
+Cria agent_configs padrão para a máquina quando ainda não existir.
 Atualiza last_seen e status online da máquina.
 ```
 
@@ -131,11 +149,7 @@ Erros esperados:
 }
 ```
 
-```json
-{
-  "detail": "Invalid check-in payload"
-}
-```
+Payload invalido retorna `422 Unprocessable Entity` com a lista de campos invalidados pelo FastAPI/Pydantic.
 
 ---
 
@@ -433,5 +447,8 @@ A API estará pronta para o MVP quando:
 * Dados forem salvos no PostgreSQL.
 * GET /api/v1/machines listar máquinas.
 * GET /api/v1/machines/{id} detalhar máquina.
+* GET /api/v1/machines/{id}/metrics listar métricas da máquina.
+* GET /api/v1/machines/{id}/programs listar programas da máquina.
 * GET /api/v1/security-events listar eventos.
 * GET /api/v1/alerts listar alertas.
+* PATCH /api/v1/alerts/{id}/resolve resolver alertas.

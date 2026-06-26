@@ -420,6 +420,106 @@ Impactos:
 
 ---
 
+# ADR-014
+
+## Data
+
+2026-06-25
+
+## Decisão
+
+Rodar o ambiente local completo com Docker Compose, incluindo PostgreSQL, backend FastAPI e frontend Next.js.
+
+O backend deverá aplicar as migrations automaticamente antes de iniciar a API quando executado em container.
+
+## Motivo
+
+Durante a execução local, rodar banco, migration, backend e dashboard manualmente gerou atrito e erros de ambiente, como:
+
+* `psql` ausente no Windows.
+* `python` sem alias no CMD.
+* backend desligado enquanto o dashboard tentava consumir a API.
+* necessidade de lembrar a ordem correta de inicialização.
+
+O Compose reduz esse atrito e mantém o fluxo coerente com a stack oficial já aprovada no ADR-007.
+
+## Alternativas Avaliadas
+
+* Continuar com execução manual de cada serviço.
+* Criar scripts `.cmd` locais.
+* Rodar apenas o PostgreSQL em Docker.
+* Rodar PostgreSQL, backend e frontend em Docker Compose.
+
+## Resultado
+
+Usar `infra/docker-compose.yml` como entrada principal para desenvolvimento local integrado.
+
+Comando oficial local:
+
+```powershell
+docker compose -f infra/docker-compose.yml up --build
+```
+
+Impactos:
+
+* Menos dependência de Python, Node e psql instalados no host.
+* Migrations aplicadas de forma previsível no startup do backend.
+* Dashboard aponta para o backend pelo DNS interno `backend`.
+* Nginx continua reservado para produção/cloud, não para o fluxo local inicial.
+
+---
+
+# ADR-015
+
+## Data
+
+2026-06-25
+
+## Decisao
+
+Adotar Docker Scout como gate de seguranca para imagens locais e tratar vulnerabilidades critical/high antes de publicar o ambiente.
+
+O backend passa a usar `python:3.14-alpine`.
+
+O frontend passa a usar Next.js `16.2.9`, `picomatch` `4.0.4` fixo e um patch de build para substituir o `picomatch` compilado dentro do Next quando necessario.
+
+A imagem final do frontend remove o `npm` global e inicia o Next.js diretamente com `node`, porque o Docker Scout detectava `picomatch 4.0.3` dentro das dependencias internas do npm empacotado pela imagem base `node:22-alpine`.
+
+O PostgreSQL permanece em `postgres:16-alpine`, com risco residual documentado quando a CVE vier da imagem oficial e ainda nao houver tag corrigida.
+
+## Motivo
+
+As varreduras iniciais apontaram:
+
+* `infra-backend:latest` com CVEs critical/high vindas da base Debian.
+* `infra-frontend:latest` com CVEs high em Next.js e `picomatch`.
+* `postgres:16-alpine` com CVE residual em pacote da imagem oficial.
+
+Como o produto e de seguranca, imagens com vulnerabilidades corrigiveis nao devem ser normalizadas no fluxo de desenvolvimento.
+
+## Alternativas Avaliadas
+
+* Ignorar alertas ate o deploy em cloud.
+* Usar `npm audit fix --force`.
+* Trocar backend para base Alpine.
+* Atualizar dependencias diretas e documentar risco residual de imagem oficial.
+
+## Resultado
+
+* Backend migrou para Alpine e deve ficar sem critical/high no Scout.
+* Frontend atualizou Next.js e corrige `picomatch` no build.
+* Frontend remove `npm` global da imagem final para eliminar dependencias de build/runtime nao usadas.
+* `npm audit fix --force` nao sera usado sem revisao.
+* CVE residual de imagem oficial sera acompanhada como P1 e registrada em `docs/SECURITY.md`.
+
+Impactos:
+
+* Build fica mais rigoroso.
+* O patch do frontend deve ser removido futuramente quando o Next empacotar `picomatch` corrigido diretamente.
+* O deploy externo passa a depender do gate de imagens descrito em `docs/DEPLOYMENT.md`.
+
+---
+
 ## ADR-XXX
 
 ### Data

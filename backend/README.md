@@ -1,14 +1,50 @@
 # Backend
 
-API do IT Center Security Cloud construída com Python e FastAPI.
+API do IT Center Security Cloud construida com Python e FastAPI.
 
-## Requisitos
+## Execucao recomendada
 
-```text
-Python 3.14+
+Use o Docker Compose da raiz do projeto:
+
+```powershell
+docker compose -f infra/docker-compose.yml up --build
 ```
 
-## Configuração local
+O container do backend:
+
+```text
+1. Instala as dependencias da imagem.
+2. Executa python apply_migrations.py.
+3. Inicia uvicorn app.main:app em 0.0.0.0:8000.
+```
+
+Health check:
+
+```text
+GET http://127.0.0.1:8000/api/v1/health
+```
+
+## Arquivos de runtime
+
+```text
+backend/Dockerfile
+backend/apply_migrations.py
+backend/migrations/
+backend/requirements.txt
+```
+
+## Variaveis
+
+```text
+AGENT_API_KEY
+DATABASE_URL
+```
+
+No Docker Compose, `DATABASE_URL` aponta para o servico interno `postgres`.
+
+## Execucao manual
+
+Use apenas quando precisar depurar fora do container.
 
 ```powershell
 cd backend
@@ -18,16 +54,16 @@ python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 ```
 
-## Execução
+Aplicar migrations:
+
+```powershell
+python apply_migrations.py
+```
+
+Subir API:
 
 ```powershell
 $env:AGENT_API_KEY="change-me"
 $env:DATABASE_URL="postgresql://itcenter:change-me@127.0.0.1:5432/it_center_security_cloud"
-uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
-```
-
-Health check:
-
-```text
-GET http://127.0.0.1:8000/api/v1/health
+python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```

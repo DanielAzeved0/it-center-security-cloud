@@ -48,6 +48,10 @@ installed_programs
 
 machines
    ↓
+machine_local_admins
+
+machines
+   ↓
 security_events
 
 machines
@@ -141,6 +145,29 @@ updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 * A data installed_at é opcional porque nem todo Windows informa essa data de forma confiável.
 * Será usada para detectar softwares monitorados conforme ASSET_POLICY.md e SOC_RULES.md.
 * Não deve existir duplicidade de name e version para a mesma máquina.
+
+---
+
+# Tabela: machine_local_admins
+
+Armazena o baseline conhecido de administradores locais por maquina.
+
+## Campos
+
+```text
+id BIGSERIAL PRIMARY KEY
+machine_id BIGINT NOT NULL REFERENCES machines(id) ON DELETE CASCADE
+admin_name VARCHAR(255) NOT NULL
+first_seen_at TIMESTAMPTZ NOT NULL DEFAULT now()
+last_seen_at TIMESTAMPTZ NOT NULL DEFAULT now()
+```
+
+## Regras
+
+* Relacionada com a maquina.
+* Usada para detectar novos administradores locais apos o primeiro baseline.
+* O primeiro check-in estabelece o baseline e nao gera alerta para todos os administradores existentes.
+* Nao deve existir duplicidade de admin_name para a mesma maquina.
 
 ---
 
@@ -282,6 +309,13 @@ INDEX machine_id
 UNIQUE machine_id, name, version
 ```
 
+## machine_local_admins
+
+```text
+INDEX machine_id
+UNIQUE machine_id, admin_name
+```
+
 ## security_events
 
 ```text
@@ -322,6 +356,16 @@ Uma máquina pode ter muitos programas instalados.
 
 ```text
 machines.id = installed_programs.machine_id
+```
+
+---
+
+## machines -> machine_local_admins
+
+Uma maquina pode ter muitos administradores locais conhecidos.
+
+```text
+machines.id = machine_local_admins.machine_id
 ```
 
 ---
@@ -372,6 +416,8 @@ Quando `POST /api/v1/agent/checkin` recebe payload válido:
 5. Insere uma nova coleta em metrics.
 6. Remove os programas anteriores da máquina em installed_programs.
 7. Insere o snapshot atual de installed_programs recebido no payload.
+8. Sincroniza machine_local_admins para detectar novos administradores locais.
+9. Gera security_events e alerts conforme SOC_RULES.md.
 ```
 
 ## Consultas
@@ -399,6 +445,46 @@ postgresql://itcenter:change-me@127.0.0.1:5432/it_center_security_cloud
 ## Testes
 
 Os testes de backend limpam as tabelas com `TRUNCATE ... RESTART IDENTITY CASCADE` antes de cada cenário.
+
+---
+
+# Migrations
+
+As migrations ficam em:
+
+```text
+backend/migrations/
+```
+
+Migration inicial:
+
+```text
+backend/migrations/001_initial_schema.sql
+```
+
+## Execucao via Docker
+
+Quando o backend roda pelo Docker Compose, o container executa:
+
+```text
+python apply_migrations.py
+```
+
+antes de iniciar:
+
+```text
+uvicorn app.main:app
+```
+
+Isso garante que o PostgreSQL tenha o schema esperado antes da API receber requisicoes.
+
+## Regras das migrations
+
+* Migrations devem ser versionadas em `backend/migrations`.
+* Scripts devem ser seguros para execucao repetida quando possivel.
+* Tabelas, indices e constraints devem continuar alinhados com este documento.
+* Triggers criados por migrations devem usar `DROP TRIGGER IF EXISTS` antes de `CREATE TRIGGER` quando a migration puder ser reaplicada.
+* Nenhum secret deve ser gravado em migration.
 
 ---
 
@@ -475,6 +561,7 @@ O banco inicial estará pronto quando existirem as tabelas:
 * machines
 * metrics
 * installed_programs
+* machine_local_admins
 * security_events
 * alerts
 * agent_configs

@@ -12,3 +12,8 @@ class AlertSummary(BaseModel):
     title: str = Field(..., min_length=1, max_length=255)
     description: str = Field(..., min_length=1)
     created_at: datetime
+
+
+class AlertResolveResponse(BaseModel):
+    status: str
+    message: str

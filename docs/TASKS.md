@@ -66,15 +66,15 @@ Criar API funcional.
 
 [x] Criar endpoint /machines
 
-[ ] Criar endpoint /machines/{id}
+[x] Criar endpoint /machines/{id}
 
-[ ] Criar endpoint /machines/{id}/metrics
+[x] Criar endpoint /machines/{id}/metrics
 
-[ ] Criar endpoint /machines/{id}/programs
+[x] Criar endpoint /machines/{id}/programs
 
 [x] Criar endpoint /alerts
 
-[ ] Criar endpoint /alerts/{id}/resolve
+[x] Criar endpoint /alerts/{id}/resolve
 
 [x] Criar endpoint /security-events
 
@@ -102,7 +102,7 @@ Persistência de dados.
 
 [x] Criar tabela alerts
 
-[ ] Criar tabela agent_configs
+[x] Criar tabela agent_configs
 
 [x] Criar migrations
 
@@ -112,7 +112,7 @@ Persistência de dados.
 
 [x] Ler machines, alerts e security_events do PostgreSQL
 
-[ ] Persistir agent_configs
+[x] Persistir agent_configs
 
 ---
 
@@ -138,7 +138,7 @@ Coleta de informações.
 
 [x] Coletar programas instalados
 
-[ ] Coletar uptime
+[x] Coletar uptime
 
 [x] Coletar CPU
 
@@ -150,9 +150,9 @@ Coleta de informações.
 
 [x] Enviar para API
 
-[ ] Cache offline
+[x] Cache offline
 
-[ ] Reenviar dados em caso de falha
+[x] Reenviar dados em caso de falha
 
 ---
 
@@ -164,17 +164,17 @@ Visualização inicial.
 
 ### Tarefas
 
-[ ] Criar projeto Next.js
+[x] Criar projeto Next.js
 
-[ ] Criar tela Dashboard
+[x] Criar tela Dashboard
 
-[ ] Criar tela Máquinas
+[x] Criar tela Máquinas
 
-[ ] Criar tela Alertas
+[x] Criar tela Alertas
 
-[ ] Criar tela Segurança
+[x] Criar tela Segurança
 
-[ ] Consumir API
+[x] Consumir API
 
 ---
 
@@ -186,21 +186,21 @@ Primeiras detecções.
 
 ### Tarefas
 
-[ ] Detectar Firewall
+[x] Detectar Firewall
 
-[ ] Detectar Defender
+[x] Detectar Defender
 
-[ ] Detectar RDP
+[x] Detectar RDP
 
-[ ] Detectar USB
+[x] Detectar USB
 
-[ ] Detectar Administradores Locais
+[x] Detectar Administradores Locais
 
-[ ] Detectar Ferramentas Remotas
+[x] Detectar Ferramentas Remotas
 
-[ ] Gerar Eventos
+[x] Gerar Eventos
 
-[ ] Gerar Alertas
+[x] Gerar Alertas
 
 ---
 

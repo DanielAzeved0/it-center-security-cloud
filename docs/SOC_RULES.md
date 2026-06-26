@@ -36,7 +36,7 @@ MEDIUM
 
 Condição:
 
-Mais de 5 falhas de login em 5 minutos.
+Mais de 5 falhas de login na ultima hora.
 
 Ação:
 
@@ -306,3 +306,37 @@ Registrar ocorrência.
 * Vulnerability Correlation
 * Active Directory Monitoring
 * Microsoft 365 Monitoring
+
+---
+
+# Status de Implementacao - EPIC 6
+
+Regras implementadas:
+
+```text
+failed_login
+new_admin_user
+firewall_disabled
+defender_disabled
+rdp_enabled
+usb_detected
+remote_access_tool_detected
+unauthorized_remote_access_tool
+unauthorized_vpn_tool
+torrent_software_detected
+```
+
+Comportamento atual:
+
+* `firewall_disabled`: gerado quando `security.firewall_enabled` vem `false`; severidade `high`; gera alerta aberto.
+* `defender_disabled`: gerado quando `security.defender_enabled` vem `false`; severidade `high`; gera alerta aberto.
+* `rdp_enabled`: gerado quando `security.rdp_enabled` vem `true`; gera alerta `medium` quando a maquina nao estiver autorizada em ASSET_POLICY.md.
+* `usb_detected`: gerado para cada dispositivo USB reportado; severidade `low`; nao gera alerta.
+* `new_admin_user`: gerado quando surge administrador local novo apos o baseline inicial; severidade `high`; gera alerta aberto.
+* `failed_login`: gerado quando `failed_logins_last_hour` for maior que 5; severidade `medium`; gera alerta aberto.
+* `remote_access_tool_detected`: gerado para RustDesk; severidade `low`; nao gera alerta.
+* `unauthorized_remote_access_tool`: gerado para AnyDesk, TeamViewer e UltraViewer; severidade `medium`; gera alerta aberto.
+* `unauthorized_vpn_tool`: gerado para Hamachi, ZeroTier, Radmin VPN e Tailscale; severidade `high`; gera alerta aberto.
+* `torrent_software_detected`: gerado para uTorrent, BitTorrent e qBittorrent; severidade `high`; gera alerta aberto.
+* Alertas abertos nao sao duplicados para a mesma maquina e mesmo tipo.
+* Eventos continuam sendo registrados a cada check-in em estado de risco.
