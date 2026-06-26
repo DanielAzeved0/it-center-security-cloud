@@ -166,7 +166,7 @@ P2:
 
 Backend:
 
-* Base alterada para `python:3.14-alpine`.
+* Base alterada para `python:3.13-alpine`.
 * Resultado esperado no Docker Scout: zero vulnerabilidades critical/high.
 
 Frontend:

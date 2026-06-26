@@ -39,12 +39,14 @@ Estrutura oficial do host:
 
 ```text
 /opt/itcenter/
-├── app/       # clone do repositório e arquivos de deploy versionados
-├── backups/   # dumps e artefatos de backup
-├── configs/   # configurações operacionais externas ao Git, quando necessário
-├── logs/      # logs operacionais do host; containers devem priorizar stdout/stderr
-├── scripts/   # automações operacionais do host
-└── secrets/   # segredos operacionais externos ao Git, quando necessário
+|-- app/       # clone do repositorio e arquivos de deploy versionados
+|-- backups/   # dumps e artefatos de backup
+|-- configs/   # configuracoes operacionais externas ao Git, quando necessario
+|-- runtime/   # estado operacional temporario do host
+|-- scripts/   # automacoes operacionais instaladas no host
+|-- secrets/   # segredos operacionais externos ao Git, quando necessario
+|-- logs/      # logs operacionais do host; containers devem priorizar stdout/stderr
+`-- bin/       # wrappers ou atalhos administrativos locais
 ```
 
 No MVP, o repositório deve ficar em `/opt/itcenter/app`. Os arquivos `.env.production` e `.secrets/dashboard.htpasswd` continuam dentro desse diretório da aplicação porque o Compose e o preflight usam caminhos relativos ao repositório. O diretório `/opt/itcenter/secrets` fica reservado para uma próxima evolução, quando esses caminhos forem externalizados sem quebrar o contrato atual.
@@ -177,13 +179,41 @@ Ele expõe somente o Nginx nas portas `80` e `443`. PostgreSQL, FastAPI e Next.j
 * Registro DNS `A` de `DOMAIN_NAME` apontando para o IP público da VM.
 * Acesso SSH por chave; login por senha e login direto do root desabilitados.
 
+## Bootstrap versionado do Edge Node
+
+A preparacao inicial do host passara a ser feita por scripts versionados. A proposta esta documentada em:
+
+```text
+docs/BOOTSTRAP.md
+```
+
+Estrutura planejada:
+
+```text
+infra/
+└── bootstrap/
+    ├── 01-system.sh
+    ├── 02-packages.sh
+    ├── 03-directories.sh
+    ├── 04-docker.sh
+    ├── 05-firewall.sh
+    └── bootstrap.sh
+```
+
+Neste momento, esta etapa esta apenas documentada. Os scripts devem ser criados em uma etapa futura. O bootstrap nao deve instalar a aplicacao imediatamente; ele deve preparar a VM, instalar dependencias de host e criar `/opt/itcenter`. Clone do repositorio, `.env.production`, Compose, HTTPS, Certbot e preflight continuam na etapa de deploy abaixo.
+
 ## Segredos e acesso administrativo
 
-Prepare a estrutura operacional e acesse o repositório:
+Se o bootstrap ainda nao tiver sido executado, prepare a estrutura operacional manualmente:
 
 ```bash
-sudo mkdir -p /opt/itcenter/{app,backups,configs,logs,scripts,secrets}
+sudo mkdir -p /opt/itcenter/{app,backups,configs,runtime,scripts,secrets,logs,bin}
 sudo chown -R ubuntu:ubuntu /opt/itcenter
+```
+
+Depois acesse o repositorio clonado em `/opt/itcenter/app`:
+
+```bash
 cd /opt/itcenter/app
 ```
 
@@ -223,14 +253,43 @@ Substitua `SEU_DOMINIO` pelo mesmo valor de `DOMAIN_NAME`. Não publique com cer
 ## Validar e publicar
 
 ```bash
-chmod +x infra/scripts/preflight-production.sh
-infra/scripts/preflight-production.sh
-docker compose --env-file .env.production -f infra/docker-compose.production.yml up -d --build
-docker compose --env-file .env.production -f infra/docker-compose.production.yml ps
+sh infra/scripts/deploy.sh
 curl --fail --user admin:SENHA_FORTE_AQUI https://SEU_DOMINIO/
 ```
 
-O preflight falha se segredos ainda forem placeholders, se a credencial administrativa não existir, se o certificado estiver ausente ou se o Compose for inválido.
+O `deploy.sh` executa preflight, valida o Compose, faz build das imagens, sobe os containers, aguarda healthchecks e executa smoke tests internos. O preflight falha se Docker/Compose estiverem ausentes, se o host tiver pouco recurso, se segredos ainda forem placeholders, se a credencial administrativa não existir, se o certificado estiver ausente, se o Compose for inválido ou se portas essenciais estiverem ocupadas por outro processo.
+
+## Rollback
+
+Antes de qualquer rollback, faça backup do banco. O rollback preserva o volume `postgres_data` e troca apenas a versão da aplicação pelo Git ref informado:
+
+```bash
+sh infra/scripts/backup.sh
+sh infra/scripts/rollback.sh HEAD~1
+```
+
+Use um commit, tag ou branch estável no lugar de `HEAD~1` quando houver uma versão homologada.
+
+## Backup e restore
+
+Backup manual:
+
+```bash
+sh infra/scripts/backup.sh
+```
+
+Variáveis opcionais:
+
+```text
+BACKUP_DIR=/opt/itcenter/backups
+RETENTION_DAYS=7
+```
+
+Restore exige confirmação explícita para evitar sobrescrita acidental:
+
+```bash
+ITCENTER_RESTORE_CONFIRM=YES sh infra/scripts/restore.sh /opt/itcenter/backups/itcenter-postgres-YYYYMMDDTHHMMSSZ.sql.gz
+```
 
 ## Renovação de certificado e rollback
 
@@ -241,7 +300,7 @@ docker compose --env-file .env.production -f infra/docker-compose.production.yml
 docker compose --env-file .env.production -f infra/docker-compose.production.yml exec nginx nginx -s reload
 ```
 
-Antes de qualquer atualização, faça backup do PostgreSQL. Para rollback da aplicação, retorne ao commit/imagem anterior e execute `up -d`; migrations devem ser sempre retrocompatíveis, pois não há rollback automático de schema.
+Antes de qualquer atualização, faça backup do PostgreSQL. Migrations devem ser sempre retrocompatíveis, pois não há rollback automático de schema.
 
 ---
 
@@ -342,8 +401,9 @@ Responsabilidades:
 * Instalar dependencias com `npm ci`.
 * Aplicar patch de seguranca do `picomatch` empacotado pelo Next.js.
 * Executar `npm run build`.
+* Gerar runtime standalone do Next.js.
 * Remover `npm` global da imagem final.
-* Iniciar Next.js em modo production diretamente com `node`.
+* Iniciar o servidor standalone com `node server.js`.
 * Expor porta interna 3000.
 
 ---

@@ -194,6 +194,7 @@ it-center-security-cloud/
     ├── DECISIONS.md
     ├── TASKS.md
     ├── ROADMAP.md
+    ├── BOOTSTRAP.md
     ├── DEPLOYMENT.md
     └── CONTRIBUTING.md
 ```
@@ -277,7 +278,14 @@ Objetivo:
 
 Manter o MVP com custo zero.
 
-O ambiente local usa `infra/docker-compose.yml`. Para produção, use `infra/docker-compose.production.yml`, que publica apenas o Nginx nas portas 80 e 443; os demais serviços permanecem na rede interna do Docker. O procedimento completo, incluindo DNS, certificado TLS, credencial administrativa, preflight, backup e renovação de certificado, está em `docs/DEPLOYMENT.md`.
+O ambiente local usa `infra/docker-compose.yml`. Para produção, a proposta de bootstrap versionado do Edge Node está documentada em `docs/BOOTSTRAP.md`. A publicação usa `infra/scripts/deploy.sh` e `infra/docker-compose.production.yml`, que publica apenas o Nginx nas portas 80 e 443; os demais serviços permanecem na rede interna do Docker. O procedimento completo, incluindo DNS, certificado TLS, credencial administrativa, preflight, backup, rollback e renovação de certificado, está em `docs/DEPLOYMENT.md`.
+
+Comando principal de producao na VM:
+
+```bash
+cd /opt/itcenter/app
+sh infra/scripts/deploy.sh
+```
 
 ---
 
@@ -350,7 +358,9 @@ docker compose -f infra/docker-compose.yml down -v
 | docs/DECISIONS.md    | Registro de decisões arquiteturais         |
 | docs/TASKS.md        | Backlog técnico                            |
 | docs/ROADMAP.md      | Evolução do produto                        |
+| docs/BOOTSTRAP.md    | Proposta de bootstrap versionado do Edge Node |
 | docs/DEPLOYMENT.md   | Estratégia de deploy                       |
+| docs/PRODUCTION_READINESS_REPORT.md | Relatório técnico de infraestrutura |
 | docs/CONTRIBUTING.md | Guia de contribuição                       |
 
 ---
@@ -395,6 +405,7 @@ docker compose -f infra/docker-compose.yml down -v
 ### Fase 5 - Deploy Cloud — pendente de publicação
 
 * Oracle Cloud
+* Bootstrap versionado do Edge Node
 * Docker Compose
 * Nginx
 * HTTPS

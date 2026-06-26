@@ -479,7 +479,7 @@ Impactos:
 
 Adotar Docker Scout como gate de seguranca para imagens locais e tratar vulnerabilidades critical/high antes de publicar o ambiente.
 
-O backend passa a usar `python:3.14-alpine`.
+O backend passa a usar base Alpine para reduzir superficie de vulnerabilidades. A base atual de producao e `python:3.13-alpine`.
 
 O frontend passa a usar Next.js `16.2.9`, `picomatch` `4.0.4` fixo e um patch de build para substituir o `picomatch` compilado dentro do Next quando necessario.
 
@@ -615,6 +615,92 @@ Impactos:
 * A arquitetura fica preparada para separar serviços sem mudar o desenho geral.
 * A operação ganha nomes estáveis para rede, dados e diretórios.
 * Não há aumento relevante de complexidade no MVP.
+
+---
+
+# ADR-018
+
+## Data
+
+2026-06-26
+
+## Decisao
+
+Refatorar a infraestrutura de producao para usar uma camada operacional versionada com:
+
+* Dockerfiles revisados para imagens menores e runtime mais enxuto.
+* `docker-compose.production.yml` com healthchecks, `depends_on` por saude e hardening basico.
+* Nginx com headers de seguranca, timeouts, endpoint interno de health e ajustes de proxy.
+* Scripts oficiais para preflight, deploy, rollback, backup e restore.
+* Estrutura do host `/opt/itcenter` expandida com `runtime` e `bin`.
+
+## Motivo
+
+O MVP precisa continuar simples e barato, mas o ambiente de producao deve ser reproduzivel, verificavel e seguro o bastante para operar na Oracle Cloud sem depender de comandos manuais.
+
+## Alternativas Avaliadas
+
+* Continuar usando apenas comandos manuais de Docker Compose.
+* Adicionar uma ferramenta externa de orquestracao desde ja.
+* Migrar para Kubernetes antes do MVP estar validado.
+* Manter Compose v2 com scripts versionados e hardening incremental.
+
+## Resultado
+
+Manter Docker Compose v2 como plataforma de producao do MVP e adicionar automacao operacional simples em `infra/scripts`.
+
+Impactos:
+
+* Deploy passa por preflight antes de subir containers.
+* Rollback preserva o banco e troca somente a versao da aplicacao.
+* Backup/restore ficam padronizados.
+* Nginx reduz superficie de informacao exposta.
+* A arquitetura segue pronta para futura observabilidade com Prometheus, Loki e Grafana sem adotar overengineering agora.
+
+---
+
+# ADR-019
+
+## Data
+
+2026-06-26
+
+## Decisao
+
+Formalizar os contratos operacionais minimos da producao:
+
+* Preflight de producao obrigatorio antes do deploy.
+* Scripts operacionais versionados em `infra/scripts`.
+* Logs de containers em `stdout`/`stderr`.
+* PostgreSQL como Data Layer do MVP.
+* Rede Docker explicita `itcenter-network`.
+
+## Motivo
+
+O projeto deve continuar simples, mas precisa de operacao repetivel e auditavel. Esses contratos reduzem risco sem adicionar ferramentas externas ou complexidade desnecessaria.
+
+## Alternativas Avaliadas
+
+* Continuar com comandos manuais.
+* Criar volumes de logs por servico.
+* Usar rede Docker gerada automaticamente.
+* Tratar PostgreSQL como detalhe interno do backend.
+* Adotar plataforma de observabilidade antes do MVP estar publicado.
+
+## Resultado
+
+* `preflight-production.sh` valida Docker, Compose, secrets, dominio, TLS, portas e Compose antes do deploy.
+* `deploy.sh` e `backup.sh` sao as entradas operacionais principais para publicacao e backup.
+* Containers continuam escrevendo logs em `stdout`/`stderr`, compativeis com `docker logs` e futura coleta por Loki/Promtail.
+* PostgreSQL permanece isolado na rede interna e persistido em `postgres_data`.
+* `itcenter-network` e o nome oficial da rede de producao, facilitando troubleshooting e evolucao futura.
+
+Impactos:
+
+* Nenhuma porta de PostgreSQL, backend ou frontend e exposta publicamente.
+* Apenas o Nginx publica `80` e `443`.
+* O deploy fica mais previsivel apos reboot da VM.
+* Observabilidade futura pode ser adicionada sem mudar o contrato de logs.
 
 ---
 

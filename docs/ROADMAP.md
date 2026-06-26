@@ -231,6 +231,7 @@ Sistema disponível externamente.
 Entregas:
 
 * Oracle Cloud
+* Bootstrap versionado do Edge Node
 * HTTPS
 * Docker
 

@@ -33,11 +33,12 @@ Data Layer
 
 Camadas oficiais:
 
-* Infrastructure Layer: Ubuntu Server 24.04, Docker Engine, Docker Compose, rede Docker `itcenter-network`, volume `postgres_data` e estrutura operacional `/opt/itcenter`.
-* Platform Layer: Nginx, TLS com Let's Encrypt, reverse proxy, arquivos de configuração e integração com Certbot.
+* Edge Node: VM Ubuntu `itcenter-edge-01`, ponto operacional do MVP na Oracle Cloud.
+* Infrastructure Layer: Ubuntu Server 24.04, Docker Engine, Docker Compose v2, rede Docker `itcenter-network`, volume `postgres_data` e estrutura operacional `/opt/itcenter`.
+* Platform Layer: Nginx, TLS com Let's Encrypt, reverse proxy, scripts de deploy, backup, restore e rollback.
 * Application Layer: Next.js, FastAPI e agente Windows.
-* Data Layer: PostgreSQL e migrations.
-* Security Layer: camada transversal com firewall, Security Lists, HTTPS, Basic Auth, `X-Agent-Api-Key`, segredos fora do Git e isolamento por rede Docker.
+* Data Layer: PostgreSQL, volume `postgres_data`, migrations e dumps em `/opt/itcenter/backups`.
+* Security Layer: camada transversal com firewall, Security Lists, HTTPS, Basic Auth, `X-Agent-Api-Key`, segredos fora do Git, hardening do Nginx e isolamento por rede Docker.
 
 Fluxo funcional:
 
@@ -87,6 +88,7 @@ Responsabilidades do `itcenter-edge-01`:
 * Manter apenas o Nginx exposto ao público.
 * Aplicar migrations no início do backend.
 * Manter PostgreSQL como Data Layer, separado conceitualmente da aplicação mesmo rodando no mesmo host.
+* Executar preflight, deploy, rollback, backup e restore por scripts versionados em `infra/scripts`.
 
 A subnet privada não hospeda serviços no MVP. Ela é uma reserva de capacidade para migrar backend, frontend e PostgreSQL para instâncias privadas futuramente, preservando o `itcenter-edge-01` como ponto de entrada e proxy reverso.
 
@@ -637,6 +639,28 @@ Persistência e montagem:
 * Configuração do Nginx, credencial Basic Auth, certificados Let's Encrypt e webroot do Certbot entram como bind mounts somente leitura quando usados pelo Nginx.
 * Migrations do backend entram como bind mount somente leitura no PostgreSQL quando necessário.
 * Logs de aplicação, Nginx e containers devem sair por `stdout`/`stderr`, permitindo coleta futura por Docker logs, Loki, Promtail ou outro agente.
+
+Estrutura oficial do host:
+
+```text
+/opt/itcenter/
+|-- app/       # clone do repositorio e Compose de producao
+|-- backups/   # dumps compactados do PostgreSQL
+|-- configs/   # configuracoes operacionais externas ao Git
+|-- runtime/   # arquivos temporarios e estado operacional do host
+|-- scripts/   # automacoes locais instaladas no host, quando necessario
+|-- secrets/   # segredos externos ao Git, uso futuro
+|-- logs/      # logs operacionais do host
+`-- bin/       # wrappers ou atalhos administrativos locais
+```
+
+Scripts oficiais de producao:
+
+* `infra/scripts/preflight-production.sh`: valida host, Compose, secrets, dominio, TLS, rede e volume.
+* `infra/scripts/deploy.sh`: executa preflight, build, subida dos containers, healthchecks e smoke tests.
+* `infra/scripts/rollback.sh`: retorna para um Git ref anterior preservando o volume `postgres_data`.
+* `infra/scripts/backup.sh`: gera dump compactado do PostgreSQL com retencao configuravel.
+* `infra/scripts/restore.sh`: restaura um dump mediante confirmacao explicita.
 
 ---
 
