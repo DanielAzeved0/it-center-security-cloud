@@ -520,6 +520,104 @@ Impactos:
 
 ---
 
+# ADR-016
+
+## Data
+
+2026-06-26
+
+## Decisão
+
+Publicar o MVP em um único nó de borda denominado `itcenter-edge-01`, executando Nginx, frontend, backend e PostgreSQL por Docker Compose.
+
+A VCN da Oracle Cloud usará `10.0.0.0/16`, com subnet pública `10.0.0.0/24` para o nó de borda e subnet privada `10.0.1.0/24` reservada para a futura separação dos serviços.
+
+## Motivo
+
+O MVP precisa de uma topologia simples, gratuita e capaz de receber tráfego HTTPS sem expor os serviços internos. Um único nó reduz custo e operação, enquanto a VCN com subnet privada já preparada evita uma mudança de endereçamento quando a aplicação crescer.
+
+## Alternativas Avaliadas
+
+* Criar uma única subnet e postergar a segmentação de rede.
+* Separar frontend, backend e banco em instâncias distintas desde o MVP.
+* Usar apenas serviços gerenciados da Oracle Cloud.
+
+## Resultado
+
+* O Nginx é o único serviço publicado nas portas 80 e 443.
+* Next.js, FastAPI e PostgreSQL permanecem na rede interna do Docker.
+* A subnet privada não hospeda componentes no MVP.
+* Em evolução futura, os componentes poderão migrar para a subnet privada, preservando `itcenter-edge-01` como ponto de entrada e proxy reverso.
+
+---
+
+# ADR-017
+
+## Data
+
+2026-06-26
+
+## Decisão
+
+Adotar uma arquitetura operacional em camadas no MVP:
+
+```text
+Edge Node
+    ↓
+Infrastructure Layer
+    ↓
+Platform Layer
+    ↓
+Application Layer
+    ↓
+Data Layer
+```
+
+Também ficam definidos:
+
+* Docker Network explícita chamada `itcenter-network`.
+* PostgreSQL tratado como Data Layer, separado conceitualmente de frontend/backend.
+* Dados do PostgreSQL persistidos em volume nomeado `postgres_data`.
+* Configurações, certificados e secrets montados por bind mounts somente leitura quando consumidos pelos containers.
+* Logs de containers enviados para `stdout`/`stderr`, sem volumes nomeados de logs no MVP.
+* Estrutura operacional do host baseada em `/opt/itcenter`.
+
+## Motivo
+
+O MVP continua simples e barato, rodando em um único Edge Node, mas a arquitetura precisa deixar claro o limite entre infraestrutura, plataforma, aplicação, dados e segurança.
+
+Essa separação reduz ambiguidade operacional e facilita evoluções futuras, como:
+
+* mover PostgreSQL para uma instância privada;
+* adicionar Prometheus, Loki, Grafana, Wazuh ou MinIO;
+* criar backups previsíveis;
+* diagnosticar rede Docker por nome estável;
+* coletar logs por ferramentas padrão sem depender de arquivos internos dos containers.
+
+## Alternativas Avaliadas
+
+* Manter a rede gerada automaticamente pelo Docker Compose.
+* Tratar PostgreSQL apenas como mais um container da aplicação.
+* Criar volumes nomeados para logs de backend, frontend e Nginx.
+* Migrar secrets imediatamente para `/opt/itcenter/secrets`.
+
+## Resultado
+
+* `infra/docker-compose.production.yml` passa a nomear explicitamente a rede interna como `itcenter-network`.
+* `postgres_data` permanece como volume nomeado oficial para persistência do PostgreSQL.
+* Bind mounts de configuração, certificados e credenciais continuam somente leitura no Nginx.
+* Logs ficam em `stdout`/`stderr`, compatíveis com `docker logs` e futura coleta por Loki/Promtail.
+* `/opt/itcenter/app` é o local oficial do repositório na VM.
+* `.env.production` e `.secrets/dashboard.htpasswd` permanecem relativos ao repositório no MVP, preservando compatibilidade com Compose e preflight.
+
+Impactos:
+
+* A arquitetura fica preparada para separar serviços sem mudar o desenho geral.
+* A operação ganha nomes estáveis para rede, dados e diretórios.
+* Não há aumento relevante de complexidade no MVP.
+
+---
+
 ## ADR-XXX
 
 ### Data

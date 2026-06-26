@@ -2,7 +2,7 @@
 
 > Plataforma full stack para monitoramento, inventário, observabilidade e segurança de máquinas Windows, com agente PowerShell, API FastAPI, PostgreSQL, dashboard web e práticas iniciais de SOC/Blue Team.
 
-Status: EPICs 1 a 6 concluídos | Ambiente local Docker operacional | Próxima fase: EPIC 7 - Produção.
+Status: Fases 0 a 4 concluídas | Ambiente local Docker operacional | Infraestrutura de produção preparada | Publicação na Oracle Cloud pendente.
 
 ---
 
@@ -61,15 +61,15 @@ Criar uma solução simples, gratuita e escalável para:
 ## Arquitetura
 
 ```text
-Máquina Windows
+Internet
       ↓
-Agente PowerShell
+Oracle Cloud VCN (10.0.0.0/16)
       ↓
-API FastAPI
+Subnet pública (10.0.0.0/24)
       ↓
-PostgreSQL
+itcenter-edge-01 (Ubuntu Server 24.04)
       ↓
-Dashboard Web
+Nginx → Next.js → FastAPI → PostgreSQL
 ```
 
 | Camada          | Responsabilidade                                          |
@@ -80,6 +80,8 @@ Dashboard Web
 | Dashboard Web   | Exibe máquinas, métricas, inventário e alertas            |
 | Nginx           | Proxy reverso, HTTPS e exposição segura                   |
 | Docker Compose  | Orquestra os containers do MVP                            |
+
+No MVP, todos os containers de produção executam no nó de borda `itcenter-edge-01`. Somente o Nginx recebe tráfego público nas portas 80 e 443; frontend, backend e banco permanecem na rede interna do Docker. A subnet privada `10.0.1.0/24` fica reservada para a futura separação dos serviços, sem alterar a entrada pública do sistema.
 
 ---
 
@@ -162,6 +164,7 @@ it-center-security-cloud/
 ├── PROJECT_PLAN.md
 ├── .gitignore
 ├── .env.example
+├── .env.production.example
 │
 ├── backend/
 │   └── app/
@@ -175,7 +178,10 @@ it-center-security-cloud/
 │
 ├── infra/
 │   ├── docker-compose.yml
-│   └── nginx.conf
+│   ├── docker-compose.production.yml
+│   ├── nginx/
+│   │   └── nginx.conf.template
+│   └── scripts/
 │
 └── docs/
     ├── ARCHITECTURE.md
@@ -196,16 +202,21 @@ it-center-security-cloud/
 
 ## Segurança
 
-O projeto seguirá princípios de segurança desde o início:
+O projeto aplica os seguintes controles de segurança:
 
 * Não coletar senhas.
 * Não coletar histórico de navegação.
 * Não coletar conteúdo de arquivos pessoais.
 * Não armazenar secrets no GitHub.
-* Utilizar `.env` para variáveis sensíveis.
-* Utilizar HTTPS no deploy.
-* Bloquear acesso externo ao PostgreSQL.
+* Utilizar `.env` e `.env.production` para variáveis sensíveis, sem versionar segredos.
+* Exigir `X-Agent-Api-Key` no check-in do agente.
 * Validar payloads recebidos dos agentes.
+* Utilizar HTTPS obrigatório em produção.
+* Manter PostgreSQL, FastAPI e Next.js sem portas públicas em produção.
+* Proteger o dashboard e a proxy administrativa com HTTP Basic no Nginx.
+* Executar o preflight de produção e a verificação de CVEs antes da publicação.
+
+Os detalhes e as limitações conhecidas estão em `docs/SECURITY.md` e `docs/DEPLOYMENT.md`.
 
 ---
 
@@ -244,11 +255,16 @@ docs/SOC_RULES.md
 
 ## Deploy
 
-Ambiente planejado:
+O deploy em produção está preparado, mas ainda não foi publicado na Oracle Cloud.
+
+Ambiente de destino:
 
 ```text
 Oracle Cloud Free Tier
-Ubuntu Server LTS
+VCN: 10.0.0.0/16
+Subnet pública: 10.0.0.0/24
+Subnet privada reservada: 10.0.1.0/24
+itcenter-edge-01: Ubuntu Server 24.04
 Docker
 Docker Compose
 Nginx
@@ -260,6 +276,8 @@ Next.js
 Objetivo:
 
 Manter o MVP com custo zero.
+
+O ambiente local usa `infra/docker-compose.yml`. Para produção, use `infra/docker-compose.production.yml`, que publica apenas o Nginx nas portas 80 e 443; os demais serviços permanecem na rede interna do Docker. O procedimento completo, incluindo DNS, certificado TLS, credencial administrativa, preflight, backup e renovação de certificado, está em `docs/DEPLOYMENT.md`.
 
 ---
 
@@ -339,7 +357,7 @@ docker compose -f infra/docker-compose.yml down -v
 
 ## Roadmap
 
-### Fase 0 - Planejamento
+### Fase 0 - Planejamento — concluída
 
 * Documentação base
 * Arquitetura
@@ -349,45 +367,53 @@ docker compose -f infra/docker-compose.yml down -v
 * Segurança
 * Regras SOC
 
-### Fase 1 - Backend MVP
+### Fase 1 - Backend MVP — concluída
 
 * FastAPI
 * Health check
 * Endpoint de check-in
 * PostgreSQL
 
-### Fase 2 - Agente Windows
+### Fase 2 - Agente Windows — concluída
 
 * Coleta de inventário
 * Coleta de métricas
 * Envio para API
 
-### Fase 3 - Dashboard
+### Fase 3 - Dashboard — concluída
 
 * Máquinas online/offline
 * Último check-in
 * CPU/RAM/Disco
 
-### Fase 4 - SOC Light
+### Fase 4 - SOC Light — concluída
 
 * Eventos de segurança
 * Alertas básicos
 * Políticas de ativos
 
-### Fase 5 - Deploy Cloud
+### Fase 5 - Deploy Cloud — pendente de publicação
 
 * Oracle Cloud
 * Docker Compose
 * Nginx
 * HTTPS
 
-### Fase 6 - Evolução
+### Fase 6 - Governança
 
 * Login
-* API Key por agente
+* Perfis e controle de acesso
+* Auditoria
+
+### Fase 7 - SOC Avançado
+
 * Wazuh
 * OpenVAS
+
+### Fase 8 - SaaS
+
 * Multiempresa
+* Multiusuário
 * SaaS
 
 ---

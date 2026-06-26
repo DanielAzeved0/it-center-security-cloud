@@ -17,19 +17,29 @@ Definir a arquitetura técnica oficial do IT Center Security Cloud para garantir
 
 # Visão Geral da Arquitetura
 
-O sistema será composto por 4 camadas principais:
+O sistema segue uma arquitetura em camadas. No MVP, todas as camadas de runtime rodam no mesmo Edge Node, mas os limites ficam claros para permitir separação futura sem redesenhar o produto.
 
 ```text
-Agente Windows
-        ↓
-API Backend
-        ↓
-Banco PostgreSQL
-        ↓
-Dashboard Web
+Edge Node
+    ↓
+Infrastructure Layer
+    ↓
+Platform Layer
+    ↓
+Application Layer
+    ↓
+Data Layer
 ```
 
-Fluxo completo:
+Camadas oficiais:
+
+* Infrastructure Layer: Ubuntu Server 24.04, Docker Engine, Docker Compose, rede Docker `itcenter-network`, volume `postgres_data` e estrutura operacional `/opt/itcenter`.
+* Platform Layer: Nginx, TLS com Let's Encrypt, reverse proxy, arquivos de configuração e integração com Certbot.
+* Application Layer: Next.js, FastAPI e agente Windows.
+* Data Layer: PostgreSQL e migrations.
+* Security Layer: camada transversal com firewall, Security Lists, HTTPS, Basic Auth, `X-Agent-Api-Key`, segredos fora do Git e isolamento por rede Docker.
+
+Fluxo funcional:
 
 ```text
 Windows PC
@@ -44,6 +54,41 @@ PostgreSQL
         ↓
 Dashboard Next.js
 ```
+
+---
+
+# Topologia de Produção do MVP
+
+O MVP é publicado em um único nó de borda, mantendo a aplicação monolítica e os serviços internos isolados da internet.
+
+```text
+Internet
+    ↓
+IPv4 público
+    ↓
+Oracle Cloud VCN (10.0.0.0/16)
+    ├── Subnet pública (10.0.0.0/24)
+    │       ↓
+    │   itcenter-edge-01 (Ubuntu Server 24.04)
+    │       ├── Infrastructure: Docker Engine, Compose, itcenter-network, volumes
+    │       ├── Platform: Nginx, TLS, reverse proxy
+    │       ├── Application: Next.js, FastAPI
+    │       ├── Data: PostgreSQL em postgres_data
+    │       └── Security: firewall, HTTPS, Basic Auth, API Key, secrets
+    │
+    └── Subnet privada (10.0.1.0/24)
+            └── Reservada para futura separação dos serviços
+```
+
+Responsabilidades do `itcenter-edge-01`:
+
+* Receber tráfego HTTPS pelo Nginx.
+* Executar frontend, backend e PostgreSQL por Docker Compose na rede explícita `itcenter-network`.
+* Manter apenas o Nginx exposto ao público.
+* Aplicar migrations no início do backend.
+* Manter PostgreSQL como Data Layer, separado conceitualmente da aplicação mesmo rodando no mesmo host.
+
+A subnet privada não hospeda serviços no MVP. Ela é uma reserva de capacidade para migrar backend, frontend e PostgreSQL para instâncias privadas futuramente, preservando o `itcenter-edge-01` como ponto de entrada e proxy reverso.
 
 ---
 
@@ -572,6 +617,27 @@ Tecnologia:
 * Nginx
 * Oracle Cloud
 
+Camadas de infraestrutura no MVP:
+
+```text
+Edge Node: itcenter-edge-01
+    └── Infrastructure Layer
+            ├── Docker Engine
+            ├── Docker Compose
+            ├── Docker Network: itcenter-network
+            ├── Volume nomeado: postgres_data
+            └── Host layout: /opt/itcenter
+```
+
+O Compose de produção deve criar a rede `itcenter-network` explicitamente. Isso evita depender do nome gerado automaticamente pelo Compose e facilita troubleshooting, backup, monitoramento e futuras migrações.
+
+Persistência e montagem:
+
+* Dados do PostgreSQL usam o volume nomeado `postgres_data`.
+* Configuração do Nginx, credencial Basic Auth, certificados Let's Encrypt e webroot do Certbot entram como bind mounts somente leitura quando usados pelo Nginx.
+* Migrations do backend entram como bind mount somente leitura no PostgreSQL quando necessário.
+* Logs de aplicação, Nginx e containers devem sair por `stdout`/`stderr`, permitindo coleta futura por Docker logs, Loki, Promtail ou outro agente.
+
 ---
 
 # Containers
@@ -638,7 +704,7 @@ backend: 127.0.0.1:8000
 postgres: 127.0.0.1:5432
 ```
 
-Nginx permanece planejado para producao/cloud, conforme DEPLOYMENT.md.
+Em produção, o Nginx executa no `itcenter-edge-01` e é o único container com portas publicadas. A topologia de rede e a publicação estão descritas em `DEPLOYMENT.md`.
 
 ---
 

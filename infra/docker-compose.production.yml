@@ -1,0 +1,99 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: itcenter-postgres
+    restart: unless-stopped
+    env_file:
+      - ../.env.production
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ../backend/migrations:/migrations:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - internal
+
+  backend:
+    build:
+      context: ../backend
+    container_name: itcenter-backend
+    restart: unless-stopped
+    env_file:
+      - ../.env.production
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health', timeout=3).read()\""
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - internal
+
+  frontend:
+    build:
+      context: ../frontend/dashboard
+    container_name: itcenter-frontend
+    restart: unless-stopped
+    env_file:
+      - ../.env.production
+    environment:
+      ITCENTER_API_BASE_URL: http://backend:8000
+      NEXT_PUBLIC_API_BASE_URL: /api/backend
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - internal
+
+  nginx:
+    image: nginx:1.28-alpine
+    container_name: itcenter-nginx
+    restart: unless-stopped
+    depends_on:
+      frontend:
+        condition: service_started
+    ports:
+      - "80:80"
+      - "443:443"
+    env_file:
+      - ../.env.production
+    environment:
+      NGINX_ENVSUBST_FILTER: DOMAIN_NAME
+    volumes:
+      - ./nginx/nginx.conf.template:/etc/nginx/templates/default.conf.template:ro
+      - ../.secrets/dashboard.htpasswd:/etc/nginx/auth/dashboard.htpasswd:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - /var/www/certbot:/var/www/certbot:ro
+    networks:
+      - internal
+
+  certbot:
+    image: certbot/certbot:v4.21.0
+    profiles: ["maintenance"]
+    volumes:
+      # Certbot precisa escrita para emitir/renovar; o Nginx monta estes caminhos somente leitura.
+      - /etc/letsencrypt:/etc/letsencrypt
+      - /var/www/certbot:/var/www/certbot
+    entrypoint: certbot
+    networks:
+      - internal
+
+volumes:
+  postgres_data:
+    name: postgres_data
+
+networks:
+  internal:
+    name: itcenter-network
+    driver: bridge

@@ -87,9 +87,14 @@ MVP local/laboratório:
 
 Antes de exposição externa:
 
-* Login obrigatório
-* Sessões com expiração
-* Controle de acesso
+* O Nginx exige autenticação HTTP Basic para todo o dashboard e para a proxy interna `/api/backend/*`.
+* O arquivo de credenciais fica em `.secrets/dashboard.htpasswd`, fora do Git e montado somente em leitura.
+* O endpoint público do agente é limitado a `POST /api/v1/agent/checkin`; ele não recebe Basic Auth porque valida obrigatoriamente `X-Agent-Api-Key` no FastAPI.
+* Endpoints internos do backend não são expostos em portas públicas.
+
+Limitação conhecida:
+
+* HTTP Basic é o controle de acesso administrativo mínimo para a primeira publicação. Login com usuários, sessões, RBAC e auditoria continua sendo requisito da Fase de Governança antes de qualquer uso multiusuário/SaaS.
 
 ---
 

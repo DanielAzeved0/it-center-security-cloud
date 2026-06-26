@@ -2,6 +2,8 @@
 
 Infraestrutura local do IT Center Security Cloud.
 
+O arquivo `docker-compose.yml` é exclusivo para desenvolvimento local. Para publicar na Oracle Cloud, use `docker-compose.production.yml` e siga o procedimento em `docs/DEPLOYMENT.md`; não exponha o Compose local diretamente na internet.
+
 ## Servicos
 
 O Docker Compose sobe:
