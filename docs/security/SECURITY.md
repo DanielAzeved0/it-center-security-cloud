@@ -160,7 +160,7 @@ P2:
 * Atualizar dependencias diretas para versoes corrigidas.
 * Atualizar imagem base quando a recomendacao reduzir CVEs sem quebrar runtime.
 * Nao usar `npm audit fix --force` sem revisao, porque pode trocar major versions e quebrar o dashboard.
-* Nao ignorar vulnerabilidade critica ou alta sem registrar motivo em `docs/DECISIONS.md`.
+* Nao ignorar vulnerabilidade critica ou alta sem registrar motivo em `docs/development/DECISIONS.md`.
 
 ## Estado Atual das Imagens
 

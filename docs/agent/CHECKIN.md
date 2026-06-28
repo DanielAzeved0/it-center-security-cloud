@@ -1,4 +1,4 @@
-# AGENT.md
+# CHECKIN.md
 
 # IT Center Security Cloud - Agente Windows
 
@@ -97,6 +97,8 @@ Segurança:
 agent-windows/
 
 * itcenter-agent.ps1
+* install-agent.ps1
+* uninstall-agent.ps1
 * config.json
 * cache/
 * logs/
@@ -169,6 +171,8 @@ Observações:
 * Se a API falhar, o agente registra aviso e salva o JSON em `agent-windows/cache`.
 * No próximo ciclo, o agente tenta reenviar check-ins pendentes antes de enviar a coleta atual.
 * O agente já registra as coletas em `agent-windows/logs/itcenter-agent.log`.
+* Em instalacao Windows, logs e cache usam os caminhos configurados em `config.json`.
+* `server_url` pode apontar para a raiz do dominio publicado ou para a base local `/api/v1`.
 
 ## Testes atuais
 
@@ -191,6 +195,9 @@ Body JSON enviado para /api/v1/agent/checkin
 Cache offline em arquivo JSON
 Reenvio de check-ins pendentes
 Coletas de seguranca do EPIC 6
+Config nova com agent_api_key e checkin_interval_minutes
+Compatibilidade com config legada api_key e interval_minutes
+Server URL raiz expandida para /api/v1/agent/checkin
 ```
 
 ---

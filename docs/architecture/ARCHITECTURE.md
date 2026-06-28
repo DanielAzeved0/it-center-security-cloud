@@ -491,6 +491,30 @@ Retorna detalhes da máquina.
 
 ---
 
+## Machine Metrics
+
+GET
+
+```text
+/api/v1/machines/{id}/metrics
+```
+
+Lista metricas da maquina.
+
+---
+
+## Installed Programs
+
+GET
+
+```text
+/api/v1/machines/{id}/programs
+```
+
+Lista programas instalados da maquina.
+
+---
+
 ## Security Events
 
 GET
@@ -512,6 +536,18 @@ GET
 ```
 
 Lista alertas.
+
+---
+
+## Resolve Alert
+
+PATCH
+
+```text
+/api/v1/alerts/{id}/resolve
+```
+
+Resolve um alerta aberto.
 
 ---
 
@@ -728,7 +764,7 @@ backend: 127.0.0.1:8000
 postgres: 127.0.0.1:5432
 ```
 
-Em produção, o Nginx executa no `itcenter-edge-01` e é o único container com portas publicadas. A topologia de rede e a publicação estão descritas em `DEPLOYMENT.md`.
+Em produção, o Nginx executa no `itcenter-edge-01` e é o único container com portas publicadas. A topologia de rede e a publicação estão descritas em `docs/deployment/PRODUCTION.md`.
 
 ---
 

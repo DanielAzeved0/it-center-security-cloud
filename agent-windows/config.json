@@ -1,8 +1,9 @@
 {
   "server_url": "http://127.0.0.1:8000/api/v1",
-  "api_key": "change-me",
-  "agent_id": "HOST-001",
-  "interval_minutes": 5,
+  "agent_api_key": "change-me",
+  "checkin_interval_minutes": 5,
+  "log_path": null,
+  "cache_path": null,
   "collect_inventory": true,
   "collect_metrics": true,
   "collect_security": true

@@ -159,44 +159,27 @@ No MVP, todos os containers de produção executam no nó de borda `itcenter-edg
 
 ```text
 it-center-security-cloud/
-│
-├── README.md
-├── PROJECT_PLAN.md
-├── .gitignore
-├── .env.example
-├── .env.production.example
-│
-├── backend/
-│   └── app/
-│
-├── frontend/
-│   └── dashboard/
-│
-├── agent-windows/
-│   ├── itcenter-agent.ps1
-│   └── config.json
-│
-├── infra/
-│   ├── docker-compose.yml
-│   ├── docker-compose.production.yml
-│   ├── nginx/
-│   │   └── nginx.conf.template
-│   └── scripts/
-│
-└── docs/
-    ├── ARCHITECTURE.md
-    ├── DATABASE.md
-    ├── API.md
-    ├── AGENT.md
-    ├── SECURITY.md
-    ├── SOC_RULES.md
-    ├── ASSET_POLICY.md
-    ├── DECISIONS.md
-    ├── TASKS.md
-    ├── ROADMAP.md
-    ├── BOOTSTRAP.md
-    ├── DEPLOYMENT.md
-    └── CONTRIBUTING.md
+|-- README.md
+|-- PROJECT_PLAN.md
+|-- backend/
+|   `-- app/
+|-- frontend/
+|   `-- dashboard/
+|-- agent-windows/
+|-- infra/
+|   |-- docker-compose.yml
+|   |-- docker-compose.production.yml
+|   |-- nginx/
+|   `-- scripts/
+`-- docs/
+    |-- README.md
+    |-- architecture/
+    |-- deployment/
+    |-- security/
+    |-- backend/
+    |-- agent/
+    |-- development/
+    `-- assets/
 ```
 
 ---
@@ -217,7 +200,7 @@ O projeto aplica os seguintes controles de segurança:
 * Proteger o dashboard e a proxy administrativa com HTTP Basic no Nginx.
 * Executar o preflight de produção e a verificação de CVEs antes da publicação.
 
-Os detalhes e as limitações conhecidas estão em `docs/SECURITY.md` e `docs/DEPLOYMENT.md`.
+Os detalhes e as limitações conhecidas estão em `docs/security/SECURITY.md` e `docs/deployment/PRODUCTION.md`.
 
 ---
 
@@ -243,13 +226,13 @@ Torrent detectado:
 A fonte de verdade para softwares autorizados será:
 
 ```text
-docs/ASSET_POLICY.md
+docs/security/ASSET_POLICY.md
 ```
 
 As regras de detecção estarão em:
 
 ```text
-docs/SOC_RULES.md
+docs/security/SOC_RULES.md
 ```
 
 ---
@@ -278,13 +261,137 @@ Objetivo:
 
 Manter o MVP com custo zero.
 
-O ambiente local usa `infra/docker-compose.yml`. Para produção, a proposta de bootstrap versionado do Edge Node está documentada em `docs/BOOTSTRAP.md`. A publicação usa `infra/scripts/deploy.sh` e `infra/docker-compose.production.yml`, que publica apenas o Nginx nas portas 80 e 443; os demais serviços permanecem na rede interna do Docker. O procedimento completo, incluindo DNS, certificado TLS, credencial administrativa, preflight, backup, rollback e renovação de certificado, está em `docs/DEPLOYMENT.md`.
+O ambiente local usa `infra/docker-compose.yml`. Para produção, a proposta de bootstrap versionado do Edge Node está documentada em `docs/deployment/BOOTSTRAP.md`. A publicação usa `infra/scripts/deploy.sh` e `infra/docker-compose.production.yml`, que publica apenas o Nginx nas portas 80 e 443; os demais serviços permanecem na rede interna do Docker. O procedimento completo, incluindo DNS, certificado TLS, credencial administrativa, preflight, backup, rollback e renovação de certificado, está em `docs/deployment/PRODUCTION.md`.
 
 Comando principal de producao na VM:
 
 ```bash
 cd /opt/itcenter/app
 sh infra/scripts/deploy.sh
+```
+
+### Producao atual
+
+```text
+Dominio: itcenter-daniel.chickenkiller.com
+IP publico: 147.15.78.220
+VM: Oracle Cloud Ubuntu 24.04 LTS
+Rede Docker: itcenter-network
+Entrada publica: Nginx 80/443
+```
+
+Fluxo de comunicacao:
+
+```mermaid
+flowchart TD
+    agent[Windows Agent] -->|HTTPS + X-Agent-Api-Key| nginx[Nginx]
+    browser[Browser] -->|HTTPS + Basic Auth| nginx
+    nginx --> frontend[Next.js Dashboard]
+    nginx --> backend[FastAPI Backend]
+    frontend --> backend
+    backend --> postgres[PostgreSQL]
+```
+
+Somente o Nginx expoe portas publicas. PostgreSQL, FastAPI e Next.js permanecem internos na rede Docker.
+
+### Guias de producao
+
+| Guia | Finalidade |
+| --- | --- |
+| `docs/deployment/ORACLE_CLOUD.md` | Implantacao completa na Oracle Cloud. |
+| `docs/deployment/SETUP.md` | Preparacao do ambiente de producao. |
+| `docs/deployment/HTTPS.md` | DNS, Certbot, TLS e renovacao. |
+| `docs/deployment/DEPLOYMENT_HISTORY.md` | Historico real da implantacao feita. |
+| `docs/deployment/TROUBLESHOOTING.md` | Diagnostico operacional. |
+| `docs/deployment/KNOWN_ISSUES.md` | Limitacoes e problemas conhecidos. |
+| `docs/deployment/LESSONS_LEARNED.md` | Aprendizados da implantacao. |
+| `docs/architecture/INFRASTRUCTURE.md` | Arquitetura de infraestrutura. |
+| `docs/architecture/NETWORK.md` | Rede, DNS e portas. |
+| `docs/architecture/CONTAINERS.md` | Containers e responsabilidades. |
+| `docs/architecture/SECURITY.md` | Controles de seguranca. |
+
+### Validar ambiente
+
+Na VM:
+
+```bash
+cd /opt/itcenter/app
+sh infra/scripts/preflight-production.sh
+docker ps
+docker compose --env-file .env.production -f infra/docker-compose.production.yml ps
+```
+
+Testes principais:
+
+```bash
+curl -I https://itcenter-daniel.chickenkiller.com
+curl --user admin:SENHA_FORTE_AQUI https://itcenter-daniel.chickenkiller.com
+```
+
+### Backup
+
+```bash
+cd /opt/itcenter/app
+sh infra/scripts/backup.sh
+```
+
+Destino:
+
+```text
+/opt/itcenter/backups
+```
+
+### HTTPS e dominio
+
+O dominio atual e:
+
+```text
+itcenter-daniel.chickenkiller.com
+```
+
+Certificados esperados:
+
+```text
+/etc/letsencrypt/live/itcenter-daniel.chickenkiller.com/fullchain.pem
+/etc/letsencrypt/live/itcenter-daniel.chickenkiller.com/privkey.pem
+```
+
+Se um provedor local nao resolver o dominio, valide com resolvers publicos:
+
+```bash
+dig @8.8.8.8 itcenter-daniel.chickenkiller.com
+dig @1.1.1.1 itcenter-daniel.chickenkiller.com
+dig @9.9.9.9 itcenter-daniel.chickenkiller.com
+```
+
+### Agente Windows
+
+O agente ainda nao esta integrado ao ambiente publicado. Por isso, o dashboard pode aparecer vazio mesmo com infraestrutura saudavel.
+
+Proxima fase do agente:
+
+* Separar o agente como produto independente.
+* Criar instalador.
+* Criar servico Windows.
+* Adicionar atualizacao automatica.
+* Expandir inventario, metricas e eventos de seguranca.
+* Adicionar cache offline, retry inteligente, compressao, criptografia e assinatura de payloads.
+
+### Troubleshooting rapido
+
+```bash
+docker logs itcenter-nginx
+docker logs itcenter-frontend
+docker logs itcenter-backend
+docker logs itcenter-postgres
+```
+
+Guias detalhados:
+
+```text
+docs/deployment/TROUBLESHOOTING.md
+docs/deployment/KNOWN_ISSUES.md
+docs/deployment/LESSONS_LEARNED.md
 ```
 
 ---
@@ -348,20 +455,14 @@ docker compose -f infra/docker-compose.yml down -v
 | Arquivo              | Função                                     |
 | -------------------- | ------------------------------------------ |
 | PROJECT_PLAN.md      | Visão estratégica do projeto               |
-| docs/ARCHITECTURE.md | Arquitetura técnica                        |
-| docs/DATABASE.md     | Modelagem do banco                         |
-| docs/API.md          | Contrato da API                            |
-| docs/AGENT.md        | Contrato do agente Windows                 |
-| docs/SECURITY.md     | Segurança da aplicação                     |
-| docs/SOC_RULES.md    | Regras de detecção SOC                     |
-| docs/ASSET_POLICY.md | Política de ativos e softwares autorizados |
-| docs/DECISIONS.md    | Registro de decisões arquiteturais         |
-| docs/TASKS.md        | Backlog técnico                            |
-| docs/ROADMAP.md      | Evolução do produto                        |
-| docs/BOOTSTRAP.md    | Proposta de bootstrap versionado do Edge Node |
-| docs/DEPLOYMENT.md   | Estratégia de deploy                       |
-| docs/PRODUCTION_READINESS_REPORT.md | Relatório técnico de infraestrutura |
-| docs/CONTRIBUTING.md | Guia de contribuição                       |
+| docs/README.md       | Índice global da documentação              |
+| docs/architecture/   | Arquitetura e fluxo de dados               |
+| docs/deployment/     | Setup, produção e troubleshooting          |
+| docs/security/       | Segurança, autenticação e regras SOC       |
+| docs/backend/        | API e banco de dados                       |
+| docs/agent/          | Agente Windows e check-in                  |
+| docs/development/    | Contribuição, roadmap, decisões e tarefas  |
+| docs/assets/         | Diagramas e imagens                        |
 
 ---
 

@@ -1,4 +1,4 @@
-# DEPLOYMENT.md
+# PRODUCTION.md
 
 # Estratégia Oficial de Deploy
 
@@ -533,7 +533,7 @@ docker scout recommendations infra-frontend:latest
 Criterio:
 
 * Backend e frontend nao devem seguir para deploy externo com CVE critical/high corrigivel.
-* PostgreSQL com CVE residual em imagem oficial pode continuar apenas em ambiente local/laboratorio, documentado como P1 em `docs/SECURITY.md`, ate existir tag oficial corrigida.
+* PostgreSQL com CVE residual em imagem oficial pode continuar apenas em ambiente local/laboratorio, documentado como P1 em `docs/security/SECURITY.md`, ate existir tag oficial corrigida.
 * O banco nunca deve ser exposto publicamente.
 
 Build limpo recomendado apos mudancas de imagem/dependencia:

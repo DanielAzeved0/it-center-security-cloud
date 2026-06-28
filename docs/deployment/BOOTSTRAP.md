@@ -119,7 +119,7 @@ O bootstrap nao deve:
 * executar migrations;
 * publicar Nginx, FastAPI, Next.js ou PostgreSQL.
 
-Essas atividades pertencem ao fluxo de deploy documentado em `docs/DEPLOYMENT.md`.
+Essas atividades pertencem ao fluxo de deploy documentado em `docs/deployment/PRODUCTION.md`.
 
 ## Beneficios esperados
 

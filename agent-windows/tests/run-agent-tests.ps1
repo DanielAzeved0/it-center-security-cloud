@@ -110,6 +110,20 @@ $mockFailedLogins = @(
     [pscustomobject]@{ Id = 4625 }
 )
 
+$validatedNewConfig = ConvertTo-AgentValidatedConfig -RawConfig ([pscustomobject]@{
+    server_url = "https://itcenter-daniel.chickenkiller.com"
+    agent_api_key = "new-key"
+    checkin_interval_minutes = 5
+    log_path = "C:\Program Files\ITCenterAgent\logs"
+    cache_path = "C:\Program Files\ITCenterAgent\cache"
+})
+
+$validatedLegacyConfig = ConvertTo-AgentValidatedConfig -RawConfig ([pscustomobject]@{
+    server_url = "http://127.0.0.1:8000/api/v1"
+    api_key = "legacy-key"
+    interval_minutes = 10
+})
+
 function Invoke-TestRequest {
     param($RequestParams)
 
@@ -119,6 +133,18 @@ function Invoke-TestRequest {
         status = "success"
         message = "Check-in received"
         machine_id = 1
+    }
+}
+
+function Invoke-TestRootUrlRequest {
+    param($RequestParams)
+
+    $script:capturedRequest = $RequestParams
+
+    [pscustomobject]@{
+        status = "success"
+        message = "Check-in received"
+        machine_id = 2
     }
 }
 
@@ -190,6 +216,12 @@ function Invoke-MockUsbDevices {
 function Invoke-MockFailedLogins {
     $script:mockFailedLogins
 }
+
+Assert-True -Condition ($validatedNewConfig.server_url -eq "https://itcenter-daniel.chickenkiller.com") -Message "New config server_url must be preserved without trailing slash."
+Assert-True -Condition ($validatedNewConfig.api_key -eq "new-key") -Message "New config must normalize agent_api_key to api_key."
+Assert-True -Condition ($validatedNewConfig.checkin_interval_minutes -eq 5) -Message "New config interval must be normalized."
+Assert-True -Condition ($validatedLegacyConfig.api_key -eq "legacy-key") -Message "Legacy config must keep api_key."
+Assert-True -Condition ($validatedLegacyConfig.checkin_interval_minutes -eq 10) -Message "Legacy config interval must be normalized."
 
 Assert-Percent -Value $cpuUsage -Name "CPU usage"
 Assert-Percent -Value $ramUsage -Name "RAM usage"
@@ -289,6 +321,14 @@ $sentPayload = $sentBody | ConvertFrom-Json
 Assert-True -Condition ($sentPayload.hostname -eq $payload.hostname) -Message "Sent payload hostname must match."
 Assert-True -Condition ($sentPayload.cpu_usage -eq $payload.cpu_usage) -Message "Sent payload CPU usage must match."
 Assert-True -Condition ($response.status -eq "success") -Message "Send-AgentCheckin should return API response."
+
+$rootUrlResponse = Send-AgentCheckin -Config ([pscustomobject]@{
+    server_url = "https://itcenter-daniel.chickenkiller.com"
+    api_key = "test-key"
+}) -Payload $payload -RequestInvoker ${function:Invoke-TestRootUrlRequest}
+
+Assert-True -Condition ($capturedRequest.Uri -eq "https://itcenter-daniel.chickenkiller.com/api/v1/agent/checkin") -Message "Root server URL must be expanded to /api/v1/agent/checkin."
+Assert-True -Condition ($rootUrlResponse.status -eq "success") -Message "Root URL check-in should return API response."
 
 $tempCacheDirectory = Join-Path ([System.IO.Path]::GetTempPath()) "itcenter-agent-tests-$([guid]::NewGuid().ToString('N'))"
 New-Item -ItemType Directory -Path $tempCacheDirectory | Out-Null

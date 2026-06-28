@@ -55,17 +55,16 @@ Deploy
 
 Antes de escrever código, consulte:
 
-* PROJECT_PLAN.md
-* ARCHITECTURE.md
-* DATABASE.md
-* API.md
-* AGENT.md
-* SECURITY.md
-* SOC_RULES.md
-* ASSET_POLICY.md
-* DECISIONS.md
-* TASKS.md
-* ROADMAP.md
+* docs/development/ROADMAP.md
+* docs/development/TASKS.md
+* docs/architecture/ARCHITECTURE.md
+* docs/backend/DATABASE.md
+* docs/backend/API.md
+* docs/agent/CHECKIN.md
+* docs/security/SECURITY.md
+* docs/security/SOC_RULES.md
+* docs/security/ASSET_POLICY.md
+* docs/development/DECISIONS.md
 
 ---
 
@@ -77,7 +76,7 @@ Cada assunto possui um documento responsável.
 
 Responsável:
 
-ARCHITECTURE.md
+docs/architecture/ARCHITECTURE.md
 
 ---
 
@@ -85,7 +84,7 @@ ARCHITECTURE.md
 
 Responsável:
 
-DATABASE.md
+docs/backend/DATABASE.md
 
 ---
 
@@ -93,7 +92,7 @@ DATABASE.md
 
 Responsável:
 
-API.md
+docs/backend/API.md
 
 ---
 
@@ -101,7 +100,7 @@ API.md
 
 Responsável:
 
-SECURITY.md
+docs/security/SECURITY.md
 
 ---
 
@@ -109,7 +108,7 @@ SECURITY.md
 
 Responsável:
 
-SOC_RULES.md
+docs/security/SOC_RULES.md
 
 ---
 
@@ -117,7 +116,7 @@ SOC_RULES.md
 
 Responsável:
 
-ASSET_POLICY.md
+docs/security/ASSET_POLICY.md
 
 ---
 
@@ -125,7 +124,7 @@ ASSET_POLICY.md
 
 Responsável:
 
-PROJECT_PLAN.md
+docs/development/ROADMAP.md e docs/development/TASKS.md
 
 ---
 
@@ -135,19 +134,19 @@ PROJECT_PLAN.md
 
 Antes de adicionar uma nova tecnologia:
 
-1. Registrar em DECISIONS.md
+1. Registrar em docs/development/DECISIONS.md
 2. Justificar a escolha
 3. Comparar alternativas
 
 ---
 
-## Não criar tabelas fora do DATABASE.md
+## Não criar tabelas fora do docs/backend/DATABASE.md
 
 Toda alteração de banco deve ser documentada primeiro.
 
 ---
 
-## Não criar endpoints fora do API.md
+## Não criar endpoints fora do docs/backend/API.md
 
 Toda alteração na API deve ser documentada primeiro.
 
@@ -157,7 +156,7 @@ Toda alteração na API deve ser documentada primeiro.
 
 Mudanças estruturais devem ser registradas em:
 
-DECISIONS.md
+docs/development/DECISIONS.md
 
 ---
 
@@ -208,7 +207,7 @@ Não utilizar:
 * Microserviços
 * Elasticsearch
 
-A menos que exista uma decisão formal registrada em DECISIONS.md.
+A menos que exista uma decisão formal registrada em docs/development/DECISIONS.md.
 
 ---
 
@@ -287,11 +286,12 @@ Todo Pull Request deve responder:
 
 Antes de implementar qualquer funcionalidade:
 
-1. Ler PROJECT_PLAN.md
-2. Ler ARCHITECTURE.md
-3. Ler DATABASE.md
-4. Ler API.md
-5. Ler DECISIONS.md
+1. Ler docs/development/ROADMAP.md
+2. Ler docs/development/TASKS.md
+3. Ler docs/architecture/ARCHITECTURE.md
+4. Ler docs/backend/DATABASE.md
+5. Ler docs/backend/API.md
+6. Ler docs/development/DECISIONS.md
 
 ---
 
@@ -306,8 +306,8 @@ Antes de implementar qualquer funcionalidade:
 
 # Agentes Devem
 
-* Seguir TASKS.md
-* Seguir ROADMAP.md
+* Seguir docs/development/TASKS.md
+* Seguir docs/development/ROADMAP.md
 * Atualizar documentação quando necessário
 * Gerar código simples
 * Priorizar clareza

@@ -14,7 +14,7 @@ Esta seção liga o planejamento oficial às tarefas do backlog.
 
 ## Planejamento de Produto
 
-`PROJECT_PLAN.md`
+`docs/development/ROADMAP.md` e `docs/development/TASKS.md`
 
 ```text
 EPIC 1 - Fundação do Projeto
@@ -24,12 +24,18 @@ EPIC 4 - Agente Windows
 EPIC 5 - Dashboard
 EPIC 6 - SOC Light
 EPIC 7 - Produção
-EPIC 8 - Melhorias Futuras
+EPIC 8 - Agente Windows em Produção
+EPIC 9 - Validação do Fluxo Fim a Fim
+EPIC 10 - Dashboard Operacional
+EPIC 11 - SOC Light Pendências
+EPIC 12 - Governança e Autenticação
+EPIC 13 - Operação e Segurança de Produção
+EPIC 14 - Melhorias Futuras
 ```
 
 ## Arquitetura
 
-`ARCHITECTURE.md`
+`docs/architecture/ARCHITECTURE.md`
 
 ```text
 Inventário do agente -> EPIC 4
@@ -37,11 +43,16 @@ Persistência API/PostgreSQL -> EPIC 2 e EPIC 3
 Endpoints do backend -> EPIC 2
 Estrutura do dashboard -> EPIC 5
 Deploy e containers -> EPIC 7
+Agente instalavel -> EPIC 8
+Fluxo fim a fim -> EPIC 9
+Dashboard operacional -> EPIC 10
+Governanca e autenticacao -> EPIC 12
+Operacao de producao -> EPIC 13
 ```
 
 ## Banco
 
-`DATABASE.md`
+`docs/backend/DATABASE.md`
 
 ```text
 machines -> EPIC 3
@@ -55,7 +66,7 @@ machine_local_admins -> EPIC 6
 
 ## API
 
-`API.md`
+`docs/backend/API.md`
 
 ```text
 POST /api/v1/agent/checkin -> EPIC 2 e EPIC 4
@@ -67,7 +78,7 @@ PATCH /api/v1/alerts/{id}/resolve -> EPIC 2
 
 ## Agente
 
-`AGENT.md`
+`docs/agent/CHECKIN.md`
 
 ```text
 Hostname -> EPIC 4
@@ -80,11 +91,15 @@ Uptime -> EPIC 4
 JSON de check-in -> EPIC 4
 Envio para API -> EPIC 4
 Cache offline e reenvio -> EPIC 4
+Instalacao como produto -> EPIC 8
+Servico Windows ou tarefa agendada -> EPIC 8
+Retry inteligente -> EPIC 8
+Validacao contra producao -> EPIC 8 e EPIC 9
 ```
 
 ## SOC Light
 
-`SOC_RULES.md`
+`docs/security/SOC_RULES.md`
 
 ```text
 Firewall, Defender e RDP -> EPIC 6
@@ -92,11 +107,14 @@ USB e falhas de login -> EPIC 6
 Administradores locais -> EPIC 6
 Ferramentas remotas, VPN e torrent -> EPIC 6
 Eventos e alertas -> EPIC 6
+unknown_asset -> EPIC 11
+machine_offline -> EPIC 11
+Politicas autorizadas -> EPIC 11
 ```
 
 ## Decisões
 
-`DECISIONS.md`
+`docs/development/DECISIONS.md`
 
 ```text
 ADR-013 -> mantém a integração direta FastAPI + PostgreSQL
@@ -239,21 +257,74 @@ Resultado Esperado:
 
 Primeira versão pública.
 
+Status:
+
+Concluido.
+
 ---
 
 # Fase 6
 
-Governança
+Agente Windows em Producao
 
 Meta:
 
-Adicionar controle operacional.
+Transformar o agente em componente instalavel e validado contra o ambiente publicado.
+
+Entregas:
+
+* Instalacao controlada
+* Servico Windows ou tarefa agendada
+* Configuracao de producao
+* Logs e cache padronizados
+* Retry inteligente
+* Primeiro check-in real em producao
+
+Resultado Esperado:
+
+Maquinas Windows enviando dados reais para o dashboard publicado.
+
+---
+
+# Fase 7
+
+Validacao Fim a Fim e Dashboard Operacional
+
+Meta:
+
+Provar o fluxo completo e transformar o dashboard em ferramenta de operacao diaria.
+
+Entregas:
+
+* Evidencia do fluxo Windows Agent -> Nginx -> FastAPI -> PostgreSQL -> Dashboard
+* Tela de detalhes da maquina
+* Historico de metricas
+* Programas instalados por maquina
+* Eventos por maquina
+* Resolucao de alertas pela interface
+* Filtros operacionais
+
+Resultado Esperado:
+
+Operacao diaria baseada em dados reais.
+
+---
+
+# Fase 8
+
+Governanca e Autenticacao
+
+Meta:
+
+Substituir controles minimos do MVP por autenticacao e governanca administrativa.
 
 Entregas:
 
 * Login
+* Sessoes ou JWT
 * Perfis
 * Auditoria
+* Planejamento de API Key por agente
 
 Resultado Esperado:
 
@@ -261,9 +332,32 @@ Controle administrativo.
 
 ---
 
-# Fase 7
+# Fase 9
 
-SOC Avançado
+Operacao e Seguranca de Producao
+
+Meta:
+
+Reduzir risco operacional e preparar manutencao continua.
+
+Entregas:
+
+* Backup automatico
+* Restore testado
+* Rollback validado
+* Renovacao TLS validada
+* Monitoramento basico da VM
+* Gate de imagens Docker
+
+Resultado Esperado:
+
+Ambiente publicado mais confiavel e auditavel.
+
+---
+
+# Fase 10
+
+SOC Avancado
 
 Meta:
 
@@ -272,8 +366,9 @@ Evoluir para Blue Team.
 Entregas:
 
 * Wazuh
+* OpenVAS
 * IOC Detection
-* Correlação
+* Correlacao
 * MITRE ATT&CK
 
 Resultado Esperado:
@@ -282,7 +377,7 @@ SOC corporativo.
 
 ---
 
-# Fase 8
+# Fase 11
 
 SaaS
 
@@ -293,9 +388,9 @@ Transformar em produto.
 Entregas:
 
 * Multiempresa
-* Multiusuário
+* Multiusuario
 * Billing
-* Gestão de clientes
+* Gestao de clientes
 
 Resultado Esperado:
 

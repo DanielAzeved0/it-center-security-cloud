@@ -7,6 +7,8 @@ Agente PowerShell do IT Center Security Cloud.
 ```text
 agent-windows/
   itcenter-agent.ps1
+  install-agent.ps1
+  uninstall-agent.ps1
   config.json
   cache/
   logs/
@@ -25,15 +27,74 @@ cd agent-windows
 
 ```text
 server_url
-api_key
-agent_id
-interval_minutes
+agent_api_key
+checkin_interval_minutes
+log_path
+cache_path
 collect_inventory
 collect_metrics
 collect_security
 ```
 
-O valor `api_key` deve ser igual ao `AGENT_API_KEY` usado pelo backend.
+O valor `agent_api_key` deve ser igual ao `AGENT_API_KEY` usado pelo backend.
+
+O agente ainda aceita os campos legados `api_key` e `interval_minutes` para compatibilidade.
+
+`server_url` pode ser informado como raiz do ambiente publicado:
+
+```text
+https://itcenter-daniel.chickenkiller.com
+```
+
+ou como base local da API:
+
+```text
+http://127.0.0.1:8000/api/v1
+```
+
+## Instalacao no Windows
+
+Executar em PowerShell como Administrador:
+
+```powershell
+cd agent-windows
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install-agent.ps1 `
+  -ServerUrl "https://itcenter-daniel.chickenkiller.com" `
+  -AgentApiKey "<AGENT_API_KEY>" `
+  -CheckinIntervalMinutes 5
+```
+
+A instalacao cria:
+
+```text
+C:\Program Files\ITCenterAgent\
+  itcenter-agent.ps1
+  install-agent.ps1
+  uninstall-agent.ps1
+  config.json
+  logs\
+  cache\
+```
+
+E registra a Tarefa Agendada:
+
+```text
+ITCenterAgent
+```
+
+## Desinstalacao
+
+Remover a Tarefa Agendada, preservando arquivos, logs e cache:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\Program Files\ITCenterAgent\uninstall-agent.ps1"
+```
+
+Remover tambem scripts e configuracao:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\Program Files\ITCenterAgent\uninstall-agent.ps1" -RemoveFiles
+```
 
 ## Coletas implementadas
 
@@ -180,9 +241,9 @@ security
 Observacoes:
 
 ```text
-installed_programs ainda e enviado como lista vazia.
-security usa valores padrao temporarios ate as coletas de seguranca do EPIC 6.
-O envio para a API ainda nao foi implementado.
+installed_programs e preenchido com o snapshot local dos programas instalados.
+security usa coletas reais de Firewall, Defender, RDP, administradores locais, USB e falhas de login.
+O envio para a API ja esta implementado.
 ```
 
 ## Testes
@@ -209,6 +270,10 @@ Payload com campos obrigatorios do check-in
 JSON parseavel e alinhado ao payload
 Requisicao POST com header X-Agent-Api-Key
 Body JSON enviado para /api/v1/agent/checkin
+Normalizacao de config nova e legada
+Expansao de server_url raiz para /api/v1/agent/checkin
+Cache offline em arquivo JSON
+Reenvio de check-ins pendentes
 ```
 
 ## Envio para API
@@ -223,8 +288,10 @@ Regras do envio:
 
 ```text
 1. Usa server_url do config.json.
-2. Anexa /agent/checkin ao endpoint base.
-3. Envia o header X-Agent-Api-Key.
-4. Envia o payload em JSON.
-5. Se a API falhar, registra aviso e devolve o JSON local.
+2. Anexa /api/v1 quando server_url apontar para a raiz do dominio.
+3. Anexa /agent/checkin ao endpoint base.
+4. Envia o header X-Agent-Api-Key.
+5. Envia o payload em JSON UTF-8.
+6. Se a API falhar, registra aviso e salva o payload em cache offline.
+7. No proximo ciclo, tenta reenviar payloads pendentes.
 ```

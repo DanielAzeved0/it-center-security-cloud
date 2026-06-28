@@ -415,7 +415,7 @@ Usar psycopg diretamente no MVP.
 Impactos:
 
 * Menos dependências e menor complexidade inicial.
-* Queries SQL explícitas e alinhadas ao DATABASE.md.
+* Queries SQL explícitas e alinhadas ao docs/backend/DATABASE.md.
 * Possibilidade de migrar para SQLAlchemy futuramente se o domínio crescer.
 
 ---
@@ -510,13 +510,13 @@ Como o produto e de seguranca, imagens com vulnerabilidades corrigiveis nao deve
 * Frontend atualizou Next.js e corrige `picomatch` no build.
 * Frontend remove `npm` global da imagem final para eliminar dependencias de build/runtime nao usadas.
 * `npm audit fix --force` nao sera usado sem revisao.
-* CVE residual de imagem oficial sera acompanhada como P1 e registrada em `docs/SECURITY.md`.
+* CVE residual de imagem oficial sera acompanhada como P1 e registrada em `docs/security/SECURITY.md`.
 
 Impactos:
 
 * Build fica mais rigoroso.
 * O patch do frontend deve ser removido futuramente quando o Next empacotar `picomatch` corrigido diretamente.
-* O deploy externo passa a depender do gate de imagens descrito em `docs/DEPLOYMENT.md`.
+* O deploy externo passa a depender do gate de imagens descrito em `docs/deployment/PRODUCTION.md`.
 
 ---
 

@@ -73,9 +73,9 @@ Impacto esperado: deploys mais seguros, rollback mais rapido e backup/restore pa
 
 Atualizados:
 
-* `docs/ARCHITECTURE.md`
-* `docs/DEPLOYMENT.md`
-* `docs/DECISIONS.md`
+* `docs/architecture/ARCHITECTURE.md`
+* `docs/deployment/PRODUCTION.md`
+* `docs/development/DECISIONS.md`
 * `infra/README.md`
 * `README.md`
 

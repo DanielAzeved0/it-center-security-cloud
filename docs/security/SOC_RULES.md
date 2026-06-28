@@ -326,6 +326,13 @@ unauthorized_vpn_tool
 torrent_software_detected
 ```
 
+Regras definidas, mas ainda nao implementadas no EPIC 6:
+
+```text
+unknown_asset
+machine_offline
+```
+
 Comportamento atual:
 
 * `firewall_disabled`: gerado quando `security.firewall_enabled` vem `false`; severidade `high`; gera alerta aberto.

@@ -3,6 +3,98 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$script:AgentRuntimeConfig = $null
+
+function Get-DefaultAgentLogDirectory {
+    Join-Path $PSScriptRoot "logs"
+}
+
+function Get-DefaultAgentCacheDirectory {
+    Join-Path $PSScriptRoot "cache"
+}
+
+function Test-AgentLocalHttpUrl {
+    param(
+        [Parameter(Mandatory = $true)]
+        [uri]$Uri
+    )
+
+    $Uri.Scheme -eq "http" -and @("localhost", "127.0.0.1", "::1") -contains $Uri.Host
+}
+
+function ConvertTo-AgentValidatedConfig {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object]$RawConfig
+    )
+
+    if ([string]::IsNullOrWhiteSpace($RawConfig.server_url)) {
+        throw "Server URL not configured."
+    }
+
+    $serverUrl = [string]$RawConfig.server_url
+    $serverUri = $null
+
+    if (-not [System.Uri]::TryCreate($serverUrl, [System.UriKind]::Absolute, [ref]$serverUri)) {
+        throw "Server URL must be an absolute URL."
+    }
+
+    if ($serverUri.Scheme -ne "https" -and -not (Test-AgentLocalHttpUrl -Uri $serverUri)) {
+        throw "Server URL must use HTTPS outside local development."
+    }
+
+    $apiKey = if (-not [string]::IsNullOrWhiteSpace($RawConfig.agent_api_key)) {
+        [string]$RawConfig.agent_api_key
+    }
+    else {
+        [string]$RawConfig.api_key
+    }
+
+    if ([string]::IsNullOrWhiteSpace($apiKey)) {
+        throw "Agent API key not configured."
+    }
+
+    $interval = if ($null -ne $RawConfig.checkin_interval_minutes) {
+        [int]$RawConfig.checkin_interval_minutes
+    }
+    elseif ($null -ne $RawConfig.interval_minutes) {
+        [int]$RawConfig.interval_minutes
+    }
+    else {
+        5
+    }
+
+    if ($interval -lt 1) {
+        throw "Check-in interval must be greater than or equal to 1 minute."
+    }
+
+    $logPath = if (-not [string]::IsNullOrWhiteSpace($RawConfig.log_path)) {
+        [string]$RawConfig.log_path
+    }
+    else {
+        Get-DefaultAgentLogDirectory
+    }
+
+    $cachePath = if (-not [string]::IsNullOrWhiteSpace($RawConfig.cache_path)) {
+        [string]$RawConfig.cache_path
+    }
+    else {
+        Get-DefaultAgentCacheDirectory
+    }
+
+    [pscustomobject]@{
+        server_url = $serverUrl.TrimEnd("/")
+        api_key = $apiKey
+        agent_api_key = $apiKey
+        checkin_interval_minutes = $interval
+        interval_minutes = $interval
+        log_path = $logPath
+        cache_path = $cachePath
+        collect_inventory = if ($null -eq $RawConfig.collect_inventory) { $true } else { [bool]$RawConfig.collect_inventory }
+        collect_metrics = if ($null -eq $RawConfig.collect_metrics) { $true } else { [bool]$RawConfig.collect_metrics }
+        collect_security = if ($null -eq $RawConfig.collect_security) { $true } else { [bool]$RawConfig.collect_security }
+    }
+}
 
 function Get-AgentConfig {
     param(
@@ -13,7 +105,16 @@ function Get-AgentConfig {
         throw "Config file not found: $Path"
     }
 
-    Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json
+    $rawConfig = Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json
+    ConvertTo-AgentValidatedConfig -RawConfig $rawConfig
+}
+
+function Get-AgentLogDirectory {
+    if ($null -ne $script:AgentRuntimeConfig -and -not [string]::IsNullOrWhiteSpace($script:AgentRuntimeConfig.log_path)) {
+        return $script:AgentRuntimeConfig.log_path
+    }
+
+    Get-DefaultAgentLogDirectory
 }
 
 function Write-AgentLog {
@@ -22,7 +123,7 @@ function Write-AgentLog {
         [string]$Level = "INFO"
     )
 
-    $logsPath = Join-Path $PSScriptRoot "logs"
+    $logsPath = Get-AgentLogDirectory
     if (-not (Test-Path -LiteralPath $logsPath)) {
         New-Item -ItemType Directory -Path $logsPath | Out-Null
     }
@@ -33,9 +134,13 @@ function Write-AgentLog {
 }
 
 function Initialize-AgentWorkspace {
+    param(
+        [object]$Config = $script:AgentRuntimeConfig
+    )
+
     $requiredDirectories = @(
-        (Join-Path $PSScriptRoot "cache"),
-        (Join-Path $PSScriptRoot "logs")
+        $(if ($null -ne $Config -and -not [string]::IsNullOrWhiteSpace($Config.cache_path)) { $Config.cache_path } else { Get-DefaultAgentCacheDirectory }),
+        $(if ($null -ne $Config -and -not [string]::IsNullOrWhiteSpace($Config.log_path)) { $Config.log_path } else { Get-DefaultAgentLogDirectory })
     )
 
     foreach ($directory in $requiredDirectories) {
@@ -464,7 +569,11 @@ function ConvertTo-AgentCheckinJson {
 }
 
 function Get-AgentCacheDirectory {
-    Join-Path $PSScriptRoot "cache"
+    if ($null -ne $script:AgentRuntimeConfig -and -not [string]::IsNullOrWhiteSpace($script:AgentRuntimeConfig.cache_path)) {
+        return $script:AgentRuntimeConfig.cache_path
+    }
+
+    Get-DefaultAgentCacheDirectory
 }
 
 function Save-AgentOfflinePayload {
@@ -508,6 +617,10 @@ function Send-AgentCheckin {
     }
 
     $baseUrl = $Config.server_url.TrimEnd("/")
+    if ($baseUrl -notmatch "/api/v1$") {
+        $baseUrl = "$baseUrl/api/v1"
+    }
+
     $jsonBody = ConvertTo-AgentCheckinJson -Payload $Payload
     $utf8Body = [System.Text.Encoding]::UTF8.GetBytes($jsonBody)
 
@@ -560,8 +673,9 @@ function Send-PendingAgentCheckins {
 }
 
 function Start-ItCenterAgent {
-    Initialize-AgentWorkspace
     $config = Get-AgentConfig -Path $ConfigPath
+    $script:AgentRuntimeConfig = $config
+    Initialize-AgentWorkspace -Config $config
     $payload = New-AgentCheckinPayload
 
     Write-AgentLog -Message "Agent started. Server URL: $($config.server_url)"
