@@ -30,7 +30,7 @@ O repositorio privado foi clonado via SSH apos configurar a chave da VM no GitHu
 ```bash
 cd /opt/itcenter
 git clone git@github.com:DanielAzeved0/it-center-security-cloud.git app
-cd /opt/itcenter/app
+cd /opt/itcenter/app/it-center-security-cloud
 ```
 
 ## Variaveis de producao
@@ -69,7 +69,7 @@ Criar credencial HTTP Basic:
 
 ```bash
 docker run --rm httpd:2.4-alpine htpasswd -Bbn admin 'SENHA_FORTE_AQUI' > .secrets/dashboard.htpasswd
-chmod 600 .secrets/dashboard.htpasswd
+chmod 644 .secrets/dashboard.htpasswd
 ```
 
 ## Rede Docker
@@ -87,7 +87,7 @@ Essa rede isola PostgreSQL, backend e frontend da internet. O Nginx e o unico se
 Com a VM preparada, executar:
 
 ```bash
-cd /opt/itcenter/app
+cd /opt/itcenter/app/it-center-security-cloud
 sh infra/scripts/deploy.sh
 ```
 

@@ -2,14 +2,14 @@
 
 Infraestrutura local e de producao do IT Center Security Cloud.
 
-O arquivo `docker-compose.yml` é exclusivo para desenvolvimento local. Para publicar na Oracle Cloud, use `docker-compose.production.yml` e siga o procedimento em `docs/DEPLOYMENT.md`; não exponha o Compose local diretamente na internet.
+O arquivo `docker-compose.yml` é exclusivo para desenvolvimento local. Para publicar na Oracle Cloud, use `docker-compose.production.yml` e siga o procedimento em `docs/deployment/PRODUCTION.md`; não exponha o Compose local diretamente na internet.
 
 ## Bootstrap do Edge Node
 
 O bootstrap versionado ainda esta documentado como proposta em:
 
 ```text
-docs/BOOTSTRAP.md
+docs/deployment/BOOTSTRAP.md
 ```
 
 A proposta define que a futura automacao deve preparar o Ubuntu Server do Edge Node antes do deploy dos containers:
@@ -20,7 +20,7 @@ A proposta define que a futura automacao deve preparar o Ubuntu Server do Edge N
 * Docker CE e Docker Compose Plugin;
 * UFW;
 
-Neste momento, os scripts ainda nao foram implementados. Clone do repositorio, `.env.production`, Compose, HTTPS e preflight pertencem ao fluxo de deploy documentado em `docs/DEPLOYMENT.md`.
+Neste momento, os scripts ainda nao foram implementados. Clone do repositorio, `.env.production`, Compose, HTTPS e preflight pertencem ao fluxo de deploy documentado em `docs/deployment/PRODUCTION.md`.
 
 ## Servicos
 
@@ -49,7 +49,7 @@ restore.sh               restaura dump mediante confirmacao explicita
 Na VM:
 
 ```bash
-cd /opt/itcenter/app
+cd /opt/itcenter/app/it-center-security-cloud
 sh infra/scripts/deploy.sh
 ```
 

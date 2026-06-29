@@ -111,14 +111,14 @@ Responsabilidades:
 
 ### 8. Healthcheck do frontend
 
-Foi identificado que o Next.js nao respondia corretamente quando consultado por `127.0.0.1` em determinado contexto de container.
+Foi identificado que o Next.js standalone respondia corretamente pelo DNS interno Docker, mas recusava conexao quando o smoke test consultava `127.0.0.1:3000` em determinado contexto de container.
 
-O healthcheck foi ajustado para usar o hostname interno correto do container.
+O smoke test e o healthcheck de producao foram ajustados para validar o frontend pela rede Docker.
 
 Resultado:
 
 ```text
-frontend: HEALTHY
+nginx -> http://frontend:3000/ -> 200 OK
 ```
 
 ### 9. DNS
@@ -179,8 +179,10 @@ Foram testados:
 ### 13. Problemas encontrados
 
 * DNS da Vivo demorou a propagar.
-* Permissao incorreta em `dashboard.htpasswd`.
+* Permissao `600` em `dashboard.htpasswd` gerou `500 Internal Server Error` no Nginx; corrigido para `644`.
 * Pouca memoria na VM exigiu criacao de Swap.
+* O preflight precisou ser executado com `MIN_MEM_MB=256` apos confirmacao de swap ativo na Oracle Free Tier.
+* O agente Windows retornou `401` enquanto usava API key diferente de `AGENT_API_KEY` em producao; corrigido ao alinhar a chave instalada no agente.
 
 ### 14. Estado final
 
@@ -191,5 +193,5 @@ Nginx: funcional
 Dashboard: funcional
 Backend: funcional
 PostgreSQL: funcional
-Windows Agent: pendente de integracao
+Windows Agent: integrado e enviando check-in com 200 OK
 ```

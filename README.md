@@ -2,7 +2,7 @@
 
 > Plataforma full stack para monitoramento, inventário, observabilidade e segurança de máquinas Windows, com agente PowerShell, API FastAPI, PostgreSQL, dashboard web e práticas iniciais de SOC/Blue Team.
 
-Status: Fases 0 a 4 concluídas | Ambiente local Docker operacional | Infraestrutura de produção preparada | Publicação na Oracle Cloud pendente.
+Status: Fases 0 a 5 concluídas | Ambiente local Docker operacional | Produção publicada na Oracle Cloud | Agente Windows integrado ao check-in.
 
 ---
 
@@ -266,7 +266,7 @@ O ambiente local usa `infra/docker-compose.yml`. Para produção, a proposta de 
 Comando principal de producao na VM:
 
 ```bash
-cd /opt/itcenter/app
+cd /opt/itcenter/app/it-center-security-cloud
 sh infra/scripts/deploy.sh
 ```
 
@@ -315,7 +315,7 @@ Somente o Nginx expoe portas publicas. PostgreSQL, FastAPI e Next.js permanecem 
 Na VM:
 
 ```bash
-cd /opt/itcenter/app
+cd /opt/itcenter/app/it-center-security-cloud
 sh infra/scripts/preflight-production.sh
 docker ps
 docker compose --env-file .env.production -f infra/docker-compose.production.yml ps
@@ -331,7 +331,7 @@ curl --user admin:SENHA_FORTE_AQUI https://itcenter-daniel.chickenkiller.com
 ### Backup
 
 ```bash
-cd /opt/itcenter/app
+cd /opt/itcenter/app/it-center-security-cloud
 sh infra/scripts/backup.sh
 ```
 
@@ -366,9 +366,9 @@ dig @9.9.9.9 itcenter-daniel.chickenkiller.com
 
 ### Agente Windows
 
-O agente ainda nao esta integrado ao ambiente publicado. Por isso, o dashboard pode aparecer vazio mesmo com infraestrutura saudavel.
+O agente Windows ja esta integrado ao ambiente publicado. O check-in de producao usa `POST /api/v1/agent/checkin` via HTTPS e autentica com o header `X-Agent-Api-Key`, que deve ser igual ao `AGENT_API_KEY` definido na VM.
 
-Proxima fase do agente:
+Proximas evolucoes do agente:
 
 * Separar o agente como produto independente.
 * Criar instalador.
@@ -503,7 +503,7 @@ docker compose -f infra/docker-compose.yml down -v
 * Alertas básicos
 * Políticas de ativos
 
-### Fase 5 - Deploy Cloud — pendente de publicação
+### Fase 5 - Deploy Cloud — concluída
 
 * Oracle Cloud
 * Bootstrap versionado do Edge Node

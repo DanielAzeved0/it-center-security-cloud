@@ -9,6 +9,7 @@ Esta pasta concentra a documentacao de setup, producao, troubleshooting e histor
 | `SETUP.md` | Preparacao do host, clone, variaveis e secrets. |
 | `PRODUCTION.md` | Estrategia de deploy e operacao em producao. |
 | `TROUBLESHOOTING.md` | Diagnostico e correcao de problemas. |
+| `OPERATIONAL_HANDOFF_2026-06-28.md` | Consolidado do deploy real, incidentes, validacoes e runbook atual. |
 
 ## Referencias complementares
 
@@ -27,7 +28,7 @@ Esta pasta concentra a documentacao de setup, producao, troubleshooting e histor
 ## Comandos principais
 
 ```bash
-cd /opt/itcenter/app
+cd /opt/itcenter/app/it-center-security-cloud
 sh infra/scripts/preflight-production.sh
 sh infra/scripts/deploy.sh
 sh infra/scripts/backup.sh

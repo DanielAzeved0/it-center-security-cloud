@@ -16,7 +16,7 @@ Sistema operacional: Ubuntu Server 24.04 LTS
 Dominio: itcenter-daniel.chickenkiller.com
 IP publico: 147.15.78.220
 Rede Docker: itcenter-network
-Aplicacao: /opt/itcenter/app
+Aplicacao: /opt/itcenter/app/it-center-security-cloud
 Backups: /opt/itcenter/backups
 ```
 
@@ -750,7 +750,7 @@ Ajuste do healthcheck para usar o alvo interno correto.
 
 ```bash
 docker compose --env-file .env.production -f infra/docker-compose.production.yml ps
-docker exec -it itcenter-frontend wget -q -O - http://localhost:3000/
+docker compose --env-file .env.production -f infra/docker-compose.production.yml exec -T nginx wget -q -O - http://frontend:3000/
 ```
 
 ## Licoes aprendidas
@@ -980,7 +980,7 @@ Permissoes inadequadas em `.secrets` ou `dashboard.htpasswd`.
 
 ```bash
 chmod 700 .secrets
-chmod 600 .secrets/dashboard.htpasswd
+chmod 644 .secrets/dashboard.htpasswd
 ```
 
 ## Como validar
@@ -1225,7 +1225,7 @@ Execucao de testes internos por container.
 ```bash
 docker network inspect itcenter-network
 docker exec -it itcenter-backend wget -q -O - http://127.0.0.1:8000/api/v1/health
-docker exec -it itcenter-frontend wget -q -O - http://localhost:3000/
+docker compose --env-file .env.production -f infra/docker-compose.production.yml exec -T nginx wget -q -O - http://frontend:3000/
 docker exec -it itcenter-nginx wget -q -O - http://127.0.0.1/healthz
 ```
 
@@ -1505,7 +1505,7 @@ Validar:
 
 ```bash
 docker logs itcenter-frontend
-docker exec -it itcenter-frontend wget -q -O - http://localhost:3000/
+docker compose --env-file .env.production -f infra/docker-compose.production.yml exec -T nginx wget -q -O - http://frontend:3000/
 ```
 
 Acao:

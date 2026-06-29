@@ -45,4 +45,35 @@ Manter logs nos containers via stdout/stderr permite evoluir para Loki/Promtail 
 
 ## 8. Dashboard vazio nao significa falha
 
-Enquanto o Windows Agent nao envia check-ins, o dashboard pode estar vazio. Isso e estado esperado do produto, nao erro de infraestrutura.
+Enquanto nenhum Windows Agent envia check-ins, o dashboard pode estar vazio. Isso e estado esperado do produto, nao erro de infraestrutura.
+
+## 9. O instalador do agente deve falhar cedo
+
+Instalar o agente sem validar DNS, porta e health check desperdicou tempo: a tarefa agendada ficava ativa, mas os check-ins acumulavam em cache.
+
+Licao:
+
+* Validar DNS antes de instalar.
+* Validar porta 443 antes de instalar.
+* Validar `/healthz` antes de instalar.
+* Permitir bypass apenas quando a instalacao offline for intencional.
+
+## 10. `hosts` e workaround, nao estrategia
+
+Editar `C:\Windows\System32\drivers\etc\hosts` resolveu um PC especifico, mas nao escala para todas as maquinas monitoradas.
+
+Licao:
+
+* Corrigir DNS no roteador/DHCP.
+* Usar DNS confiavel, como Cloudflare ou Google.
+* Considerar dominio proprio gerenciado por Cloudflare para o endpoint dos agentes.
+
+## 11. Secrets expostos em operacao devem ser rotacionados
+
+Durante diagnosticos, e facil colar API keys ou senhas em chats e terminais.
+
+Licao:
+
+* Nao documentar valores reais.
+* Rotacionar `AGENT_API_KEY` e senha do dashboard apos fases de teste assistido.
+* Usar placeholders nos docs.

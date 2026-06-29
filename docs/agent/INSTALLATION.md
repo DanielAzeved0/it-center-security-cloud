@@ -18,6 +18,7 @@ Ja existem:
 * instalacao em `C:\Program Files\ITCenterAgent`;
 * registro de Tarefa Agendada do Windows;
 * desinstalacao da Tarefa Agendada.
+* validacao previa de DNS, porta TCP e health check do endpoint antes da instalacao.
 
 ## Objetivo
 
@@ -35,9 +36,10 @@ Servico Windows nativo fica reservado para evolucao futura.
 3. Executar install-agent.ps1
 4. Configurar URL da API
 5. Configurar AGENT_API_KEY
-6. Registrar Tarefa Agendada
-7. Iniciar coleta periodica
-8. Enviar check-ins periodicos
+6. Validar DNS, porta e health check do servidor
+7. Registrar Tarefa Agendada
+8. Iniciar coleta periodica
+9. Enviar check-ins periodicos
 ```
 
 ## Comando de instalacao
@@ -49,7 +51,8 @@ cd agent-windows
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install-agent.ps1 `
   -ServerUrl "https://itcenter-daniel.chickenkiller.com" `
   -AgentApiKey "<AGENT_API_KEY>" `
-  -CheckinIntervalMinutes 5
+  -CheckinIntervalMinutes 5 `
+  -Force
 ```
 
 Ambiente local:
@@ -69,13 +72,58 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install-agent.ps1 `
 1. Validar execucao como Administrador
 2. Configurar URL da API
 3. Configurar AGENT_API_KEY
-4. Criar C:\Program Files\ITCenterAgent
-5. Criar logs\
-6. Criar cache\
-7. Copiar scripts do agente
-8. Gerar config.json
-9. Registrar Tarefa Agendada ITCenterAgent
+4. Resolver DNS do host configurado
+5. Validar conexao TCP na porta do endpoint
+6. Validar health check do endpoint
+7. Criar C:\Program Files\ITCenterAgent
+8. Criar logs\
+9. Criar cache\
+10. Copiar scripts do agente
+11. Gerar config.json
+12. Registrar Tarefa Agendada ITCenterAgent
 ```
+
+## Preflight de rede do instalador
+
+Por padrao, o instalador bloqueia a instalacao se o endpoint do agente nao estiver acessivel. Isso evita instalar o agente em maquinas cujo DNS local nao resolve o dominio de producao, o que faria os check-ins acumularem em cache.
+
+Validacoes feitas antes de copiar arquivos:
+
+```text
+1. DNS do host informado em ServerUrl.
+2. Conexao TCP na porta 443 para HTTPS ou 80 para HTTP local.
+3. Health check:
+   - ServerUrl raiz: /healthz
+   - ServerUrl terminado em /api/v1: /api/v1/health
+```
+
+Se a rede usar DNS de provedor que nao resolve o dominio publicado, corrija o DNS da rede antes de instalar. Preferencias recomendadas:
+
+```text
+DNS primario: 1.1.1.1
+DNS secundario: 8.8.8.8
+```
+
+Para validar manualmente no Windows:
+
+```powershell
+nslookup itcenter-daniel.chickenkiller.com
+nslookup itcenter-daniel.chickenkiller.com 1.1.1.1
+Test-NetConnection itcenter-daniel.chickenkiller.com -Port 443
+```
+
+Bypass operacional, apenas quando a instalacao offline for intencional:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install-agent.ps1 `
+  -ServerUrl "https://itcenter-daniel.chickenkiller.com" `
+  -AgentApiKey "<AGENT_API_KEY>" `
+  -CheckinIntervalMinutes 5 `
+  -SkipConnectivityCheck `
+  -Force
+```
+
+Nao use `hosts` como solucao padrao para distribuir agentes. Se o IP publico mudar, cada maquina ficara presa ao IP antigo.
 
 ## Configuracoes esperadas
 
@@ -135,11 +183,11 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\Program Files\ITCent
 * Configuracao persistente de `AGENT_API_KEY`.
 * Local padrao de logs.
 * Local padrao de cache offline.
+* Preflight de conectividade antes da instalacao.
 
 ## Requisitos pendentes
 
 * Retry inteligente.
-* Validacao contra o ambiente publicado.
 * Instalador assinado.
 * Atualizacao automatica.
 * Servico Windows nativo.

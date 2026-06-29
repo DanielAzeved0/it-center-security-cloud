@@ -49,7 +49,7 @@ Estrutura oficial do host:
 `-- bin/       # wrappers ou atalhos administrativos locais
 ```
 
-No MVP, o repositório deve ficar em `/opt/itcenter/app`. Os arquivos `.env.production` e `.secrets/dashboard.htpasswd` continuam dentro desse diretório da aplicação porque o Compose e o preflight usam caminhos relativos ao repositório. O diretório `/opt/itcenter/secrets` fica reservado para uma próxima evolução, quando esses caminhos forem externalizados sem quebrar o contrato atual.
+No MVP, o repositório deve ficar em `/opt/itcenter/app/it-center-security-cloud`. Os arquivos `.env.production` e `.secrets/dashboard.htpasswd` continuam dentro desse diretório da aplicação porque o Compose e o preflight usam caminhos relativos ao repositório. O diretório `/opt/itcenter/secrets` fica reservado para uma próxima evolução, quando esses caminhos forem externalizados sem quebrar o contrato atual.
 
 ---
 
@@ -174,7 +174,7 @@ Ele expõe somente o Nginx nas portas `80` e `443`. PostgreSQL, FastAPI e Next.j
 * Instância `itcenter-edge-01` com Ubuntu Server 24.04 LTS atualizado, na subnet pública e com IPv4 público.
 * Docker Engine e Docker Compose Plugin instalados.
 * Diretórios operacionais criados em `/opt/itcenter`.
-* Repositório clonado em `/opt/itcenter/app`.
+* Repositório clonado em `/opt/itcenter/app/it-center-security-cloud`.
 * Firewall da Oracle Cloud e UFW liberando somente `22` (restrito ao IP administrativo), `80` e `443`.
 * Registro DNS `A` de `DOMAIN_NAME` apontando para o IP público da VM.
 * Acesso SSH por chave; login por senha e login direto do root desabilitados.
@@ -184,7 +184,7 @@ Ele expõe somente o Nginx nas portas `80` e `443`. PostgreSQL, FastAPI e Next.j
 A preparacao inicial do host passara a ser feita por scripts versionados. A proposta esta documentada em:
 
 ```text
-docs/BOOTSTRAP.md
+docs/deployment/BOOTSTRAP.md
 ```
 
 Estrutura planejada:
@@ -211,10 +211,10 @@ sudo mkdir -p /opt/itcenter/{app,backups,configs,runtime,scripts,secrets,logs,bi
 sudo chown -R ubuntu:ubuntu /opt/itcenter
 ```
 
-Depois acesse o repositorio clonado em `/opt/itcenter/app`:
+Depois acesse o repositorio clonado em `/opt/itcenter/app/it-center-security-cloud`:
 
 ```bash
-cd /opt/itcenter/app
+cd /opt/itcenter/app/it-center-security-cloud
 ```
 
 Na raiz do repositório, na VM:
@@ -231,10 +231,11 @@ Crie a credencial do dashboard com bcrypt. O arquivo não deve ser commitado:
 
 ```bash
 docker run --rm httpd:2.4-alpine htpasswd -Bbn admin 'SENHA_FORTE_AQUI' > .secrets/dashboard.htpasswd
-chmod 600 .secrets/dashboard.htpasswd .env.production
+chmod 644 .secrets/dashboard.htpasswd
+chmod 600 .env.production
 ```
 
-O Nginx exige essa credencial para o dashboard e para as chamadas administrativas proxificadas pelo Next.js. O check-in do agente continua autenticado por `X-Agent-Api-Key`; use no agente a mesma chave definida em `AGENT_API_KEY`.
+O Nginx exige essa credencial para o dashboard e para as chamadas administrativas proxificadas pelo Next.js. Como esse arquivo e montado somente leitura no container, ele precisa ser legivel pelo worker do Nginx. Permissao `600` no host pode gerar `500 Internal Server Error` com `Permission denied`; use `644` para `.secrets/dashboard.htpasswd` e mantenha `.env.production` com `600`. O check-in do agente continua autenticado por `X-Agent-Api-Key`; use no agente a mesma chave definida em `AGENT_API_KEY`.
 
 ## Certificado TLS inicial
 
@@ -258,6 +259,25 @@ curl --fail --user admin:SENHA_FORTE_AQUI https://SEU_DOMINIO/
 ```
 
 O `deploy.sh` executa preflight, valida o Compose, faz build das imagens, sobe os containers, aguarda healthchecks e executa smoke tests internos. O preflight falha se Docker/Compose estiverem ausentes, se o host tiver pouco recurso, se segredos ainda forem placeholders, se a credencial administrativa não existir, se o certificado estiver ausente, se o Compose for inválido ou se portas essenciais estiverem ocupadas por outro processo.
+
+Em instancias Oracle Free Tier com pouca RAM, crie swap antes do deploy. O preflight mede `MemAvailable` e nao soma swap; quando a VM ja tiver swap ativo e os containers estiverem saudaveis, o limite pode ser reduzido explicitamente:
+
+```bash
+MIN_MEM_MB=256 sh infra/scripts/preflight-production.sh
+MIN_MEM_MB=256 sh infra/scripts/deploy.sh
+```
+
+Use esse override somente depois de validar `free -h`.
+
+Smoke tests esperados:
+
+```bash
+docker compose --env-file .env.production -f infra/docker-compose.production.yml exec -T backend wget -q -O /dev/null http://127.0.0.1:8000/api/v1/health
+docker compose --env-file .env.production -f infra/docker-compose.production.yml exec -T nginx wget -q -O /dev/null http://frontend:3000/
+docker compose --env-file .env.production -f infra/docker-compose.production.yml exec -T nginx wget -q -O /dev/null http://127.0.0.1/healthz
+```
+
+O frontend deve ser validado pelo DNS interno Docker (`frontend:3000`) a partir do Nginx. Em algumas imagens standalone do Next.js, `127.0.0.1:3000` dentro do proprio container pode recusar conexao mesmo com o servico acessivel pela rede Docker.
 
 ## Rollback
 

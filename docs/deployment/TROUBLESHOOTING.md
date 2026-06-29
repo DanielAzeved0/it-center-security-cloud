@@ -49,10 +49,10 @@ frontend: unhealthy
 Validar internamente:
 
 ```bash
-docker exec -it itcenter-frontend wget -q -O - http://localhost:3000/
+docker compose --env-file .env.production -f infra/docker-compose.production.yml exec -T nginx wget -S -O - http://frontend:3000/
 ```
 
-Se o problema estiver relacionado ao hostname usado no healthcheck, validar o hostname interno correto do container.
+Se `http://frontend:3000/` responder `200 OK`, o frontend esta acessivel na rede Docker. Evite diagnosticar producao apenas por `127.0.0.1:3000` dentro do container do frontend, pois o runtime standalone do Next.js pode nao estar associado a esse loopback mesmo quando responde pelo hostname do container.
 
 ## Backend unhealthy
 
@@ -112,8 +112,9 @@ Permission denied
 Corrigir:
 
 ```bash
-chmod 600 .secrets/dashboard.htpasswd
+chmod 644 .secrets/dashboard.htpasswd
 chmod 700 .secrets
+docker compose --env-file .env.production -f infra/docker-compose.production.yml restart nginx
 ```
 
 Validar owner:
@@ -121,6 +122,15 @@ Validar owner:
 ```bash
 ls -la .secrets
 ```
+
+Quando o Nginx nao consegue ler `/etc/nginx/auth/dashboard.htpasswd`, a rota `/` pode retornar:
+
+```text
+500 Internal Server Error
+open() "/etc/nginx/auth/dashboard.htpasswd" failed (13: Permission denied)
+```
+
+O arquivo e montado no container como somente leitura; a permissao `600` para o usuario `ubuntu` no host pode impedir leitura pelo worker do Nginx dentro do container.
 
 ## DNS nao resolve
 
@@ -152,13 +162,34 @@ docker stats
 Mitigacao aplicada:
 
 * Criacao de Swap na Oracle VM.
+* Uso pontual de `MIN_MEM_MB=256` no preflight/deploy quando `free -h` confirma swap ativo e a memoria disponivel real fica abaixo de 512MB.
+
+Criar swap:
+
+```bash
+sudo rm -f /swapfile
+sudo fallocate -l 1G /swapfile
+sudo chmod 600 /swapfile
+sudo mkswap /swapfile
+sudo swapon /swapfile
+grep -q '^/swapfile ' /etc/fstab || echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+free -h
+```
 
 ## Dashboard vazio
 
-Isso e esperado enquanto o Windows Agent nao estiver integrado.
+Isso e esperado enquanto nenhum Windows Agent tiver enviado check-in com sucesso.
 
 O dashboard depende de check-ins em:
 
 ```text
 POST /api/v1/agent/checkin
 ```
+
+Validar no backend/Nginx:
+
+```bash
+docker compose --env-file .env.production -f infra/docker-compose.production.yml logs --tail=120 backend nginx
+```
+
+Um agente autenticado corretamente deve gerar `POST /api/v1/agent/checkin` com `200 OK`. Se retornar `401`, confira se a chave instalada no agente e exatamente igual a `AGENT_API_KEY` da producao.

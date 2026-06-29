@@ -19,7 +19,7 @@ Runtime: Docker Engine
 Orquestracao: Docker Compose
 Rede Docker: itcenter-network
 Raiz operacional: /opt/itcenter
-Aplicacao: /opt/itcenter/app
+Aplicacao: /opt/itcenter/app/it-center-security-cloud
 Backups: /opt/itcenter/backups
 ```
 
@@ -398,7 +398,7 @@ Licoes aprendidas:
 
 Proximos passos:
 
-* Clonar o repositorio em `/opt/itcenter/app`.
+* Clonar o repositorio em `/opt/itcenter/app/it-center-security-cloud`.
 
 ### 6. Clone do repositorio privado
 
@@ -593,7 +593,7 @@ Correcao aplicada:
 
 ```bash
 chmod 700 .secrets
-chmod 600 .secrets/dashboard.htpasswd
+chmod 644 .secrets/dashboard.htpasswd
 ```
 
 Motivo da correcao:
@@ -976,7 +976,7 @@ Comandos executados:
 ```bash
 docker compose --env-file .env.production -f infra/docker-compose.production.yml ps
 docker logs itcenter-frontend
-docker exec -it itcenter-frontend wget -q -O - http://localhost:3000/
+docker compose --env-file .env.production -f infra/docker-compose.production.yml exec -T nginx wget -q -O - http://frontend:3000/
 ```
 
 Resultado esperado:
@@ -1395,7 +1395,7 @@ Comandos executados:
 docker logs itcenter-nginx
 ls -la .secrets
 chmod 700 .secrets
-chmod 600 .secrets/dashboard.htpasswd
+chmod 644 .secrets/dashboard.htpasswd
 ```
 
 Resultado esperado:
@@ -1427,7 +1427,7 @@ Correcao aplicada:
 
 ```text
 chmod 700 .secrets
-chmod 600 .secrets/dashboard.htpasswd
+chmod 644 .secrets/dashboard.htpasswd
 ```
 
 Motivo da correcao:
@@ -1489,7 +1489,7 @@ Dashboard vazio por ausencia de check-ins do agente.
 Causa raiz:
 
 ```text
-Windows Agent ainda nao integrado ao ambiente publicado.
+Windows Agent integrado ao ambiente publicado apos alinhamento da `AGENT_API_KEY` e correcao de DNS no cliente.
 ```
 
 Correcao aplicada:
@@ -1534,7 +1534,7 @@ Comandos executados:
 
 ```bash
 docker exec -it itcenter-backend wget -q -O - http://127.0.0.1:8000/api/v1/health
-docker exec -it itcenter-frontend wget -q -O - http://localhost:3000/
+docker compose --env-file .env.production -f infra/docker-compose.production.yml exec -T nginx wget -q -O - http://frontend:3000/
 docker exec -it itcenter-nginx wget -q -O - http://127.0.0.1/healthz
 ```
 
@@ -1760,7 +1760,7 @@ Nginx: healthy
 HTTPS: funcionando
 Dashboard: funcionando
 Banco: funcionando
-Windows Agent: ainda nao integrado
+Windows Agent: integrado e enviando check-in com 200 OK quando DNS e API key estao corretos
 ```
 
 Problemas encontrados:
@@ -1953,7 +1953,7 @@ Sem Windows Agent integrado, o dashboard pode estar vazio mesmo com a infraestru
 - [ ] Chave SSH cadastrada no GitHub.
 - [ ] `ssh -T git@github.com` validado.
 - [ ] Repositorio privado clonado.
-- [ ] Repositorio em `/opt/itcenter/app`.
+- [ ] Repositorio em `/opt/itcenter/app/it-center-security-cloud`.
 - [ ] Branch correta selecionada.
 - [ ] Arquivos de infraestrutura presentes.
 - [ ] `.gitignore` protege secrets.
@@ -1962,7 +1962,7 @@ Sem Windows Agent integrado, o dashboard pode estar vazio mesmo com a infraestru
 
 ### Estrutura operacional
 
-- [ ] `/opt/itcenter/app` existe.
+- [ ] `/opt/itcenter/app/it-center-security-cloud` existe.
 - [ ] `/opt/itcenter/backups` existe.
 - [ ] `/opt/itcenter/configs` existe.
 - [ ] `/opt/itcenter/runtime` existe.

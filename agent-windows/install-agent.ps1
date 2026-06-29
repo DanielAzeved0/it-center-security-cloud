@@ -11,6 +11,8 @@ param(
 
     [string]$TaskName = "ITCenterAgent",
 
+    [switch]$SkipConnectivityCheck,
+
     [switch]$Force
 )
 
@@ -48,9 +50,77 @@ function Assert-InstallInput {
     if ($CheckinIntervalMinutes -lt 1) {
         throw "CheckinIntervalMinutes must be greater than or equal to 1."
     }
+
+    $serverUri
 }
 
-Assert-InstallInput
+function Test-AgentServerConnectivity {
+    param(
+        [Parameter(Mandatory = $true)]
+        [uri]$ServerUri
+    )
+
+    $hostName = $ServerUri.Host
+    try {
+        $addresses = [System.Net.Dns]::GetHostAddresses($hostName) |
+            Where-Object { $_.AddressFamily -eq [System.Net.Sockets.AddressFamily]::InterNetwork } |
+            ForEach-Object { $_.IPAddressToString }
+    }
+    catch {
+        throw "ServerUrl host could not be resolved: $hostName. Configure DNS on this network before installing the agent."
+    }
+
+    if ($null -eq $addresses -or @($addresses).Count -eq 0) {
+        throw "ServerUrl host resolved no IPv4 address: $hostName. Configure DNS on this network before installing the agent."
+    }
+
+    Write-Output "ServerUrl DNS resolved: $hostName -> $(@($addresses) -join ', ')"
+
+    $port = if ($ServerUri.IsDefaultPort) {
+        if ($ServerUri.Scheme -eq "https") { 443 } elseif ($ServerUri.Scheme -eq "http") { 80 } else { $ServerUri.Port }
+    }
+    else {
+        $ServerUri.Port
+    }
+
+    $tcpClient = [System.Net.Sockets.TcpClient]::new()
+    try {
+        $connectTask = $tcpClient.ConnectAsync($hostName, $port)
+        if (-not $connectTask.Wait(5000) -or -not $tcpClient.Connected) {
+            throw "ServerUrl TCP connection failed: $hostName`:$port. Check firewall, DNS, or internet access before installing the agent."
+        }
+
+        Write-Output "ServerUrl TCP reachable: $hostName`:$port"
+    }
+    finally {
+        $tcpClient.Dispose()
+    }
+
+    $baseUrl = $ServerUri.AbsoluteUri.TrimEnd("/")
+    $healthUrl = if ($baseUrl -match "/api/v1$") {
+        "$baseUrl/health"
+    }
+    else {
+        "$baseUrl/healthz"
+    }
+
+    try {
+        Invoke-RestMethod -Uri $healthUrl -Method Get -TimeoutSec 10 -ErrorAction Stop | Out-Null
+        Write-Output "ServerUrl health check passed: $healthUrl"
+    }
+    catch {
+        throw "ServerUrl health check failed: $healthUrl. The agent endpoint must be reachable before installation. Details: $($_.Exception.Message)"
+    }
+}
+
+$serverUri = Assert-InstallInput
+
+if ($SkipConnectivityCheck) {
+    Write-Output "ServerUrl connectivity check skipped."
+}
+else {
+    Test-AgentServerConnectivity -ServerUri $serverUri
+}
 
 $agentSource = Join-Path $PSScriptRoot "itcenter-agent.ps1"
 if (-not (Test-Path -LiteralPath $agentSource)) {

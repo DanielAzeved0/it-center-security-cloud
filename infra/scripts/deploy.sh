@@ -46,7 +46,7 @@ domain=$(get_env DOMAIN_NAME)
 
 printf 'Executando smoke tests...\n'
 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" exec -T backend wget -q -O /dev/null http://127.0.0.1:8000/api/v1/health
-docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" exec -T frontend wget -q -O /dev/null http://127.0.0.1:3000/
+docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" exec -T nginx wget -q -O /dev/null http://frontend:3000/
 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" exec -T nginx wget -q -O /dev/null http://127.0.0.1/healthz
 
 printf '\nDeploy concluido.\n'

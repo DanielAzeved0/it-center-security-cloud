@@ -11,7 +11,7 @@ Dominio: itcenter-daniel.chickenkiller.com
 IP publico: 147.15.78.220
 Runtime: Docker Engine + Docker Compose
 Rede Docker: itcenter-network
-Diretorio da aplicacao: /opt/itcenter/app
+Diretorio da aplicacao: /opt/itcenter/app/it-center-security-cloud
 Backups: /opt/itcenter/backups
 ```
 
@@ -92,7 +92,7 @@ Dashboard: funcionando
 Backend: funcionando
 PostgreSQL: funcionando
 Containers: healthy
-Windows Agent: ainda nao integrado
+Windows Agent: integrado ao check-in de producao quando DNS e API key estao corretos
 ```
 
 O dashboard pode aparecer vazio ate que o Windows Agent envie o primeiro check-in. Esse comportamento e esperado.

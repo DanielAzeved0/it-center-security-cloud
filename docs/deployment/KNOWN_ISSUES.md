@@ -1,19 +1,22 @@
 # Known Issues
 
-## Windows Agent ainda nao integrado
+## API key do agente exposta durante suporte
 
 Estado:
 
 ```text
-Pendente
+Aberto
 ```
 
 Impacto:
 
-* Dashboard pode aparecer vazio.
-* Nenhuma maquina aparece ate que um agente realize check-in.
+* Qualquer pessoa com a chave poderia tentar enviar check-ins para o endpoint do agente.
 
-Isso e esperado no estado atual.
+Acao:
+
+* Rotacionar `AGENT_API_KEY` apos concluir a fase de testes.
+* Reinstalar ou atualizar os agentes com a nova chave.
+* Confirmar `POST /api/v1/agent/checkin` com `200 OK`.
 
 ## DNS da Vivo com propagacao lenta
 
@@ -30,6 +33,8 @@ Acao:
 * Aguardar propagacao.
 * Testar resolvers publicos.
 * Evitar alterar infraestrutura quando outros resolvers ja resolvem corretamente.
+* Corrigir DNS no roteador/DHCP para evitar editar `hosts` em cada maquina.
+* Avaliar dominio proprio em Cloudflare para o endpoint dos agentes.
 
 ## VM com pouca memoria
 

@@ -148,7 +148,7 @@ Em uma nova VM, o fluxo desejado sera:
 
 ```bash
 git clone <repo-url> /opt/itcenter/app
-cd /opt/itcenter/app
+cd /opt/itcenter/app/it-center-security-cloud
 sudo sh infra/bootstrap/bootstrap.sh
 ```
 

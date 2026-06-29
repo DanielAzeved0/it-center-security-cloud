@@ -40,7 +40,7 @@ Em producao, todos os servicos rodam em Docker Compose na Oracle Cloud VM. Somen
 | `deployment/` | Setup, producao, troubleshooting, postmortems e diario de deploy. |
 | `security/` | Politicas de seguranca, autenticacao e regras SOC. |
 | `backend/` | API, banco de dados e contratos do backend. |
-| `agent/` | Agente Windows, instalacao futura e check-in. |
+| `agent/` | Agente Windows, instalacao, preflight de conectividade e check-in. |
 | `development/` | Contribuicao, roadmap, tarefas e decisoes. |
 | `assets/` | Diagramas e imagens de apoio. |
 
@@ -66,7 +66,7 @@ Postgres:  127.0.0.1:5432
 Na VM:
 
 ```bash
-cd /opt/itcenter/app
+cd /opt/itcenter/app/it-center-security-cloud
 sh infra/scripts/preflight-production.sh
 sh infra/scripts/deploy.sh
 ```
@@ -89,6 +89,7 @@ curl -I https://itcenter-daniel.chickenkiller.com
 | `deployment/SETUP.md` | Preparacao do ambiente. |
 | `deployment/PRODUCTION.md` | Estrategia e operacao de producao. |
 | `deployment/TROUBLESHOOTING.md` | Diagnostico de falhas. |
+| `deployment/OPERATIONAL_HANDOFF_2026-06-28.md` | Consolidado operacional do deploy real e integracao do agente. |
 | `security/SECURITY.md` | Politicas de seguranca. |
 | `security/AUTH.md` | Autenticacao do dashboard e do agente. |
 | `backend/API.md` | Contrato da API. |
@@ -105,5 +106,5 @@ HTTPS: ativo
 Dashboard: ativo
 Backend: ativo
 PostgreSQL: ativo
-Windows Agent: proxima fase de evolucao
+Windows Agent: integrado ao check-in de producao
 ```

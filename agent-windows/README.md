@@ -61,7 +61,21 @@ cd agent-windows
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install-agent.ps1 `
   -ServerUrl "https://itcenter-daniel.chickenkiller.com" `
   -AgentApiKey "<AGENT_API_KEY>" `
-  -CheckinIntervalMinutes 5
+  -CheckinIntervalMinutes 5 `
+  -Force
+```
+
+Antes de copiar arquivos, o instalador valida DNS, conexao TCP e health check do servidor. Se a rede local nao resolver o dominio publicado, a instalacao falha cedo com uma mensagem de diagnostico, evitando agentes instalados acumulando cache sem conectividade.
+
+Bypass apenas para instalacao offline intencional:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install-agent.ps1 `
+  -ServerUrl "https://itcenter-daniel.chickenkiller.com" `
+  -AgentApiKey "<AGENT_API_KEY>" `
+  -CheckinIntervalMinutes 5 `
+  -SkipConnectivityCheck `
+  -Force
 ```
 
 A instalacao cria:
@@ -274,6 +288,7 @@ Normalizacao de config nova e legada
 Expansao de server_url raiz para /api/v1/agent/checkin
 Cache offline em arquivo JSON
 Reenvio de check-ins pendentes
+Preflight de conectividade do instalador
 ```
 
 ## Envio para API
