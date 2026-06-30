@@ -58,14 +58,16 @@ jobs:
           test -n "$PROD_APP_DIR"
           test -n "$PROD_SSH_HOST"
           test -n "$PROD_SSH_USER"
+          test -n "$GH_TOKEN"
 
           ssh -i ~/.ssh/production_key -p "${PROD_SSH_PORT:-22}" "$PROD_SSH_USER@$PROD_SSH_HOST" \
             "DEPLOY_REF='$DEPLOY_REF' GH_REPOSITORY='$GH_REPOSITORY' GH_TOKEN='$GH_TOKEN' PROD_APP_DIR='$PROD_APP_DIR' sh -s" <<'REMOTE'
           set -eu
 
           cd "$PROD_APP_DIR"
-          git -c http.extraHeader="AUTHORIZATION: bearer $GH_TOKEN" fetch --prune "https://github.com/$GH_REPOSITORY.git"
-          git -c http.extraHeader="AUTHORIZATION: bearer $GH_TOKEN" fetch "https://github.com/$GH_REPOSITORY.git" "$DEPLOY_REF"
+          GH_AUTH_HEADER="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $GH_AUTH_HEADER" fetch --prune "https://github.com/$GH_REPOSITORY.git"
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $GH_AUTH_HEADER" fetch "https://github.com/$GH_REPOSITORY.git" "$DEPLOY_REF"
           git checkout --force FETCH_HEAD
 
           sh infra/scripts/backup.sh
