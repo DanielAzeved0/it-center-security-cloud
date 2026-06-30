@@ -303,6 +303,8 @@ sh infra/scripts/backup.sh
 MIN_MEM_MB=256 sh infra/scripts/deploy.sh
 ```
 
+A atualizacao do codigo na VM usa o `GITHUB_TOKEN` temporario do proprio workflow com permissao `contents: read`, buscando o ref por HTTPS. Portanto, a VM nao precisa ter uma deploy key propria para acessar o repositorio GitHub durante esse deploy.
+
 Secrets necessarios no GitHub:
 
 ```text
@@ -328,6 +330,31 @@ Os secrets da aplicacao continuam fora do GitHub Actions e permanecem na VM:
 ```
 
 O deploy automatico em todo push nao esta habilitado neste momento. A politica atual e CI automatico e deploy manual com controle operacional.
+
+### Registro do rollout do GitHub Actions
+
+Status em 2026-06-30:
+
+* secrets de SSH de producao cadastrados em `Settings > Secrets and variables > Actions`;
+* workflow `CI` executado com sucesso no GitHub Actions, cobrindo backend tests, frontend build e compose validation;
+* erro de sintaxe no heredoc do `deploy-production.yml` corrigido antes do primeiro deploy;
+* dependencia `httpx` adicionada ao backend para suportar `fastapi.testclient.TestClient` no ambiente do CI.
+* deploy ajustado para buscar o codigo via HTTPS com `GITHUB_TOKEN` temporario, evitando dependencia de chave SSH da VM para o GitHub.
+
+Task atual:
+
+```text
+Concluir deploy de producao pelo GitHub Actions.
+```
+
+Proximos passos operacionais:
+
+1. Abrir `Actions > Deploy Production`.
+2. Executar `Run workflow` na branch `main`, deixando `ref` vazio para usar o commit atual.
+3. Acompanhar o job ate concluir os passos de SSH, backup e deploy.
+4. Rodar os smoke tests de producao descritos neste documento.
+5. Validar a aplicacao pelo dominio publico.
+6. Se o deploy finalizar corretamente, registrar a task como concluida em `docs/development/TASKS.md`.
 
 ## Rollback
 

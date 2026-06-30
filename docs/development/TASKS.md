@@ -404,8 +404,6 @@ Substituir controles minimos do MVP por autenticacao e governanca adequadas para
 
 [ ] Registrar auditoria de acoes criticas
 
-[ ] Planejar rotacao de AGENT_API_KEY
-
 [ ] Planejar API Key por agente
 
 [ ] Atualizar docs/security/AUTH.md
@@ -445,6 +443,16 @@ Reduzir risco operacional do ambiente publicado e preparar manutencao continua.
 [x] Declarar dependencia `httpx` para testes FastAPI/Starlette no CI
 
 [x] Criar deploy manual de producao no GitHub Actions
+
+[ ] Concluir deploy de producao pelo GitHub Actions
+
+    Status atual em 2026-06-30:
+
+    * secrets de SSH cadastrados no GitHub Actions;
+    * erro de sintaxe do workflow `deploy-production.yml` corrigido;
+    * dependencia `httpx` declarada para o `TestClient` do FastAPI/Starlette;
+    * workflow `CI` validado com sucesso no GitHub Actions: backend tests, frontend build e compose validation;
+    * proximo passo: executar manualmente o workflow `Deploy Production`, validar backup/deploy na VM e rodar smoke tests de producao.
 
 [ ] Documentar rotina operacional semanal
 

@@ -135,15 +135,6 @@ Dashboard com credencial deve retornar `HTTP/2 200`:
 curl -k -i -u admin:'<senha-do-dashboard>' https://itcenter-daniel.chickenkiller.com/
 ```
 
-Nao registrar a senha real em historico compartilhado. Se a senha for exposta, rotacionar:
-
-```bash
-cd /opt/itcenter/app/it-center-security-cloud
-docker run --rm httpd:2.4-alpine htpasswd -nbB admin 'NOVA_SENHA_FORTE_AQUI' > .secrets/dashboard.htpasswd
-chmod 644 .secrets/dashboard.htpasswd
-docker compose --env-file .env.production -f infra/docker-compose.production.yml restart nginx
-```
-
 ## Incidentes resolvidos
 
 ### DNS local nao resolvia o dominio
@@ -413,21 +404,6 @@ git diff --check sem erros
 
 ## Riscos remanescentes
 
-### API key exposta durante operacao assistida
-
-A chave do agente foi compartilhada em conversa operacional. Recomenda-se rotacionar quando terminar a fase de testes.
-
-Rotacao segura:
-
-```text
-1. Gerar nova AGENT_API_KEY.
-2. Atualizar .env.production na VPS.
-3. Recriar backend.
-4. Reinstalar ou atualizar agentes.
-5. Confirmar check-ins 200 OK.
-6. Remover cache antigo se necessario.
-```
-
 ### Dominio gratuito e DNS de provedor
 
 `chickenkiller.com` funcionou em resolvers publicos, mas falhou no DNS da Vivo em uma maquina monitorada.
@@ -468,12 +444,11 @@ Backups frequentes, restore testado e monitoramento de disco/memoria.
 
 ## Proximos passos recomendados
 
-1. Rotacionar `AGENT_API_KEY` e senha do dashboard porque foram expostas durante suporte.
-2. Criar pacote `.zip` versionado contendo apenas `agent-windows`.
-3. Configurar DNS central da rede ou dominio proprio em Cloudflare.
-4. Criar script de instalacao assistida do agente com prompts seguros.
-5. Adicionar endpoint de health especifico do frontend, se necessario.
-6. Automatizar criacao de `.env.production` sem registrar secrets.
-7. Configurar backup periodico do PostgreSQL.
-8. Testar restore em ambiente separado.
-9. Adicionar monitoramento de certificado, disco, memoria, swap e containers unhealthy.
+1. Criar pacote `.zip` versionado contendo apenas `agent-windows`.
+2. Configurar DNS central da rede ou dominio proprio em Cloudflare.
+3. Criar script de instalacao assistida do agente com prompts seguros.
+4. Adicionar endpoint de health especifico do frontend, se necessario.
+5. Automatizar criacao de `.env.production` sem registrar secrets.
+6. Configurar backup periodico do PostgreSQL.
+7. Testar restore em ambiente separado.
+8. Adicionar monitoramento de certificado, disco, memoria, swap e containers unhealthy.

@@ -12,6 +12,9 @@ concurrency:
   group: production-deploy
   cancel-in-progress: false
 
+permissions:
+  contents: read
+
 jobs:
   deploy:
     name: Deploy to Oracle VM
@@ -45,6 +48,8 @@ jobs:
       - name: Deploy on VM
         env:
           DEPLOY_REF: ${{ steps.deploy_ref.outputs.value }}
+          GH_REPOSITORY: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
           PROD_APP_DIR: ${{ secrets.PROD_APP_DIR }}
           PROD_SSH_HOST: ${{ secrets.PROD_SSH_HOST }}
           PROD_SSH_PORT: ${{ secrets.PROD_SSH_PORT }}
@@ -55,12 +60,12 @@ jobs:
           test -n "$PROD_SSH_USER"
 
           ssh -i ~/.ssh/production_key -p "${PROD_SSH_PORT:-22}" "$PROD_SSH_USER@$PROD_SSH_HOST" \
-            "DEPLOY_REF='$DEPLOY_REF' PROD_APP_DIR='$PROD_APP_DIR' sh -s" <<'REMOTE'
+            "DEPLOY_REF='$DEPLOY_REF' GH_REPOSITORY='$GH_REPOSITORY' GH_TOKEN='$GH_TOKEN' PROD_APP_DIR='$PROD_APP_DIR' sh -s" <<'REMOTE'
           set -eu
 
           cd "$PROD_APP_DIR"
-          git fetch --prune origin
-          git fetch origin "$DEPLOY_REF"
+          git -c http.extraHeader="AUTHORIZATION: bearer $GH_TOKEN" fetch --prune "https://github.com/$GH_REPOSITORY.git"
+          git -c http.extraHeader="AUTHORIZATION: bearer $GH_TOKEN" fetch "https://github.com/$GH_REPOSITORY.git" "$DEPLOY_REF"
           git checkout --force FETCH_HEAD
 
           sh infra/scripts/backup.sh

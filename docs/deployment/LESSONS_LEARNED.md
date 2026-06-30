@@ -67,13 +67,3 @@ Licao:
 * Corrigir DNS no roteador/DHCP.
 * Usar DNS confiavel, como Cloudflare ou Google.
 * Considerar dominio proprio gerenciado por Cloudflare para o endpoint dos agentes.
-
-## 11. Secrets expostos em operacao devem ser rotacionados
-
-Durante diagnosticos, e facil colar API keys ou senhas em chats e terminais.
-
-Licao:
-
-* Nao documentar valores reais.
-* Rotacionar `AGENT_API_KEY` e senha do dashboard apos fases de teste assistido.
-* Usar placeholders nos docs.

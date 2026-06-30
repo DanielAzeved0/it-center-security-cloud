@@ -1,23 +1,5 @@
 # Known Issues
 
-## API key do agente exposta durante suporte
-
-Estado:
-
-```text
-Aberto
-```
-
-Impacto:
-
-* Qualquer pessoa com a chave poderia tentar enviar check-ins para o endpoint do agente.
-
-Acao:
-
-* Rotacionar `AGENT_API_KEY` apos concluir a fase de testes.
-* Reinstalar ou atualizar os agentes com a nova chave.
-* Confirmar `POST /api/v1/agent/checkin` com `200 OK`.
-
 ## DNS da Vivo com propagacao lenta
 
 Foi observado que o dominio `itcenter-daniel.chickenkiller.com` resolvia corretamente em Google DNS, Cloudflare e Quad9, mas ainda nao propagava no DNS da Vivo.
