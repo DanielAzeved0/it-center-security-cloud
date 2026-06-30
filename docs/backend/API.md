@@ -281,6 +281,8 @@ start_date
 end_date
 ```
 
+Observacao: o dashboard ja possui filtros locais por severidade, tipo e maquina usando os dados carregados. Esta secao se refere a filtros futuros na propria API, por query string.
+
 Resposta:
 
 ```json

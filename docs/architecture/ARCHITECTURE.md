@@ -171,11 +171,18 @@ config.json
 
 ```json
 {
-  "server_url": "https://api.itcenter.local",
-  "agent_id": "HOST-001",
-  "interval_minutes": 5
+  "server_url": "https://itcenter-daniel.chickenkiller.com",
+  "agent_api_key": "<valor seguro>",
+  "checkin_interval_minutes": 5,
+  "log_path": "C:\\Program Files\\ITCenterAgent\\logs",
+  "cache_path": "C:\\Program Files\\ITCenterAgent\\cache",
+  "collect_inventory": true,
+  "collect_metrics": true,
+  "collect_security": true
 }
 ```
+
+Configs legadas com `api_key` e `interval_minutes` ainda podem ser aceitas pelo agente para compatibilidade, mas o schema oficial de producao usa `agent_api_key` e `checkin_interval_minutes`.
 
 ---
 

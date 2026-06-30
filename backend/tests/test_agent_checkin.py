@@ -50,7 +50,7 @@ def test_agent_checkin_accepts_valid_payload(monkeypatch):
     }
 
 
-def test_agent_checkin_persists_machine_metrics_and_programs(monkeypatch):
+def test_agent_checkin_persists_full_operational_snapshot(monkeypatch):
     monkeypatch.setenv("AGENT_API_KEY", "test-key")
     client = TestClient(app)
 
@@ -61,17 +61,116 @@ def test_agent_checkin_persists_machine_metrics_and_programs(monkeypatch):
     )
 
     assert response.status_code == 200
+    machine_id = response.json()["machine_id"]
 
     with get_connection() as connection:
-        machine_count = connection.execute("SELECT count(*) FROM machines").fetchone()["count"]
-        metric_count = connection.execute("SELECT count(*) FROM metrics").fetchone()["count"]
-        program_count = connection.execute("SELECT count(*) FROM installed_programs").fetchone()["count"]
-        agent_config_count = connection.execute("SELECT count(*) FROM agent_configs").fetchone()["count"]
+        machine = connection.execute(
+            """
+            SELECT
+                hostname,
+                username,
+                host(ip_address) AS ip_address,
+                operating_system,
+                os_version,
+                status,
+                last_seen
+            FROM machines
+            WHERE id = %s
+            """,
+            (machine_id,),
+        ).fetchone()
+        metric = connection.execute(
+            """
+            SELECT
+                cpu_usage::float AS cpu_usage,
+                ram_usage::float AS ram_usage,
+                disk_usage::float AS disk_usage,
+                uptime_seconds
+            FROM metrics
+            WHERE machine_id = %s
+            """,
+            (machine_id,),
+        ).fetchone()
+        programs = connection.execute(
+            """
+            SELECT name, version, publisher
+            FROM installed_programs
+            WHERE machine_id = %s
+            """,
+            (machine_id,),
+        ).fetchall()
+        local_admins = connection.execute(
+            """
+            SELECT admin_name
+            FROM machine_local_admins
+            WHERE machine_id = %s
+            ORDER BY admin_name
+            """,
+            (machine_id,),
+        ).fetchall()
+        agent_config = connection.execute(
+            """
+            SELECT
+                checkin_interval_minutes,
+                collect_inventory,
+                collect_security,
+                collect_metrics
+            FROM agent_configs
+            WHERE machine_id = %s
+            """,
+            (machine_id,),
+        ).fetchone()
 
-    assert machine_count == 1
-    assert metric_count == 1
-    assert program_count == 1
-    assert agent_config_count == 1
+    assert machine == {
+        "hostname": "PC-FINANCEIRO-01",
+        "username": "daniel",
+        "ip_address": "192.168.15.25",
+        "operating_system": "Windows 11 Pro",
+        "os_version": "23H2",
+        "status": "online",
+        "last_seen": machine["last_seen"],
+    }
+    assert machine["last_seen"] is not None
+    assert metric == {
+        "cpu_usage": 22.5,
+        "ram_usage": 61.2,
+        "disk_usage": 74.8,
+        "uptime_seconds": 86400,
+    }
+    assert programs == [
+        {
+            "name": "Google Chrome",
+            "version": "126.0",
+            "publisher": "Google",
+        }
+    ]
+    assert [admin["admin_name"] for admin in local_admins] == ["Administrator", "Daniel"]
+    assert agent_config == {
+        "checkin_interval_minutes": 5,
+        "collect_inventory": True,
+        "collect_security": True,
+        "collect_metrics": True,
+    }
+
+    machine_response = client.get(f"/api/v1/machines/{machine_id}")
+    machines_response = client.get("/api/v1/machines")
+    metrics_response = client.get(f"/api/v1/machines/{machine_id}/metrics")
+    programs_response = client.get(f"/api/v1/machines/{machine_id}/programs")
+
+    assert machines_response.status_code == 200
+    assert machines_response.json()[0]["hostname"] == "PC-FINANCEIRO-01"
+    assert machine_response.status_code == 200
+    assert machine_response.json()["hostname"] == "PC-FINANCEIRO-01"
+    assert metrics_response.status_code == 200
+    assert metrics_response.json()[0]["uptime_seconds"] == 86400
+    assert programs_response.status_code == 200
+    assert programs_response.json() == [
+        {
+            "name": "Google Chrome",
+            "version": "126.0",
+            "publisher": "Google",
+        }
+    ]
 
 
 def test_agent_checkin_generates_soc_events_and_alerts_for_risky_posture(monkeypatch):
@@ -124,6 +223,22 @@ def test_agent_checkin_generates_soc_events_and_alerts_for_risky_posture(monkeyp
         "rdp_enabled",
     ]
     assert {alert["status"] for alert in alerts} == {"open"}
+
+    events_response = client.get("/api/v1/security-events")
+    alerts_response = client.get("/api/v1/alerts")
+
+    assert events_response.status_code == 200
+    assert [event["event_type"] for event in events_response.json()] == [
+        "rdp_enabled",
+        "defender_disabled",
+        "firewall_disabled",
+    ]
+    assert alerts_response.status_code == 200
+    assert [alert["alert_type"] for alert in alerts_response.json()] == [
+        "rdp_enabled",
+        "defender_disabled",
+        "firewall_disabled",
+    ]
 
 
 def test_agent_checkin_does_not_duplicate_open_soc_alerts(monkeypatch):

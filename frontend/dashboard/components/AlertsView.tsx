@@ -8,6 +8,9 @@ import type { AlertSummary } from "@/lib/types";
 
 export function AlertsView() {
   const [alerts, setAlerts] = useState<AlertSummary[]>([]);
+  const [severityFilter, setSeverityFilter] = useState("all");
+  const [typeFilter, setTypeFilter] = useState("all");
+  const [machineFilter, setMachineFilter] = useState("all");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [resolvingId, setResolvingId] = useState<number | null>(null);
@@ -52,6 +55,31 @@ export function AlertsView() {
     [alerts],
   );
   const resolvedAlerts = alerts.filter((alert) => alert.status === "resolved").length;
+  const severityOptions = useMemo(() => uniqueValues(alerts.map((alert) => alert.severity)), [alerts]);
+  const typeOptions = useMemo(() => uniqueValues(alerts.map((alert) => alert.alert_type)), [alerts]);
+  const machineOptions = useMemo(
+    () => uniqueValues(alerts.map((alert) => (alert.machine_id === null ? "sem-maquina" : String(alert.machine_id)))),
+    [alerts],
+  );
+  const filteredAlerts = useMemo(
+    () =>
+      alerts.filter((alert) => {
+        const matchesSeverity = severityFilter === "all" || alert.severity === severityFilter;
+        const matchesType = typeFilter === "all" || alert.alert_type === typeFilter;
+        const machineValue = alert.machine_id === null ? "sem-maquina" : String(alert.machine_id);
+        const matchesMachine = machineFilter === "all" || machineValue === machineFilter;
+
+        return matchesSeverity && matchesType && matchesMachine;
+      }),
+    [alerts, machineFilter, severityFilter, typeFilter],
+  );
+  const hasActiveFilters = severityFilter !== "all" || typeFilter !== "all" || machineFilter !== "all";
+
+  const clearFilters = () => {
+    setSeverityFilter("all");
+    setTypeFilter("all");
+    setMachineFilter("all");
+  };
 
   return (
     <Shell
@@ -74,14 +102,55 @@ export function AlertsView() {
           <section className="panel">
             <div className="panel-header">
               <h2>Fila de alertas</h2>
-              <span>{alerts.length} itens</span>
+              <span>{filteredAlerts.length} de {alerts.length} itens</span>
+            </div>
+
+            <div className="filter-bar" aria-label="Filtros de alertas">
+              <label>
+                Severidade
+                <select value={severityFilter} onChange={(event) => setSeverityFilter(event.target.value)}>
+                  <option value="all">Todas</option>
+                  {severityOptions.map((severity) => (
+                    <option key={severity} value={severity}>
+                      {severity}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Tipo
+                <select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}>
+                  <option value="all">Todos</option>
+                  {typeOptions.map((alertType) => (
+                    <option key={alertType} value={alertType}>
+                      {alertType}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Maquina
+                <select value={machineFilter} onChange={(event) => setMachineFilter(event.target.value)}>
+                  <option value="all">Todas</option>
+                  {machineOptions.map((machineId) => (
+                    <option key={machineId} value={machineId}>
+                      {machineId === "sem-maquina" ? "Sem maquina" : `ID ${machineId}`}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button className="secondary-button" type="button" disabled={!hasActiveFilters} onClick={clearFilters}>
+                Limpar filtros
+              </button>
             </div>
 
             {alerts.length === 0 ? (
               <EmptyState title="Sem alertas" message="Nenhum alerta foi gerado ate o momento." />
+            ) : filteredAlerts.length === 0 ? (
+              <EmptyState title="Nenhum alerta encontrado" message="Ajuste os filtros para ampliar a busca." />
             ) : (
               <div className="stack-list">
-                {alerts.map((alert) => (
+                {filteredAlerts.map((alert) => (
                   <article className="list-item alert-item" key={alert.id}>
                     <div>
                       <strong>{alert.title}</strong>
@@ -111,4 +180,8 @@ export function AlertsView() {
       ) : null}
     </Shell>
   );
+}
+
+function uniqueValues(values: string[]): string[] {
+  return Array.from(new Set(values)).sort((a, b) => a.localeCompare(b, "pt-BR"));
 }

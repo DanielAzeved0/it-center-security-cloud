@@ -47,7 +47,9 @@ docker compose version
 6. Clonar o repositorio privado:
 
 ```bash
-git clone git@github.com:DanielAzeved0/it-center-security-cloud.git
+cd /opt/itcenter/app
+git clone git@github.com:DanielAzeved0/it-center-security-cloud.git it-center-security-cloud
+cd /opt/itcenter/app/it-center-security-cloud
 ```
 
 7. Criar `.env.production` a partir de `.env.production.example`.
@@ -75,7 +77,7 @@ openssl rand -hex 32
 - [ ] DNS apontando para o IP publico.
 - [ ] Docker instalado.
 - [ ] Docker Compose instalado.
-- [ ] Repositorio clonado em `/opt/itcenter/app`.
+- [ ] Repositorio clonado em `/opt/itcenter/app/it-center-security-cloud`.
 - [ ] `.env.production` criado fora do Git.
 - [ ] `.secrets/dashboard.htpasswd` criado fora do Git.
 - [ ] Certificado TLS emitido.

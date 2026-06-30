@@ -20,8 +20,10 @@ Criacao:
 mkdir -p .secrets
 docker run --rm httpd:2.4-alpine htpasswd -Bbn admin 'SENHA_FORTE_AQUI' > .secrets/dashboard.htpasswd
 chmod 700 .secrets
-chmod 600 .secrets/dashboard.htpasswd
+chmod 644 .secrets/dashboard.htpasswd
 ```
+
+O arquivo `dashboard.htpasswd` precisa ser legivel pelo worker do Nginx dentro do container. Por isso, em producao, use `644` no arquivo e mantenha a pasta `.secrets` com `700`.
 
 ## Agente Windows
 

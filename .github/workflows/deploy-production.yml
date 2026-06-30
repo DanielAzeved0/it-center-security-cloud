@@ -1,0 +1,68 @@
+name: Deploy Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Git ref to deploy. Leave empty to deploy the workflow commit.
+        required: false
+        type: string
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to Oracle VM
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Resolve deploy ref
+        id: deploy_ref
+        run: |
+          if [ -n "${{ inputs.ref }}" ]; then
+            printf 'value=%s\n' "${{ inputs.ref }}" >> "$GITHUB_OUTPUT"
+          else
+            printf 'value=%s\n' "${{ github.sha }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Configure SSH
+        env:
+          PROD_SSH_HOST: ${{ secrets.PROD_SSH_HOST }}
+          PROD_SSH_PRIVATE_KEY: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
+          PROD_SSH_PORT: ${{ secrets.PROD_SSH_PORT }}
+        run: |
+          test -n "$PROD_SSH_HOST"
+          test -n "$PROD_SSH_PRIVATE_KEY"
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$PROD_SSH_PRIVATE_KEY" > ~/.ssh/production_key
+          chmod 600 ~/.ssh/production_key
+          ssh-keyscan -p "${PROD_SSH_PORT:-22}" "$PROD_SSH_HOST" >> ~/.ssh/known_hosts
+
+      - name: Deploy on VM
+        env:
+          DEPLOY_REF: ${{ steps.deploy_ref.outputs.value }}
+          PROD_APP_DIR: ${{ secrets.PROD_APP_DIR }}
+          PROD_SSH_HOST: ${{ secrets.PROD_SSH_HOST }}
+          PROD_SSH_PORT: ${{ secrets.PROD_SSH_PORT }}
+          PROD_SSH_USER: ${{ secrets.PROD_SSH_USER }}
+        run: |
+          test -n "$PROD_APP_DIR"
+          test -n "$PROD_SSH_HOST"
+          test -n "$PROD_SSH_USER"
+
+          ssh -i ~/.ssh/production_key -p "${PROD_SSH_PORT:-22}" "$PROD_SSH_USER@$PROD_SSH_HOST" \
+            "DEPLOY_REF='$DEPLOY_REF' PROD_APP_DIR='$PROD_APP_DIR' sh -s" <<'REMOTE'
+          set -eu
+
+          cd "$PROD_APP_DIR"
+          git fetch --prune origin
+          git fetch origin "$DEPLOY_REF"
+          git checkout --force FETCH_HEAD
+
+          sh infra/scripts/backup.sh
+          MIN_MEM_MB=256 sh infra/scripts/deploy.sh
+REMOTE

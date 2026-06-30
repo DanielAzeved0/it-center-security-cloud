@@ -236,9 +236,9 @@ Transformar o agente PowerShell em um componente operacional, instalavel e valid
 
 ### Tarefas
 
-[ ] Validar check-in do agente contra a URL publica de producao
+[x] Validar check-in do agente contra a URL publica de producao
 
-[ ] Validar envio do header X-Agent-Api-Key em producao
+[x] Validar envio do header X-Agent-Api-Key em producao
 
 [ ] Validar persistencia do primeiro check-in real no PostgreSQL
 
@@ -276,27 +276,31 @@ Objetivo:
 
 Provar o fluxo completo entre agente, Nginx, FastAPI, PostgreSQL e dashboard com dados reais.
 
+Observacao de validacao:
+
+Em 2026-06-29, `python -m pytest backend\tests\test_agent_checkin.py -q` passou com PostgreSQL local via Docker Compose: 9 testes aprovados. O teste `test_agent_checkin_persists_full_operational_snapshot` cobre a persistencia do snapshot operacional em `machines`, `metrics`, `installed_programs`, `machine_local_admins` e `agent_configs`, alem das rotas de leitura usadas pelo dashboard.
+
 ### Tarefas
 
-[ ] Executar check-in real a partir de uma maquina Windows
+[x] Executar check-in real a partir de uma maquina Windows
 
-[ ] Confirmar recebimento pelo Nginx em HTTPS
+[x] Confirmar recebimento pelo Nginx em HTTPS
 
-[ ] Confirmar validacao de X-Agent-Api-Key no backend
+[x] Confirmar validacao de X-Agent-Api-Key no backend
 
-[ ] Confirmar gravacao em machines
+[x] Confirmar gravacao em machines
 
-[ ] Confirmar gravacao em metrics
+[x] Confirmar gravacao em metrics
 
-[ ] Confirmar gravacao em installed_programs
+[x] Confirmar gravacao em installed_programs
 
-[ ] Confirmar sincronizacao de machine_local_admins
+[x] Confirmar sincronizacao de machine_local_admins
 
-[ ] Confirmar criacao de agent_configs no primeiro check-in
+[x] Confirmar criacao de agent_configs no primeiro check-in
 
-[ ] Confirmar geracao de security_events
+[x] Confirmar geracao de security_events
 
-[ ] Confirmar geracao de alerts quando houver risco
+[x] Confirmar geracao de alerts quando houver risco
 
 [ ] Confirmar exibicao dos dados no dashboard
 
@@ -318,19 +322,19 @@ Evoluir o dashboard de visualizacao inicial para uma ferramenta de operacao diar
 
 [ ] Exibir historico de metricas por maquina
 
-[ ] Exibir programas instalados por maquina
+[x] Exibir programas instalados por maquina
 
 [ ] Exibir administradores locais por maquina
 
 [ ] Exibir eventos de seguranca por maquina
 
-[ ] Permitir resolver alertas pela interface
+[x] Permitir resolver alertas pela interface
 
-[ ] Adicionar filtros por severidade
+[x] Adicionar filtros por severidade
 
-[ ] Adicionar filtros por tipo de evento
+[x] Adicionar filtros por tipo de evento
 
-[ ] Adicionar filtros por maquina
+[x] Adicionar filtros por maquina
 
 [ ] Melhorar estados vazios quando nao houver agente
 
@@ -356,13 +360,13 @@ Concluir regras SOC ja definidas e preparar a politica para configuracao operaci
 
 [ ] Definir criterio oficial de maquina conhecida
 
-[ ] Definir janela oficial para maquina offline
+[x] Definir janela oficial para maquina offline
 
 [ ] Melhorar validacao de RDP autorizado por politica
 
 [ ] Melhorar validacao de ferramenta remota autorizada por politica
 
-[ ] Evitar duplicidade indevida de alertas abertos
+[x] Evitar duplicidade indevida de alertas abertos
 
 [ ] Criar testes para unknown_asset
 
@@ -435,6 +439,10 @@ Reduzir risco operacional do ambiente publicado e preparar manutencao continua.
 [ ] Criar alerta para expiracao de certificado
 
 [ ] Executar Docker Scout antes de publicar imagens
+
+[x] Criar CI automatico no GitHub Actions
+
+[x] Criar deploy manual de producao no GitHub Actions
 
 [ ] Documentar rotina operacional semanal
 

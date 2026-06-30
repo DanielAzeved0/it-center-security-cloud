@@ -279,6 +279,56 @@ docker compose --env-file .env.production -f infra/docker-compose.production.yml
 
 O frontend deve ser validado pelo DNS interno Docker (`frontend:3000`) a partir do Nginx. Em algumas imagens standalone do Next.js, `127.0.0.1:3000` dentro do proprio container pode recusar conexao mesmo com o servico acessivel pela rede Docker.
 
+## GitHub Actions
+
+O projeto usa GitHub Actions para automatizar validacoes e permitir deploy manual em producao sem versionar secrets da aplicacao.
+
+Workflows:
+
+```text
+.github/workflows/ci.yml
+.github/workflows/deploy-production.yml
+```
+
+O workflow `CI` executa:
+
+* testes do backend com PostgreSQL de servico;
+* build do dashboard Next.js;
+* validacao do Docker Compose local e do Compose de producao com placeholders temporarios.
+
+O workflow `Deploy Production` e manual (`workflow_dispatch`) e deve ser executado somente apos o CI passar. Ele acessa a VM por SSH, atualiza o repositorio para o ref selecionado, executa backup e chama o deploy versionado:
+
+```bash
+sh infra/scripts/backup.sh
+MIN_MEM_MB=256 sh infra/scripts/deploy.sh
+```
+
+Secrets necessarios no GitHub:
+
+```text
+PROD_SSH_HOST
+PROD_SSH_USER
+PROD_SSH_PRIVATE_KEY
+PROD_APP_DIR
+PROD_SSH_PORT
+```
+
+`PROD_SSH_PORT` e opcional quando SSH usa a porta `22`. `PROD_APP_DIR` deve apontar para:
+
+```text
+/opt/itcenter/app/it-center-security-cloud
+```
+
+Os secrets da aplicacao continuam fora do GitHub Actions e permanecem na VM:
+
+```text
+.env.production
+.secrets/dashboard.htpasswd
+/etc/letsencrypt
+```
+
+O deploy automatico em todo push nao esta habilitado neste momento. A politica atual e CI automatico e deploy manual com controle operacional.
+
 ## Rollback
 
 Antes de qualquer rollback, faça backup do banco. O rollback preserva o volume `postgres_data` e troca apenas a versão da aplicação pelo Git ref informado:
@@ -467,7 +517,9 @@ externamente.
 
 Banco:
 
-Backup diário.
+O script versionado `infra/scripts/backup.sh` executa backup manual do PostgreSQL.
+
+Backup periodico ainda deve ser agendado como tarefa operacional da Fase 9.
 
 Retenção:
 
@@ -475,7 +527,7 @@ Retenção:
 
 Local:
 
-Volume Docker + Storage Oracle.
+`/opt/itcenter/backups`
 
 ---
 
@@ -526,7 +578,7 @@ Ambiente será considerado pronto quando:
 * Banco funcionando
 * Backend funcionando
 * Frontend funcionando
-* Backup configurado
+* Script de backup disponivel
 * Firewall configurado
 * Docker Compose operacional
 

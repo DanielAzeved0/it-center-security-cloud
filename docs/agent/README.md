@@ -14,7 +14,9 @@ Esta pasta documenta o agente Windows.
 
 O agente PowerShell ja possui coleta local, envio para `POST /api/v1/agent/checkin`, cache offline, reenvio de check-ins pendentes, preflight de conectividade no instalador e instalacao por Tarefa Agendada do Windows.
 
-O fluxo completo ja foi validado no ambiente publicado com maquina Windows real.
+Uma integracao inicial do agente ja foi validada no ambiente publicado com maquina Windows real e check-in `200 OK`.
+
+A validacao evidenciada item a item do fluxo completo Windows Agent -> Nginx -> FastAPI -> PostgreSQL -> Dashboard continua rastreada no EPIC 9 de `docs/development/TASKS.md`.
 
 Enquanto nenhum agente realizar check-in, o dashboard pode aparecer vazio. Depois do primeiro check-in com `200 OK`, a maquina deve aparecer no dashboard.
 

@@ -704,6 +704,41 @@ Impactos:
 
 ---
 
+# ADR-020
+
+## Data
+
+2026-06-29
+
+## Decisao
+
+Adicionar GitHub Actions para CI automatico e deploy manual de producao via SSH.
+
+## Motivo
+
+O deploy ja possui scripts versionados (`preflight-production.sh`, `deploy.sh`, `backup.sh` e `rollback.sh`), mas a execucao ainda depende de comandos manuais fora de um fluxo auditavel. GitHub Actions permite validar pull requests, registrar historico de execucao e acionar deploy controlado sem mover os secrets da aplicacao para o repositorio.
+
+## Alternativas Avaliadas
+
+* Continuar com deploy manual por SSH.
+* Fazer deploy automatico em todo push na `main`.
+* Usar GitHub Actions com acionamento manual para producao.
+
+## Resultado
+
+* `CI` roda testes do backend, build do frontend e validacao de Docker Compose.
+* `Deploy Production` roda apenas por `workflow_dispatch`.
+* A action acessa a VM via SSH, atualiza o repositorio, executa backup e chama `MIN_MEM_MB=256 sh infra/scripts/deploy.sh`.
+* `.env.production`, `.secrets/dashboard.htpasswd` e certificados TLS continuam armazenados na VM, fora do GitHub Actions.
+
+Impactos:
+
+* CI passa a ser o gate minimo antes do deploy.
+* O deploy fica auditavel no GitHub, mas ainda exige acionamento humano.
+* Deploy automatico em push fica fora do escopo ate a operacao estar mais madura.
+
+---
+
 ## ADR-XXX
 
 ### Data

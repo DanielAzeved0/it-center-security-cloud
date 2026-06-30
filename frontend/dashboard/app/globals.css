@@ -222,6 +222,42 @@ a {
   white-space: nowrap;
 }
 
+.filter-bar {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(160px, 1fr)) auto;
+  gap: 12px;
+  align-items: end;
+  margin-bottom: 16px;
+  padding: 12px;
+  background: var(--surface-strong);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.filter-bar label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.filter-bar select {
+  min-width: 0;
+  min-height: 38px;
+  padding: 0 10px;
+  color: var(--text);
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.filter-bar select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .content-grid {
   display: grid;
   gap: 18px;
@@ -585,6 +621,7 @@ progress::-moz-progress-bar {
 
   .stats-grid,
   .compact-stats,
+  .filter-bar,
   .metric-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -610,6 +647,7 @@ progress::-moz-progress-bar {
   .nav-list,
   .stats-grid,
   .compact-stats,
+  .filter-bar,
   .detail-grid,
   .metric-grid {
     grid-template-columns: 1fr;

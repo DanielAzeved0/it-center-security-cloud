@@ -28,8 +28,8 @@ sudo chown -R ubuntu:ubuntu /opt/itcenter
 O repositorio privado foi clonado via SSH apos configurar a chave da VM no GitHub:
 
 ```bash
-cd /opt/itcenter
-git clone git@github.com:DanielAzeved0/it-center-security-cloud.git app
+cd /opt/itcenter/app
+git clone git@github.com:DanielAzeved0/it-center-security-cloud.git it-center-security-cloud
 cd /opt/itcenter/app/it-center-security-cloud
 ```
 
