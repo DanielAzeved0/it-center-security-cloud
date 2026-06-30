@@ -442,6 +442,8 @@ Reduzir risco operacional do ambiente publicado e preparar manutencao continua.
 
 [x] Criar CI automatico no GitHub Actions
 
+[x] Declarar dependencia `httpx` para testes FastAPI/Starlette no CI
+
 [x] Criar deploy manual de producao no GitHub Actions
 
 [ ] Documentar rotina operacional semanal
