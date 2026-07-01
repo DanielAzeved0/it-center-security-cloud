@@ -146,6 +146,9 @@ Schema:
   "server_url": "https://itcenter-daniel.chickenkiller.com",
   "agent_api_key": "<valor seguro>",
   "checkin_interval_minutes": 5,
+  "retry_max_attempts": 3,
+  "retry_initial_delay_seconds": 2,
+  "retry_max_delay_seconds": 15,
   "log_path": "C:\\Program Files\\ITCenterAgent\\logs",
   "cache_path": "C:\\Program Files\\ITCenterAgent\\cache",
   "collect_inventory": true,
@@ -184,10 +187,10 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\Program Files\ITCent
 * Local padrao de logs.
 * Local padrao de cache offline.
 * Preflight de conectividade antes da instalacao.
+* Retry inteligente para falhas temporarias.
 
 ## Requisitos pendentes
 
-* Retry inteligente.
 * Instalador assinado.
 * Atualizacao automatica.
 * Servico Windows nativo.
@@ -281,13 +284,17 @@ Confirmar maquina no dashboard publicado:
 5. Confirmar ultimo check-in recente
 ```
 
-## Critério de conclusão
+## Estado de validacao
 
-O EPIC 8 sera considerado concluido quando:
+Validado:
 
 * o agente for instalado em uma maquina Windows sem passos manuais soltos;
-* o agente executar periodicamente;
+* o agente executar periodicamente e manter a maquina visivel no dashboard;
 * o agente enviar check-in real para producao;
 * a maquina aparecer no dashboard publicado;
 * logs e cache offline ficarem em locais previsiveis;
 * a instalacao e a remocao estiverem documentadas.
+
+Pendencias:
+
+* documentar troubleshooting do agente.

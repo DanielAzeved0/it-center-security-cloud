@@ -29,6 +29,9 @@ cd agent-windows
 server_url
 agent_api_key
 checkin_interval_minutes
+retry_max_attempts
+retry_initial_delay_seconds
+retry_max_delay_seconds
 log_path
 cache_path
 collect_inventory
@@ -285,9 +288,11 @@ JSON parseavel e alinhado ao payload
 Requisicao POST com header X-Agent-Api-Key
 Body JSON enviado para /api/v1/agent/checkin
 Normalizacao de config nova e legada
+Defaults de retry inteligente
 Expansao de server_url raiz para /api/v1/agent/checkin
 Cache offline em arquivo JSON
 Reenvio de check-ins pendentes
+Retry em falhas temporarias sem expor API key em logs
 Preflight de conectividade do instalador
 ```
 
@@ -307,6 +312,18 @@ Regras do envio:
 3. Anexa /agent/checkin ao endpoint base.
 4. Envia o header X-Agent-Api-Key.
 5. Envia o payload em JSON UTF-8.
-6. Se a API falhar, registra aviso e salva o payload em cache offline.
-7. No proximo ciclo, tenta reenviar payloads pendentes.
+6. Em timeout, falha de rede, HTTP 408, 429 ou 5xx, aplica retry com atraso progressivo.
+7. Em HTTP 400, 401, 403 ou 422, registra falha permanente sem retry excessivo.
+8. Se as tentativas temporarias esgotarem, registra aviso e salva o payload em cache offline.
+9. No proximo ciclo, tenta reenviar payloads pendentes antes do check-in atual.
 ```
+
+## Troubleshooting
+
+O guia operacional fica em:
+
+```text
+docs/agent/TROUBLESHOOTING.md
+```
+
+Ele cobre Tarefa Agendada, `config.json`, logs, cache offline, DNS, porta 443, health check, API key, retry e validacao no dashboard.

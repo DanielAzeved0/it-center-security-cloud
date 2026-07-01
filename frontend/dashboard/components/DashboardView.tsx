@@ -48,6 +48,7 @@ export function DashboardView() {
   const openAlerts = alerts.filter((alert) => alert.status === "open").length;
   const lastSeen = machines
     .map((machine) => machine.last_seen)
+    .filter((value): value is string => Boolean(value))
     .sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0];
 
   return (

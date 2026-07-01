@@ -240,9 +240,9 @@ Transformar o agente PowerShell em um componente operacional, instalavel e valid
 
 [x] Validar envio do header X-Agent-Api-Key em producao
 
-[ ] Validar persistencia do primeiro check-in real no PostgreSQL
+[x] Validar persistencia do primeiro check-in real no PostgreSQL
 
-[ ] Validar que a maquina aparece no dashboard publicado
+[x] Validar que a maquina aparece no dashboard publicado
 
 [x] Criar script de instalacao do agente
 
@@ -258,15 +258,15 @@ Transformar o agente PowerShell em um componente operacional, instalavel e valid
 
 [x] Padronizar config.json do agente para producao
 
-[ ] Validar ciclo periodico de check-in
+[x] Validar ciclo periodico de check-in
 
-[ ] Melhorar retry inteligente em falhas temporarias
+[x] Melhorar retry inteligente em falhas temporarias
 
 [x] Garantir que cache offline nao armazene dados proibidos
 
 [x] Documentar instalacao real em docs/agent/INSTALLATION.md
 
-[ ] Documentar troubleshooting do agente
+[x] Documentar troubleshooting do agente
 
 ---
 
@@ -302,9 +302,9 @@ Em 2026-06-29, `python -m pytest backend\tests\test_agent_checkin.py -q` passou 
 
 [x] Confirmar geracao de alerts quando houver risco
 
-[ ] Confirmar exibicao dos dados no dashboard
+[x] Confirmar exibicao dos dados no dashboard
 
-[ ] Registrar evidencias do teste em docs/deployment/DEPLOYMENT_HISTORY.md
+[x] Registrar evidencias do teste em docs/deployment/DEPLOYMENT_HISTORY.md
 
 [ ] Atualizar docs/deployment/KNOWN_ISSUES.md se houver falha conhecida
 
@@ -318,7 +318,7 @@ Evoluir o dashboard de visualizacao inicial para uma ferramenta de operacao diar
 
 ### Tarefas
 
-[ ] Melhorar tela de detalhes da maquina
+[x] Melhorar tela de detalhes da maquina
 
 [ ] Exibir historico de metricas por maquina
 
@@ -444,15 +444,20 @@ Reduzir risco operacional do ambiente publicado e preparar manutencao continua.
 
 [x] Criar deploy manual de producao no GitHub Actions
 
-[ ] Concluir deploy de producao pelo GitHub Actions
+[x] Concluir deploy de producao pelo GitHub Actions
 
-    Status atual em 2026-06-30:
+    Validado em 2026-06-30:
 
     * secrets de SSH cadastrados no GitHub Actions;
     * erro de sintaxe do workflow `deploy-production.yml` corrigido;
     * dependencia `httpx` declarada para o `TestClient` do FastAPI/Starlette;
     * workflow `CI` validado com sucesso no GitHub Actions: backend tests, frontend build e compose validation;
-    * proximo passo: executar manualmente o workflow `Deploy Production`, validar backup/deploy na VM e rodar smoke tests de producao.
+    * workflow `Deploy Production` executado manualmente com sucesso;
+    * backup PostgreSQL criado antes do deploy;
+    * build de backend e frontend concluido;
+    * containers `postgres`, `backend`, `frontend` e `nginx` saudaveis;
+    * smoke tests de producao aprovados;
+    * dashboard publicado validado sem bug visual reportado.
 
 [ ] Documentar rotina operacional semanal
 

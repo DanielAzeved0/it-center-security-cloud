@@ -95,6 +95,7 @@ curl -I https://itcenter-daniel.chickenkiller.com
 | `backend/API.md` | Contrato da API. |
 | `backend/DATABASE.md` | Modelo de dados. |
 | `agent/CHECKIN.md` | Contrato do check-in do agente. |
+| `agent/TROUBLESHOOTING.md` | Diagnostico operacional do agente Windows. |
 | `development/CONTRIBUTING.md` | Regras de contribuicao. |
 | `development/ROADMAP.md` | Roadmap do projeto. |
 

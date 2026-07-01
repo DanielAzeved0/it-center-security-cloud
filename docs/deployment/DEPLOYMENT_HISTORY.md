@@ -2,6 +2,52 @@
 
 Este documento registra o processo real de implantacao do IT Center Security Cloud na Oracle Cloud.
 
+## 2026-06-30 - Deploy manual via GitHub Actions
+
+Workflow:
+
+```text
+Deploy Production
+```
+
+Commit implantado:
+
+```text
+7f5f846d4b51f9293daee8c943a05288e6976901
+```
+
+Resultado:
+
+* `git fetch` autenticado via GitHub Actions concluido com sucesso.
+* Backup PostgreSQL criado antes do deploy: `itcenter-postgres-20260630T231819Z.sql.gz`.
+* Preflight de producao aprovado: Docker, Docker Compose, disco, memoria, secrets, dominio, TLS, rede, portas e volumes.
+* Build das imagens `infra-backend` e `infra-frontend` concluido.
+* Containers recriados e saudaveis: `itcenter-postgres`, `itcenter-backend`, `itcenter-frontend` e `itcenter-nginx`.
+* Smoke tests de producao aprovados.
+* Dashboard validado no navegador sem bug visual reportado.
+
+URLs validadas:
+
+```text
+Dashboard: https://itcenter-daniel.chickenkiller.com/
+Agent check-in: https://itcenter-daniel.chickenkiller.com/api/v1/agent/checkin
+```
+
+## 2026-06-30 - Validacao do ciclo periodico do agente
+
+Resultado:
+
+* Agente Windows permaneceu integrado ao ambiente publicado.
+* Maquinas continuaram aparecendo no dashboard apos a validacao inicial.
+* Ciclo periodico de check-in considerado validado operacionalmente.
+
+Evidencia funcional:
+
+```text
+Dashboard publicado mantendo maquinas visiveis:
+https://itcenter-daniel.chickenkiller.com/machines
+```
+
 ## Linha do tempo tecnica
 
 ### 1. Docker e Compose

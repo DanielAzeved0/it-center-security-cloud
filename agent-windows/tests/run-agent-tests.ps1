@@ -36,6 +36,10 @@ $jsonPayload = $json | ConvertFrom-Json
 $capturedRequest = $null
 $resendRequestCount = 0
 $capturedResendRequests = @()
+$temporaryFailureRequestCount = 0
+$permanentFailureRequestCount = 0
+$retryLimitRequestCount = 0
+$capturedRetryDelays = @()
 $mockOsRegistry = [pscustomobject]@{
     ProductName = "Windows 11 Pro"
     DisplayVersion = "23H2"
@@ -124,6 +128,15 @@ $validatedLegacyConfig = ConvertTo-AgentValidatedConfig -RawConfig ([pscustomobj
     interval_minutes = 10
 })
 
+$validatedRetryConfig = ConvertTo-AgentValidatedConfig -RawConfig ([pscustomobject]@{
+    server_url = "https://itcenter-daniel.chickenkiller.com"
+    agent_api_key = "retry-key"
+    checkin_interval_minutes = 5
+    retry_max_attempts = 4
+    retry_initial_delay_seconds = 1
+    retry_max_delay_seconds = 8
+})
+
 function Invoke-TestRequest {
     param($RequestParams)
 
@@ -159,6 +172,41 @@ function Invoke-TestResendRequest {
         message = "Check-in received"
         machine_id = $script:resendRequestCount
     }
+}
+
+function Invoke-TestTemporaryThenSuccessRequest {
+    param($RequestParams)
+
+    $script:temporaryFailureRequestCount++
+    if ($script:temporaryFailureRequestCount -eq 1) {
+        throw "HTTP 500 temporary test failure"
+    }
+
+    [pscustomobject]@{
+        status = "success"
+        message = "Check-in received after retry"
+        machine_id = 3
+    }
+}
+
+function Invoke-TestAlwaysTemporaryFailureRequest {
+    param($RequestParams)
+
+    $script:retryLimitRequestCount++
+    throw "HTTP 503 temporary test failure"
+}
+
+function Invoke-TestPermanentFailureRequest {
+    param($RequestParams)
+
+    $script:permanentFailureRequestCount++
+    throw "HTTP 401 invalid API key"
+}
+
+function Invoke-TestRetryDelay {
+    param($DelaySeconds)
+
+    $script:capturedRetryDelays += $DelaySeconds
 }
 
 function Invoke-MockOsRegistry {
@@ -220,8 +268,15 @@ function Invoke-MockFailedLogins {
 Assert-True -Condition ($validatedNewConfig.server_url -eq "https://itcenter-daniel.chickenkiller.com") -Message "New config server_url must be preserved without trailing slash."
 Assert-True -Condition ($validatedNewConfig.api_key -eq "new-key") -Message "New config must normalize agent_api_key to api_key."
 Assert-True -Condition ($validatedNewConfig.checkin_interval_minutes -eq 5) -Message "New config interval must be normalized."
+Assert-True -Condition ($validatedNewConfig.retry_max_attempts -eq 3) -Message "New config must use default retry max attempts."
+Assert-True -Condition ($validatedNewConfig.retry_initial_delay_seconds -eq 2) -Message "New config must use default retry initial delay."
+Assert-True -Condition ($validatedNewConfig.retry_max_delay_seconds -eq 15) -Message "New config must use default retry max delay."
 Assert-True -Condition ($validatedLegacyConfig.api_key -eq "legacy-key") -Message "Legacy config must keep api_key."
 Assert-True -Condition ($validatedLegacyConfig.checkin_interval_minutes -eq 10) -Message "Legacy config interval must be normalized."
+Assert-True -Condition ($validatedLegacyConfig.retry_max_attempts -eq 3) -Message "Legacy config must use default retry max attempts."
+Assert-True -Condition ($validatedRetryConfig.retry_max_attempts -eq 4) -Message "Retry config must preserve max attempts."
+Assert-True -Condition ($validatedRetryConfig.retry_initial_delay_seconds -eq 1) -Message "Retry config must preserve initial delay."
+Assert-True -Condition ($validatedRetryConfig.retry_max_delay_seconds -eq 8) -Message "Retry config must preserve max delay."
 
 Assert-Percent -Value $cpuUsage -Name "CPU usage"
 Assert-Percent -Value $ramUsage -Name "RAM usage"
@@ -329,6 +384,74 @@ $rootUrlResponse = Send-AgentCheckin -Config ([pscustomobject]@{
 
 Assert-True -Condition ($capturedRequest.Uri -eq "https://itcenter-daniel.chickenkiller.com/api/v1/agent/checkin") -Message "Root server URL must be expanded to /api/v1/agent/checkin."
 Assert-True -Condition ($rootUrlResponse.status -eq "success") -Message "Root URL check-in should return API response."
+
+$tempLogDirectory = Join-Path ([System.IO.Path]::GetTempPath()) "itcenter-agent-logs-$([guid]::NewGuid().ToString('N'))"
+New-Item -ItemType Directory -Path $tempLogDirectory | Out-Null
+$previousRuntimeConfig = $script:AgentRuntimeConfig
+$script:AgentRuntimeConfig = [pscustomobject]@{
+    log_path = $tempLogDirectory
+    cache_path = $null
+}
+
+try {
+    $retrySuccessResponse = Send-AgentCheckin -Config ([pscustomobject]@{
+        server_url = "http://127.0.0.1:8000/api/v1"
+        api_key = "retry-secret-key"
+        retry_max_attempts = 3
+        retry_initial_delay_seconds = 1
+        retry_max_delay_seconds = 5
+    }) -Payload $payload -RequestInvoker ${function:Invoke-TestTemporaryThenSuccessRequest} -RetryDelayInvoker ${function:Invoke-TestRetryDelay}
+
+    Assert-True -Condition ($retrySuccessResponse.status -eq "success") -Message "Temporary failure must succeed on retry."
+    Assert-True -Condition ($temporaryFailureRequestCount -eq 2) -Message "Temporary failure must retry once before success."
+    Assert-True -Condition ($capturedRetryDelays.Count -eq 1) -Message "Temporary retry must capture one delay."
+    Assert-True -Condition ($capturedRetryDelays[0] -eq 1) -Message "Temporary retry delay must use configured initial delay."
+
+    $script:capturedRetryDelays = @()
+
+    try {
+        Send-AgentCheckin -Config ([pscustomobject]@{
+            server_url = "http://127.0.0.1:8000/api/v1"
+            api_key = "retry-secret-key"
+            retry_max_attempts = 2
+            retry_initial_delay_seconds = 1
+            retry_max_delay_seconds = 5
+        }) -Payload $payload -RequestInvoker ${function:Invoke-TestAlwaysTemporaryFailureRequest} -RetryDelayInvoker ${function:Invoke-TestRetryDelay} | Out-Null
+        throw "Expected temporary retry limit failure."
+    }
+    catch {
+        Assert-True -Condition ($_.Exception.Message -like "*HTTP 503*") -Message "Temporary retry limit must surface the final error."
+    }
+
+    Assert-True -Condition ($retryLimitRequestCount -eq 2) -Message "Temporary failure must stop at configured retry limit."
+    Assert-True -Condition ($capturedRetryDelays.Count -eq 1) -Message "Retry limit scenario must delay before the second attempt only."
+
+    try {
+        Send-AgentCheckin -Config ([pscustomobject]@{
+            server_url = "http://127.0.0.1:8000/api/v1"
+            api_key = "permanent-secret-key"
+            retry_max_attempts = 3
+            retry_initial_delay_seconds = 1
+            retry_max_delay_seconds = 5
+        }) -Payload $payload -RequestInvoker ${function:Invoke-TestPermanentFailureRequest} -RetryDelayInvoker ${function:Invoke-TestRetryDelay} | Out-Null
+        throw "Expected permanent failure."
+    }
+    catch {
+        Assert-True -Condition ($_.Exception.Message -like "*HTTP 401*") -Message "Permanent failure must surface the original error."
+    }
+
+    Assert-True -Condition ($permanentFailureRequestCount -eq 1) -Message "Permanent failure must not be retried."
+
+    $logText = Get-Content -LiteralPath (Join-Path $tempLogDirectory "itcenter-agent.log") -Raw
+    Assert-True -Condition ($logText -notlike "*retry-secret-key*") -Message "Retry logs must not contain the retry API key."
+    Assert-True -Condition ($logText -notlike "*permanent-secret-key*") -Message "Retry logs must not contain the permanent failure API key."
+}
+finally {
+    $script:AgentRuntimeConfig = $previousRuntimeConfig
+    if (Test-Path -LiteralPath $tempLogDirectory) {
+        Remove-Item -LiteralPath $tempLogDirectory -Recurse -Force
+    }
+}
 
 $tempCacheDirectory = Join-Path ([System.IO.Path]::GetTempPath()) "itcenter-agent-tests-$([guid]::NewGuid().ToString('N'))"
 New-Item -ItemType Directory -Path $tempCacheDirectory | Out-Null

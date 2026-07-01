@@ -340,21 +340,19 @@ Status em 2026-06-30:
 * erro de sintaxe no heredoc do `deploy-production.yml` corrigido antes do primeiro deploy;
 * dependencia `httpx` adicionada ao backend para suportar `fastapi.testclient.TestClient` no ambiente do CI.
 * deploy ajustado para buscar o codigo via HTTPS com `GITHUB_TOKEN` temporario, evitando dependencia de chave SSH da VM para o GitHub.
+* workflow `Deploy Production` executado manualmente com sucesso;
+* backup PostgreSQL criado antes do deploy;
+* build das imagens `infra-backend` e `infra-frontend` concluido;
+* containers `postgres`, `backend`, `frontend` e `nginx` validados como saudaveis;
+* smoke tests de producao aprovados;
+* dashboard publicado validado no navegador sem bug visual reportado.
 
-Task atual:
+Evidencia registrada em:
 
 ```text
-Concluir deploy de producao pelo GitHub Actions.
+docs/deployment/DEPLOYMENT_HISTORY.md
+docs/development/TASKS.md
 ```
-
-Proximos passos operacionais:
-
-1. Abrir `Actions > Deploy Production`.
-2. Executar `Run workflow` na branch `main`, deixando `ref` vazio para usar o commit atual.
-3. Acompanhar o job ate concluir os passos de SSH, backup e deploy.
-4. Rodar os smoke tests de producao descritos neste documento.
-5. Validar a aplicacao pelo dominio publico.
-6. Se o deploy finalizar corretamente, registrar a task como concluida em `docs/development/TASKS.md`.
 
 ## Rollback
 

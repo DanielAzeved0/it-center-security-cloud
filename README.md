@@ -239,9 +239,9 @@ docs/security/SOC_RULES.md
 
 ## Deploy
 
-O deploy em produção está preparado, mas ainda não foi publicado na Oracle Cloud.
+O deploy em produção está publicado na Oracle Cloud e foi validado pelo workflow manual `Deploy Production` do GitHub Actions.
 
-Ambiente de destino:
+Ambiente atual:
 
 ```text
 Oracle Cloud Free Tier
@@ -511,18 +511,42 @@ docker compose -f infra/docker-compose.yml down -v
 * Nginx
 * HTTPS
 
-### Fase 6 - Governança
+### Fase 6 - Agente Windows em Produção
+
+* Instalação controlada
+* Tarefa Agendada do Windows
+* Configuração de produção
+* Logs e cache padronizados
+* Check-in real em produção
+
+### Fase 7 - Validação Fim a Fim e Dashboard Operacional
+
+* Fluxo Windows Agent -> Nginx -> FastAPI -> PostgreSQL -> Dashboard
+* Detalhes da máquina
+* Histórico de métricas
+* Eventos por máquina
+* Filtros operacionais
+
+### Fase 8 - Governança
 
 * Login
 * Perfis e controle de acesso
 * Auditoria
 
-### Fase 7 - SOC Avançado
+### Fase 9 - Operação e Segurança de Produção
+
+* Backup automático
+* Restore testado
+* Rollback validado
+* Monitoramento básico da VM
+* Gate de imagens Docker
+
+### Fase 10 - SOC Avançado
 
 * Wazuh
 * OpenVAS
 
-### Fase 8 - SaaS
+### Fase 11 - SaaS
 
 * Multiempresa
 * Multiusuário

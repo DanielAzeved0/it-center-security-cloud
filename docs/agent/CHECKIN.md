@@ -168,7 +168,9 @@ Observações:
 * O bloco `security` usa coletas reais do EPIC 6 para Firewall, Defender, RDP, administradores locais, USB e falhas de login.
 * O agente já envia o check-in para `POST /api/v1/agent/checkin`.
 * O JSON do check-in é enviado como bytes UTF-8 para suportar nomes de programas com acentos e caracteres especiais.
-* Se a API falhar, o agente registra aviso e salva o JSON em `agent-windows/cache`.
+* Se a API falhar temporariamente, o agente aplica retry com atraso progressivo antes de salvar o JSON em `agent-windows/cache`.
+* Falhas temporarias incluem timeout, erro de rede, HTTP 408, HTTP 429 e respostas 5xx.
+* Falhas permanentes como HTTP 400, 401, 403 e 422 nao recebem retry excessivo.
 * No próximo ciclo, o agente tenta reenviar check-ins pendentes antes de enviar a coleta atual.
 * O agente já registra as coletas em `agent-windows/logs/itcenter-agent.log`.
 * Em instalacao Windows, logs e cache usam os caminhos configurados em `config.json`.
@@ -198,6 +200,9 @@ Coletas de seguranca do EPIC 6
 Config nova com agent_api_key e checkin_interval_minutes
 Compatibilidade com config legada api_key e interval_minutes
 Server URL raiz expandida para /api/v1/agent/checkin
+Retry em falhas temporarias
+Falha permanente sem retry excessivo
+Logs de retry sem valor de API key
 ```
 
 ---

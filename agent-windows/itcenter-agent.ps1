@@ -68,6 +68,43 @@ function ConvertTo-AgentValidatedConfig {
         throw "Check-in interval must be greater than or equal to 1 minute."
     }
 
+    $retryMaxAttempts = if ($null -ne $RawConfig.retry_max_attempts) {
+        [int]$RawConfig.retry_max_attempts
+    }
+    else {
+        3
+    }
+
+    if ($retryMaxAttempts -lt 1) {
+        throw "Retry max attempts must be greater than or equal to 1."
+    }
+
+    $retryInitialDelaySeconds = if ($null -ne $RawConfig.retry_initial_delay_seconds) {
+        [int]$RawConfig.retry_initial_delay_seconds
+    }
+    else {
+        2
+    }
+
+    if ($retryInitialDelaySeconds -lt 0) {
+        throw "Retry initial delay seconds must be greater than or equal to 0."
+    }
+
+    $retryMaxDelaySeconds = if ($null -ne $RawConfig.retry_max_delay_seconds) {
+        [int]$RawConfig.retry_max_delay_seconds
+    }
+    else {
+        15
+    }
+
+    if ($retryMaxDelaySeconds -lt 0) {
+        throw "Retry max delay seconds must be greater than or equal to 0."
+    }
+
+    if ($retryMaxDelaySeconds -lt $retryInitialDelaySeconds) {
+        throw "Retry max delay seconds must be greater than or equal to retry initial delay seconds."
+    }
+
     $logPath = if (-not [string]::IsNullOrWhiteSpace($RawConfig.log_path)) {
         [string]$RawConfig.log_path
     }
@@ -88,6 +125,9 @@ function ConvertTo-AgentValidatedConfig {
         agent_api_key = $apiKey
         checkin_interval_minutes = $interval
         interval_minutes = $interval
+        retry_max_attempts = $retryMaxAttempts
+        retry_initial_delay_seconds = $retryInitialDelaySeconds
+        retry_max_delay_seconds = $retryMaxDelaySeconds
         log_path = $logPath
         cache_path = $cachePath
         collect_inventory = if ($null -eq $RawConfig.collect_inventory) { $true } else { [bool]$RawConfig.collect_inventory }
@@ -596,6 +636,86 @@ function Save-AgentOfflinePayload {
     $cacheFile
 }
 
+function Get-AgentHttpStatusCode {
+    param(
+        [Parameter(Mandatory = $true)]
+        [System.Management.Automation.ErrorRecord]$ErrorRecord
+    )
+
+    $exception = $ErrorRecord.Exception
+
+    if ($null -ne $exception.Response -and $null -ne $exception.Response.StatusCode) {
+        return [int]$exception.Response.StatusCode
+    }
+
+    if ($exception.Message -match "\b(400|401|403|408|422|429|500|502|503|504)\b") {
+        return [int]$Matches[1]
+    }
+
+    $null
+}
+
+function Get-AgentCheckinFailureClassification {
+    param(
+        [Parameter(Mandatory = $true)]
+        [System.Management.Automation.ErrorRecord]$ErrorRecord
+    )
+
+    $statusCode = Get-AgentHttpStatusCode -ErrorRecord $ErrorRecord
+
+    if ($null -ne $statusCode) {
+        if ($statusCode -in @(400, 401, 403, 422)) {
+            return [pscustomobject]@{
+                type = "permanent"
+                reason = "HTTP $statusCode"
+                status_code = $statusCode
+            }
+        }
+
+        if ($statusCode -ge 500 -or $statusCode -in @(408, 429)) {
+            return [pscustomobject]@{
+                type = "temporary"
+                reason = "HTTP $statusCode"
+                status_code = $statusCode
+            }
+        }
+    }
+
+    [pscustomobject]@{
+        type = "temporary"
+        reason = "network_or_transport_error"
+        status_code = $statusCode
+    }
+}
+
+function Get-AgentRetryPolicy {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object]$Config
+    )
+
+    [pscustomobject]@{
+        max_attempts = if ($null -eq $Config.retry_max_attempts) { 3 } else { [int]$Config.retry_max_attempts }
+        initial_delay_seconds = if ($null -eq $Config.retry_initial_delay_seconds) { 2 } else { [int]$Config.retry_initial_delay_seconds }
+        max_delay_seconds = if ($null -eq $Config.retry_max_delay_seconds) { 15 } else { [int]$Config.retry_max_delay_seconds }
+    }
+}
+
+function Get-AgentRetryDelaySeconds {
+    param(
+        [int]$Attempt,
+        [int]$InitialDelaySeconds,
+        [int]$MaxDelaySeconds
+    )
+
+    if ($InitialDelaySeconds -le 0 -or $MaxDelaySeconds -le 0) {
+        return 0
+    }
+
+    $delay = $InitialDelaySeconds * [math]::Pow(2, [math]::Max(0, $Attempt - 1))
+    [int][math]::Min($delay, $MaxDelaySeconds)
+}
+
 function Send-AgentCheckin {
     param(
         [Parameter(Mandatory = $true)]
@@ -605,6 +725,12 @@ function Send-AgentCheckin {
         [scriptblock]$RequestInvoker = {
             param($RequestParams)
             Invoke-RestMethod @RequestParams
+        },
+        [scriptblock]$RetryDelayInvoker = {
+            param($DelaySeconds)
+            if ($DelaySeconds -gt 0) {
+                Start-Sleep -Seconds $DelaySeconds
+            }
         }
     )
 
@@ -635,7 +761,41 @@ function Send-AgentCheckin {
         ErrorAction = "Stop"
     }
 
-    & $RequestInvoker $requestParams
+    $retryPolicy = Get-AgentRetryPolicy -Config $Config
+    $lastError = $null
+
+    for ($attempt = 1; $attempt -le $retryPolicy.max_attempts; $attempt++) {
+        try {
+            if ($attempt -gt 1) {
+                Write-AgentLog -Message "Retrying check-in. Attempt $attempt of $($retryPolicy.max_attempts)."
+            }
+
+            return & $RequestInvoker $requestParams
+        }
+        catch {
+            $lastError = $_
+            $classification = Get-AgentCheckinFailureClassification -ErrorRecord $_
+            $message = "Check-in attempt $attempt of $($retryPolicy.max_attempts) failed as $($classification.type) ($($classification.reason))."
+
+            if ($classification.type -eq "permanent") {
+                Write-AgentLog -Message "$message No retry will be attempted." -Level "WARN"
+                throw
+            }
+
+            if ($attempt -ge $retryPolicy.max_attempts) {
+                Write-AgentLog -Message "$message Retry limit reached." -Level "WARN"
+                throw
+            }
+
+            $delaySeconds = Get-AgentRetryDelaySeconds -Attempt $attempt -InitialDelaySeconds $retryPolicy.initial_delay_seconds -MaxDelaySeconds $retryPolicy.max_delay_seconds
+            Write-AgentLog -Message "$message Waiting ${delaySeconds}s before next retry." -Level "WARN"
+            & $RetryDelayInvoker $delaySeconds
+        }
+    }
+
+    if ($null -ne $lastError) {
+        throw $lastError
+    }
 }
 
 function Send-PendingAgentCheckins {
@@ -646,6 +806,12 @@ function Send-PendingAgentCheckins {
         [scriptblock]$RequestInvoker = {
             param($RequestParams)
             Invoke-RestMethod @RequestParams
+        },
+        [scriptblock]$RetryDelayInvoker = {
+            param($DelaySeconds)
+            if ($DelaySeconds -gt 0) {
+                Start-Sleep -Seconds $DelaySeconds
+            }
         }
     )
 
@@ -659,7 +825,7 @@ function Send-PendingAgentCheckins {
     foreach ($pendingFile in $pendingFiles) {
         try {
             $pendingPayload = Get-Content -LiteralPath $pendingFile.FullName -Raw | ConvertFrom-Json
-            Send-AgentCheckin -Config $Config -Payload $pendingPayload -RequestInvoker $RequestInvoker | Out-Null
+            Send-AgentCheckin -Config $Config -Payload $pendingPayload -RequestInvoker $RequestInvoker -RetryDelayInvoker $RetryDelayInvoker | Out-Null
             Remove-Item -LiteralPath $pendingFile.FullName
             $sentCount++
         }

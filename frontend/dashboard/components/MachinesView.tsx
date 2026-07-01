@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Shell } from "@/components/Shell";
 import { EmptyState, ErrorState, LoadingBlock, StatCard, StatusBadge, ToolbarButton } from "@/components/Ui";
@@ -125,7 +126,12 @@ export function MachinesView() {
                 <section className="panel">
                   <div className="panel-header">
                     <h2>{selection.detail.hostname}</h2>
-                    <StatusBadge value={selection.detail.status} />
+                    <div className="panel-actions">
+                      <StatusBadge value={selection.detail.status} />
+                      <Link className="secondary-button compact-button" href={`/machines/${selection.detail.id}`}>
+                        Detalhes
+                      </Link>
+                    </div>
                   </div>
                   <dl className="detail-grid">
                     <div>
@@ -163,7 +169,7 @@ export function MachinesView() {
                       <MetricBar label="Disco" value={latestMetric.disk_usage} />
                       <div className="uptime-box">
                         <span>Uptime</span>
-                        <strong>{formatUptime(latestMetric.uptime_seconds)}</strong>
+                        <strong>{typeof latestMetric.uptime_seconds === "number" ? formatUptime(latestMetric.uptime_seconds) : "-"}</strong>
                       </div>
                     </div>
                   ) : (
@@ -210,14 +216,17 @@ export function MachinesView() {
   );
 }
 
-function MetricBar({ label, value }: { label: string; value: number }) {
+function MetricBar({ label, value }: { label: string; value: number | null }) {
+  const normalized = typeof value === "number" && !Number.isNaN(value) ? Math.max(0, Math.min(100, value)) : 0;
+  const displayValue = typeof value === "number" && !Number.isNaN(value) ? `${normalized.toFixed(1)}%` : "-";
+
   return (
     <div className="metric-bar">
       <div>
         <span>{label}</span>
-        <strong>{value.toFixed(1)}%</strong>
+        <strong>{displayValue}</strong>
       </div>
-      <progress value={value} max={100} aria-label={`${label}: ${value.toFixed(1)}%`} />
+      <progress value={normalized} max={100} aria-label={`${label}: ${displayValue}`} />
     </div>
   );
 }

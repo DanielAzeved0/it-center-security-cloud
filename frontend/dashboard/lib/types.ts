@@ -4,7 +4,7 @@ export type MachineSummary = {
   username: string | null;
   ip_address: string | null;
   status: "online" | "offline" | string;
-  last_seen: string;
+  last_seen: string | null;
 };
 
 export type MachineDetail = MachineSummary & {
@@ -13,11 +13,11 @@ export type MachineDetail = MachineSummary & {
 };
 
 export type MachineMetric = {
-  cpu_usage: number;
-  ram_usage: number;
-  disk_usage: number;
-  uptime_seconds: number;
-  created_at: string;
+  cpu_usage: number | null;
+  ram_usage: number | null;
+  disk_usage: number | null;
+  uptime_seconds: number | null;
+  created_at: string | null;
 };
 
 export type MachineProgram = {
