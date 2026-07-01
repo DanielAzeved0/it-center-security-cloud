@@ -121,7 +121,7 @@ Registrar log
 
 # Estado Atual da Implementação
 
-O agente PowerShell já possui as primeiras coletas locais do EPIC 4.
+O agente PowerShell ja possui coleta local, geracao de payload, envio autenticado para a API, cache offline, reenvio de pendencias e retry inteligente para falhas temporarias.
 
 ## Coletas implementadas
 
@@ -216,14 +216,16 @@ Caso a API esteja indisponível:
 
 ---
 
-# Critério de Sucesso
+# Critério de Sucesso do Contrato Básico
 
-O agente estará concluído quando:
+O contrato basico do agente e considerado atendido quando:
 
 * Conseguir coletar dados
 * Gerar JSON válido
 * Enviar para API
 * Operar offline temporariamente
+
+Esses pontos ja estao implementados e cobertos pelos testes do agente. Melhorias como assinatura de payloads, atualizacao automatica e empacotamento independente ficam como evolucao futura.
 
 ---
 

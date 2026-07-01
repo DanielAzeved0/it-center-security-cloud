@@ -128,7 +128,7 @@ Regra atual:
 4. Registra o hostname no log local.
 ```
 
-O envio para a API sera implementado nas proximas tarefas do EPIC 4.
+O envio para a API ja esta implementado pelo endpoint `POST /api/v1/agent/checkin`.
 
 ### Usuario
 

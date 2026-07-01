@@ -368,14 +368,21 @@ dig @9.9.9.9 itcenter-daniel.chickenkiller.com
 
 O agente Windows ja esta integrado ao ambiente publicado. O check-in de producao usa `POST /api/v1/agent/checkin` via HTTPS e autentica com o header `X-Agent-Api-Key`, que deve ser igual ao `AGENT_API_KEY` definido na VM.
 
+Estado atual do agente:
+
+* Instalacao controlada por script PowerShell.
+* Execucao periodica por Tarefa Agendada do Windows.
+* Cache offline e reenvio de check-ins pendentes.
+* Retry inteligente para timeout, falha de rede, HTTP 408, HTTP 429 e respostas 5xx.
+* Troubleshooting operacional documentado em `docs/agent/TROUBLESHOOTING.md`.
+
 Proximas evolucoes do agente:
 
 * Separar o agente como produto independente.
-* Criar instalador.
-* Criar servico Windows.
 * Adicionar atualizacao automatica.
+* Avaliar servico Windows nativo.
 * Expandir inventario, metricas e eventos de seguranca.
-* Adicionar cache offline, retry inteligente, compressao, criptografia e assinatura de payloads.
+* Adicionar compressao, criptografia e assinatura de payloads.
 
 ### Troubleshooting rapido
 

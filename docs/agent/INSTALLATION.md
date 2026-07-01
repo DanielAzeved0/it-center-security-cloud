@@ -295,6 +295,6 @@ Validado:
 * logs e cache offline ficarem em locais previsiveis;
 * a instalacao e a remocao estiverem documentadas.
 
-Pendencias:
+Documentacao complementar:
 
-* documentar troubleshooting do agente.
+* troubleshooting operacional do agente em `docs/agent/TROUBLESHOOTING.md`.
