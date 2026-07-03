@@ -3,9 +3,9 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Shell } from "@/components/Shell";
-import { EmptyState, ErrorState, LoadingBlock, StatusBadge, ToolbarButton } from "@/components/Ui";
+import { EmptyState, ErrorState, LoadingBlock, SeverityBadge, StatusBadge, ToolbarButton } from "@/components/Ui";
 import { formatDateTime, formatRelativeMinutes, formatUptime, requestBackend } from "@/lib/api";
-import type { MachineDetail, MachineMetric, MachineProgram } from "@/lib/types";
+import type { AlertSummary, MachineDetail, MachineLocalAdmin, MachineMetric, MachineProgram, SecurityEvent } from "@/lib/types";
 
 type SectionState<T> = {
   data: T;
@@ -25,6 +25,24 @@ const emptyProgramsState: SectionState<MachineProgram[]> = {
   error: null,
 };
 
+const emptyAdminsState: SectionState<MachineLocalAdmin[]> = {
+  data: [],
+  loading: true,
+  error: null,
+};
+
+const emptyEventsState: SectionState<SecurityEvent[]> = {
+  data: [],
+  loading: true,
+  error: null,
+};
+
+const emptyAlertsState: SectionState<AlertSummary[]> = {
+  data: [],
+  loading: true,
+  error: null,
+};
+
 export function MachineDetailView({ machineId }: { machineId: string }) {
   const parsedMachineId = Number(machineId);
   const validMachineId = Number.isInteger(parsedMachineId) && parsedMachineId > 0;
@@ -34,6 +52,9 @@ export function MachineDetailView({ machineId }: { machineId: string }) {
   const [detailError, setDetailError] = useState<string | null>(null);
   const [metrics, setMetrics] = useState<SectionState<MachineMetric[]>>(emptyMetricsState);
   const [programs, setPrograms] = useState<SectionState<MachineProgram[]>>(emptyProgramsState);
+  const [admins, setAdmins] = useState<SectionState<MachineLocalAdmin[]>>(emptyAdminsState);
+  const [events, setEvents] = useState<SectionState<SecurityEvent[]>>(emptyEventsState);
+  const [alerts, setAlerts] = useState<SectionState<AlertSummary[]>>(emptyAlertsState);
 
   const loadDetail = useCallback(async () => {
     if (!validMachineId) {
@@ -89,11 +110,70 @@ export function MachineDetailView({ machineId }: { machineId: string }) {
     }
   }, [parsedMachineId, validMachineId]);
 
+  const loadAdmins = useCallback(async () => {
+    if (!validMachineId) {
+      setAdmins({ data: [], loading: false, error: null });
+      return;
+    }
+
+    setAdmins((current) => ({ ...current, loading: true, error: null }));
+
+    try {
+      const adminList = await requestBackend<MachineLocalAdmin[]>(`/api/v1/machines/${parsedMachineId}/admins`);
+      setAdmins({ data: adminList, loading: false, error: null });
+    } catch (err) {
+      setAdmins({ data: [], loading: false, error: err instanceof Error ? err.message : "Erro inesperado" });
+    }
+  }, [parsedMachineId, validMachineId]);
+
+  const loadEvents = useCallback(async () => {
+    if (!validMachineId) {
+      setEvents({ data: [], loading: false, error: null });
+      return;
+    }
+
+    setEvents((current) => ({ ...current, loading: true, error: null }));
+
+    try {
+      const eventList = await requestBackend<SecurityEvent[]>("/api/v1/security-events");
+      setEvents({
+        data: eventList.filter((event) => event.machine_id === parsedMachineId),
+        loading: false,
+        error: null,
+      });
+    } catch (err) {
+      setEvents({ data: [], loading: false, error: err instanceof Error ? err.message : "Erro inesperado" });
+    }
+  }, [parsedMachineId, validMachineId]);
+
+  const loadAlerts = useCallback(async () => {
+    if (!validMachineId) {
+      setAlerts({ data: [], loading: false, error: null });
+      return;
+    }
+
+    setAlerts((current) => ({ ...current, loading: true, error: null }));
+
+    try {
+      const alertList = await requestBackend<AlertSummary[]>("/api/v1/alerts");
+      setAlerts({
+        data: alertList.filter((alert) => alert.machine_id === parsedMachineId),
+        loading: false,
+        error: null,
+      });
+    } catch (err) {
+      setAlerts({ data: [], loading: false, error: err instanceof Error ? err.message : "Erro inesperado" });
+    }
+  }, [parsedMachineId, validMachineId]);
+
   const loadAll = useCallback(() => {
     void loadDetail();
     void loadMetrics();
     void loadPrograms();
-  }, [loadDetail, loadMetrics, loadPrograms]);
+    void loadAdmins();
+    void loadEvents();
+    void loadAlerts();
+  }, [loadAdmins, loadAlerts, loadDetail, loadEvents, loadMetrics, loadPrograms]);
 
   useEffect(() => {
     loadAll();
@@ -102,11 +182,15 @@ export function MachineDetailView({ machineId }: { machineId: string }) {
   const latestMetric = metrics.data[0];
   const lastSeenLabel = detail ? formatRelativeMinutes(detail.last_seen) : "sem check-in";
   const programsPreview = useMemo(() => programs.data.slice(0, 80), [programs.data]);
+  const metricHistory = useMemo(() => metrics.data.slice(0, 12), [metrics.data]);
+  const metricSummary = useMemo(() => buildMetricSummary(metricHistory), [metricHistory]);
+  const latestEvents = useMemo(() => events.data.slice(0, 10), [events.data]);
+  const openAlerts = useMemo(() => alerts.data.filter((alert) => alert.status === "open"), [alerts.data]);
 
   return (
     <Shell
       title={detail?.hostname ?? "Detalhe da maquina"}
-      subtitle="Resumo operacional, ultimo check-in, metricas recentes e programas instalados."
+      subtitle="Resumo operacional, metricas, administradores locais, eventos e alertas da maquina."
       actions={
         <>
           <Link className="secondary-button" href="/machines">
@@ -130,6 +214,10 @@ export function MachineDetailView({ machineId }: { machineId: string }) {
               </div>
               <StatusBadge value={detail.status} />
             </div>
+            <div className={`status-context ${detail.status.toLowerCase() === "online" ? "online" : "offline"}`}>
+              <strong>{detail.status.toLowerCase() === "online" ? "Ativa na janela operacional" : "Fora da janela operacional"}</strong>
+              <span>Ultima comunicacao: {lastSeenLabel}</span>
+            </div>
             <dl className="detail-grid detail-grid-wide">
               <DetailItem label="Usuario" value={detail.username} />
               <DetailItem label="IP" value={detail.ip_address} />
@@ -138,6 +226,40 @@ export function MachineDetailView({ machineId }: { machineId: string }) {
               <DetailItem label="Ultimo check-in" value={formatDateTime(detail.last_seen)} helper={lastSeenLabel} />
               <DetailItem label="ID interno" value={String(detail.id)} />
             </dl>
+          </section>
+
+          <section className="panel">
+            <div className="panel-header">
+              <h2>Alertas da maquina</h2>
+              <span>{alerts.data.length} itens</span>
+            </div>
+            {alerts.loading ? <LoadingBlock label="Carregando alertas" /> : null}
+            {alerts.error ? <SectionError message={alerts.error} onRetry={loadAlerts} /> : null}
+            {!alerts.loading && !alerts.error && alerts.data.length === 0 ? (
+              <EmptyState title="Sem alertas para esta maquina" message="Nenhum alerta foi associado a este ativo ate o momento." />
+            ) : null}
+            {!alerts.loading && !alerts.error && alerts.data.length > 0 ? (
+              <div className="stack-list compact">
+                {alerts.data.slice(0, 6).map((alert) => (
+                  <article className="list-item" key={alert.id}>
+                    <div>
+                      <strong>{alert.title}</strong>
+                      <p>{alert.description}</p>
+                      <small>
+                        {alert.alert_type} | {formatDateTime(alert.created_at)}
+                      </small>
+                    </div>
+                    <div className="item-meta">
+                      <SeverityBadge value={alert.severity} />
+                      <StatusBadge value={alert.status} />
+                    </div>
+                  </article>
+                ))}
+              </div>
+            ) : null}
+            {!alerts.loading && !alerts.error && openAlerts.length > 0 ? (
+              <p className="panel-note">{openAlerts.length} alerta(s) aberto(s) exigem acompanhamento na tela de Alertas.</p>
+            ) : null}
           </section>
 
           <section className="panel">
@@ -161,6 +283,52 @@ export function MachineDetailView({ machineId }: { machineId: string }) {
             ) : null}
             {!metrics.loading && !metrics.error && !latestMetric ? (
               <EmptyState title="Nenhuma metrica registrada" message="A maquina ainda nao enviou coletas de metricas." />
+            ) : null}
+          </section>
+
+          <section className="panel">
+            <div className="panel-header">
+              <h2>Historico de metricas</h2>
+              <span>ultimas {metricHistory.length} coletas</span>
+            </div>
+            {metrics.loading ? <LoadingBlock label="Carregando historico" /> : null}
+            {metrics.error ? <SectionError message={metrics.error} onRetry={loadMetrics} /> : null}
+            {!metrics.loading && !metrics.error && metricHistory.length === 0 ? (
+              <EmptyState title="Sem historico" message="As coletas historicas aparecem depois dos proximos check-ins." />
+            ) : null}
+            {!metrics.loading && !metrics.error && metricHistory.length > 0 ? (
+              <div className="metric-history">
+                <div className="metric-summary-grid" aria-label="Resumo do historico de metricas">
+                  <MetricSummaryItem label="CPU media" value={metricSummary.cpuAverage} />
+                  <MetricSummaryItem label="RAM media" value={metricSummary.ramAverage} />
+                  <MetricSummaryItem label="Disco medio" value={metricSummary.diskAverage} />
+                  <MetricSummaryItem label="Pico de CPU" value={metricSummary.cpuPeak} />
+                </div>
+                <div className="table-wrap">
+                  <table className="compact-table">
+                    <thead>
+                      <tr>
+                        <th>Coleta</th>
+                        <th>CPU</th>
+                        <th>RAM</th>
+                        <th>Disco</th>
+                        <th>Uptime</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {metricHistory.map((metric, index) => (
+                        <tr key={`${metric.created_at ?? "metric"}-${index}`}>
+                          <td>{formatDateTime(metric.created_at)}</td>
+                          <td>{formatOptionalPercent(metric.cpu_usage)}</td>
+                          <td>{formatOptionalPercent(metric.ram_usage)}</td>
+                          <td>{formatOptionalPercent(metric.disk_usage)}</td>
+                          <td>{formatOptionalUptime(metric.uptime_seconds)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             ) : null}
           </section>
 
@@ -197,6 +365,70 @@ export function MachineDetailView({ machineId }: { machineId: string }) {
               </div>
             ) : null}
           </section>
+
+          <section className="panel">
+            <div className="panel-header">
+              <h2>Administradores locais</h2>
+              <span>{admins.data.length} contas</span>
+            </div>
+            {admins.loading ? <LoadingBlock label="Carregando administradores" /> : null}
+            {admins.error ? <SectionError message={admins.error} onRetry={loadAdmins} /> : null}
+            {!admins.loading && !admins.error && admins.data.length === 0 ? (
+              <EmptyState title="Sem administradores registrados" message="O baseline de administradores aparece apos o check-in com coleta de seguranca." />
+            ) : null}
+            {!admins.loading && !admins.error && admins.data.length > 0 ? (
+              <div className="table-wrap">
+                <table className="compact-table">
+                  <thead>
+                    <tr>
+                      <th>Conta</th>
+                      <th>Primeira deteccao</th>
+                      <th>Ultima deteccao</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {admins.data.map((admin) => (
+                      <tr key={admin.admin_name}>
+                        <td>{admin.admin_name}</td>
+                        <td>{formatDateTime(admin.first_seen_at)}</td>
+                        <td>{formatDateTime(admin.last_seen_at)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : null}
+          </section>
+
+          <section className="panel">
+            <div className="panel-header">
+              <h2>Eventos de seguranca</h2>
+              <span>{events.data.length} eventos</span>
+            </div>
+            {events.loading ? <LoadingBlock label="Carregando eventos" /> : null}
+            {events.error ? <SectionError message={events.error} onRetry={loadEvents} /> : null}
+            {!events.loading && !events.error && events.data.length === 0 ? (
+              <EmptyState title="Sem eventos para esta maquina" message="Eventos SOC Light associados a este ativo aparecerao aqui." />
+            ) : null}
+            {!events.loading && !events.error && events.data.length > 0 ? (
+              <div className="stack-list compact">
+                {latestEvents.map((event) => (
+                  <article className="list-item" key={event.id}>
+                    <div>
+                      <strong>{event.event_type}</strong>
+                      <p>{event.description}</p>
+                      <small>
+                        Origem: {event.source} | {formatDateTime(event.created_at)}
+                      </small>
+                    </div>
+                    <div className="item-meta">
+                      <SeverityBadge value={event.severity} />
+                    </div>
+                  </article>
+                ))}
+              </div>
+            ) : null}
+          </section>
         </section>
       ) : null}
     </Shell>
@@ -223,6 +455,15 @@ function MetricTile({ label, value }: { label: string; value: number | null | un
         <strong>{normalized.label}</strong>
       </div>
       <progress value={normalized.value} max={100} aria-label={`${label}: ${normalized.label}`} />
+    </div>
+  );
+}
+
+function MetricSummaryItem({ label, value }: { label: string; value: number | null }) {
+  return (
+    <div className="metric-summary-item">
+      <span>{label}</span>
+      <strong>{formatOptionalPercent(value)}</strong>
     </div>
   );
 }
@@ -255,8 +496,45 @@ function formatOptionalUptime(value: number | null | undefined) {
   return typeof value === "number" && !Number.isNaN(value) ? formatUptime(value) : "-";
 }
 
+function formatOptionalPercent(value: number | null | undefined) {
+  if (typeof value !== "number" || Number.isNaN(value)) {
+    return "-";
+  }
+
+  return `${Math.max(0, Math.min(100, value)).toFixed(1)}%`;
+}
+
 function formatMachineIdentity(username: string | null, ipAddress: string | null) {
   const user = formatOptionalText(username);
   const ip = formatOptionalText(ipAddress);
   return `${user} | ${ip}`;
+}
+
+function buildMetricSummary(history: MachineMetric[]) {
+  return {
+    cpuAverage: averageMetric(history, "cpu_usage"),
+    ramAverage: averageMetric(history, "ram_usage"),
+    diskAverage: averageMetric(history, "disk_usage"),
+    cpuPeak: peakMetric(history, "cpu_usage"),
+  };
+}
+
+function averageMetric(history: MachineMetric[], key: "cpu_usage" | "ram_usage" | "disk_usage") {
+  const values = history
+    .map((metric) => metric[key])
+    .filter((value): value is number => typeof value === "number" && !Number.isNaN(value));
+
+  if (values.length === 0) {
+    return null;
+  }
+
+  return values.reduce((total, value) => total + value, 0) / values.length;
+}
+
+function peakMetric(history: MachineMetric[], key: "cpu_usage" | "ram_usage" | "disk_usage") {
+  const values = history
+    .map((metric) => metric[key])
+    .filter((value): value is number => typeof value === "number" && !Number.isNaN(value));
+
+  return values.length > 0 ? Math.max(...values) : null;
 }

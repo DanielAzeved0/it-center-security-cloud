@@ -739,6 +739,108 @@ Impactos:
 
 ---
 
+# ADR-021
+
+## Data
+
+2026-07-03
+
+## Decisao
+
+Adotar RBAC administrativo inicial com tres papeis:
+
+* `admin`
+* `analyst`
+* `viewer`
+
+A autenticacao de usuarios humanos sera separada da autenticacao do agente Windows.
+
+O agente continuara usando `X-Agent-Api-Key` para check-in. Usuarios administrativos usarao login proprio em etapa futura da EPIC 12, com sessao ou JWT, validacao de usuario ativo, permissao por papel e auditoria de acoes criticas.
+
+## Motivo
+
+O MVP usa HTTP Basic Auth no Nginx para proteger o dashboard, mas esse controle nao oferece governanca suficiente para operacao administrativa:
+
+* nao identifica adequadamente cada usuario no backend;
+* nao permite RBAC;
+* nao registra auditoria de acoes sensiveis;
+* nao diferencia leitura, investigacao e administracao.
+
+Separar autenticacao do agente e autenticacao humana evita misturar dois dominios com riscos e ciclos de vida diferentes.
+
+## Alternativas Avaliadas
+
+* Manter apenas HTTP Basic Auth.
+* Usar um unico segredo compartilhado para operadores.
+* Implementar login sem RBAC.
+* Implementar RBAC inicial com `admin`, `analyst` e `viewer`.
+* Unificar API Key do agente com credenciais de usuarios humanos.
+
+## Resultado
+
+O projeto adotara RBAC inicial documentado em `docs/security/AUTH.md`.
+
+Contratos definidos:
+
+* `admin` tem permissao administrativa completa.
+* `analyst` pode visualizar dados e resolver alertas, mas nao gerenciar usuarios.
+* `viewer` tem acesso somente leitura.
+* `users` e `audit_logs` fazem parte da base de governanca administrativa.
+* `POST /api/v1/agent/checkin` permanece protegido por `X-Agent-Api-Key`.
+* Rotas administrativas serao protegidas por login humano.
+
+Impactos:
+
+* EPIC 12 passa a ter fronteira clara entre governanca administrativa e check-in do agente.
+* Proximas tasks podem implementar banco, login e protecao de rotas sem redefinir o modelo de permissao.
+* HTTP Basic Auth pode continuar como camada adicional no Nginx, mas nao substitui o login administrativo da aplicacao.
+
+---
+
+# ADR-022
+
+## Data
+
+2026-07-03
+
+## Decisao
+
+Implementar login administrativo com Bearer token assinado por HMAC SHA-256, senha armazenada como PBKDF2-SHA256 e autorizacao server-side por RBAC.
+
+## Motivo
+
+A EPIC 12 precisa substituir o Basic Auth do MVP por um mecanismo em que o backend conheca o usuario humano, valide o status do usuario, aplique permissoes por papel e registre auditoria de acoes criticas.
+
+O projeto ainda nao precisa de SSO, MFA ou provedor externo. Um token assinado localmente atende ao escopo atual sem adicionar dependencia externa.
+
+## Alternativas Avaliadas
+
+* Manter Basic Auth.
+* Usar cookie de sessao server-side.
+* Usar JWT por biblioteca externa.
+* Usar Bearer token assinado localmente com HMAC SHA-256.
+* Adotar SSO desde ja.
+
+## Resultado
+
+* `POST /api/v1/auth/login` valida `users.email`, `users.status` e `password_hash`.
+* Tokens expiram por `AUTH_TOKEN_EXPIRATION_MINUTES`.
+* `AUTH_TOKEN_SECRET` e obrigatorio em producao.
+* Rotas administrativas exigem Bearer token.
+* `admin`, `analyst` e `viewer` acessam leituras.
+* Apenas `admin` e `analyst` podem resolver alertas.
+* Login, falha de login, logout e resolucao de alerta registram `audit_logs`.
+* `POST /api/v1/agent/checkin` continua separado e protegido por `X-Agent-Api-Key`.
+
+Impactos:
+
+* O dashboard passa a ter tela de login.
+* O frontend guarda o token no navegador e o envia para o proxy interno.
+* A revogacao server-side antes da expiracao fica fora do escopo atual.
+* API Key individual por agente fica planejada para evolucao futura.
+
+---
+
 ## ADR-XXX
 
 ### Data

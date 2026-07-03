@@ -26,6 +26,43 @@ Servidores físicos ou virtuais.
 
 ---
 
+# Ativos Conhecidos
+
+No MVP, a regra SOC `unknown_asset` usa uma allowlist simples de hostnames conhecidos.
+
+Fonte oficial documental:
+
+```text
+ASSET_POLICY.md
+```
+
+Lista inicial de hostnames conhecidos:
+
+```text
+NOTE-DANIEL
+PC-TI-01
+PC-TI-02
+PC-FINANCEIRO-01
+```
+
+Regra operacional:
+
+```text
+Se um check-in chegar com hostname fora desta lista, o backend registra unknown_asset e gera alerta high.
+```
+
+Normalização:
+
+* Comparar hostnames em caixa alta.
+* Ignorar espaços no início e no fim.
+
+Limitação conhecida:
+
+* A allowlist também existe no código do backend enquanto não houver tabela ou tela administrativa de ativos.
+* Quando a governança evoluir, esta lista deverá migrar para banco de dados e administração pelo dashboard.
+
+---
+
 # Ferramentas de Acesso Remoto
 
 ## Autorizadas
@@ -47,6 +84,67 @@ Ferramenta utilizada pela equipe de TI para suporte remoto.
 Motivo:
 
 Não fazem parte do padrão atual da operação.
+
+---
+
+# Ferramentas Sensiveis e Indicadores de Malware
+
+Esta secao define ferramentas que podem ser legitimas em administracao de TI, mas tambem podem ser abusadas em reconhecimento, movimentacao lateral, exfiltracao, persistencia ou operacoes de ransomware.
+
+Esta deteccao e heuristica e nao substitui antivirus, EDR, analise de comportamento, YARA, Sigma ou threat intelligence externa.
+
+## Ferramentas Dual-Use ou Sensiveis
+
+Geram evento `suspicious_tool_detected`, severidade `medium`, com alerta aberto.
+
+* Advanced IP Scanner
+* Angry IP Scanner
+* Nmap
+* Masscan
+* PsExec
+* PAExec
+* Metasploit
+* Cobalt Strike
+* Process Hacker
+* Netcat
+* Rclone
+* MegaSync
+* Tor Browser
+
+## Indicadores Fortes de Malware ou Ransomware
+
+Geram evento `malware_or_ransomware_indicator`, severidade `high`, com alerta aberto.
+
+* Mimikatz
+* WannaCry
+* WCry
+* LockBit
+* BlackCat
+* ALPHV
+* Conti
+* Ryuk
+* REvil
+* DarkSide
+
+Regra operacional:
+
+```text
+RustDesk gera remote_access_tool_detected low sem alerta.
+AnyDesk, TeamViewer e UltraViewer geram unauthorized_remote_access_tool medium com alerta.
+Ferramentas dual-use geram suspicious_tool_detected medium com alerta.
+Indicadores fortes de malware/ransomware geram malware_or_ransomware_indicator high com alerta.
+```
+
+Normalizacao:
+
+* Comparar nomes sem diferenciar maiusculas e minusculas.
+* Aceitar correspondencia por substring para nomes como TeamViewer Host, AnyDesk MSI, rustdesk.exe e lockbit.exe.
+* Avaliar programas instalados e processos em execucao quando o payload do agente trouxer essas informacoes.
+
+Limitacao conhecida:
+
+* As listas tambem existem no codigo do backend enquanto nao houver tabela ou tela administrativa de politicas.
+* Eventos indicam evidencia operacional para investigacao, nao confirmacao definitiva de comprometimento.
 
 ---
 
@@ -105,6 +203,30 @@ A lista real será mantida conforme o inventário crescer.
 
 * Servidores
 * Máquinas da equipe de TI
+
+## Hostnames Autorizados no MVP
+
+```text
+NOTE-DANIEL
+PC-TI-01
+PC-TI-02
+```
+
+Regra operacional:
+
+```text
+RDP habilitado em hostname autorizado gera evento informativo low e nao gera alerta.
+RDP habilitado fora desta lista gera evento medium e alerta aberto.
+```
+
+Normalização:
+
+* Comparar hostnames em caixa alta.
+* Ignorar espaços no início e no fim.
+
+Limitação conhecida:
+
+* A allowlist de RDP também existe no código do backend enquanto não houver tabela ou tela administrativa de politicas.
 
 ## Não Permitido
 

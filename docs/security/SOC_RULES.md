@@ -165,9 +165,6 @@ LOW
 Ferramentas monitoradas:
 
 * RustDesk
-* AnyDesk
-* TeamViewer
-* UltraViewer
 
 Ação:
 
@@ -188,6 +185,12 @@ unauthorized_remote_access_tool
 Severidade:
 
 MEDIUM
+
+Ferramentas monitoradas:
+
+* AnyDesk
+* TeamViewer
+* UltraViewer
 
 Condição:
 
@@ -296,6 +299,79 @@ Registrar ocorrência.
 
 ---
 
+# Regra 13
+
+Ferramenta Sensivel ou Dual-Use
+
+Evento:
+
+suspicious_tool_detected
+
+Severidade:
+
+MEDIUM
+
+Ferramentas monitoradas:
+
+* Advanced IP Scanner
+* Angry IP Scanner
+* Nmap
+* Masscan
+* PsExec
+* PAExec
+* Metasploit
+* Cobalt Strike
+* Process Hacker
+* Netcat
+* Rclone
+* MegaSync
+* Tor Browser
+
+Condicao:
+
+Ferramenta instalada ou processo reportado pelo agente com potencial de abuso operacional.
+
+Acao:
+
+Gerar alerta.
+
+---
+
+# Regra 14
+
+Indicador de Malware ou Ransomware
+
+Evento:
+
+malware_or_ransomware_indicator
+
+Severidade:
+
+HIGH
+
+Indicadores monitorados:
+
+* Mimikatz
+* WannaCry
+* WCry
+* LockBit
+* BlackCat
+* ALPHV
+* Conti
+* Ryuk
+* REvil
+* DarkSide
+
+Condicao:
+
+Nome de programa instalado ou processo reportado pelo agente corresponde a indicador forte de ferramenta maliciosa ou ransomware conhecido.
+
+Acao:
+
+Gerar alerta imediato.
+
+---
+
 # Futuras Regras
 
 * Wazuh Integration
@@ -322,28 +398,35 @@ rdp_enabled
 usb_detected
 remote_access_tool_detected
 unauthorized_remote_access_tool
+suspicious_tool_detected
+malware_or_ransomware_indicator
 unauthorized_vpn_tool
 torrent_software_detected
+machine_offline
+unknown_asset
 ```
 
-Regras definidas, mas ainda nao implementadas no EPIC 6:
+Regras definidas, mas ainda nao implementadas no EPIC 6/11:
 
 ```text
-unknown_asset
-machine_offline
+Nenhuma.
 ```
 
 Comportamento atual:
 
 * `firewall_disabled`: gerado quando `security.firewall_enabled` vem `false`; severidade `high`; gera alerta aberto.
 * `defender_disabled`: gerado quando `security.defender_enabled` vem `false`; severidade `high`; gera alerta aberto.
-* `rdp_enabled`: gerado quando `security.rdp_enabled` vem `true`; gera alerta `medium` quando a maquina nao estiver autorizada em ASSET_POLICY.md.
+* `rdp_enabled`: gerado quando `security.rdp_enabled` vem `true`; em hostnames autorizados por ASSET_POLICY.md gera evento `low` sem alerta; fora da allowlist gera evento `medium` e alerta aberto.
 * `usb_detected`: gerado para cada dispositivo USB reportado; severidade `low`; nao gera alerta.
 * `new_admin_user`: gerado quando surge administrador local novo apos o baseline inicial; severidade `high`; gera alerta aberto.
 * `failed_login`: gerado quando `failed_logins_last_hour` for maior que 5; severidade `medium`; gera alerta aberto.
 * `remote_access_tool_detected`: gerado para RustDesk; severidade `low`; nao gera alerta.
 * `unauthorized_remote_access_tool`: gerado para AnyDesk, TeamViewer e UltraViewer; severidade `medium`; gera alerta aberto.
+* `suspicious_tool_detected`: gerado para Advanced IP Scanner, Angry IP Scanner, Nmap, Masscan, PsExec, PAExec, Metasploit, Cobalt Strike, Process Hacker, Netcat, Rclone, MegaSync e Tor Browser; severidade `medium`; gera alerta aberto.
+* `malware_or_ransomware_indicator`: gerado para Mimikatz, WannaCry, WCry, LockBit, BlackCat, ALPHV, Conti, Ryuk, REvil e DarkSide; severidade `high`; gera alerta aberto.
 * `unauthorized_vpn_tool`: gerado para Hamachi, ZeroTier, Radmin VPN e Tailscale; severidade `high`; gera alerta aberto.
 * `torrent_software_detected`: gerado para uTorrent, BitTorrent e qBittorrent; severidade `high`; gera alerta aberto.
+* `machine_offline`: gerado quando uma maquina transiciona de `online` para `offline` por ficar sem check-in por mais de 10 minutos; severidade `low`; origem `system`; nao gera alerta.
+* `unknown_asset`: gerado quando o hostname do check-in nao esta na allowlist de ativos conhecidos em ASSET_POLICY.md; severidade `high`; gera alerta aberto.
 * Alertas abertos nao sao duplicados para a mesma maquina e mesmo tipo.
 * Eventos continuam sendo registrados a cada check-in em estado de risco.

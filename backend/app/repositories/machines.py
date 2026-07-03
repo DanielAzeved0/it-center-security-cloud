@@ -1,6 +1,10 @@
 from app.schemas.agent import AgentCheckinRequest
-from app.schemas.machine import MachineDetail, MachineMetric, MachineProgram, MachineSummary
+from app.schemas.machine import MachineDetail, MachineLocalAdmin, MachineMetric, MachineProgram, MachineSummary
 from app.database import get_connection
+from psycopg.types.json import Jsonb
+
+
+OFFLINE_THRESHOLD_MINUTES = 10
 
 
 def save_machine_checkin(payload: AgentCheckinRequest) -> MachineSummary:
@@ -100,6 +104,8 @@ def save_machine_checkin(payload: AgentCheckinRequest) -> MachineSummary:
 
 
 def list_machines() -> list[MachineSummary]:
+    mark_stale_machines_offline()
+
     with get_connection() as connection:
         rows = connection.execute(
             """
@@ -119,6 +125,8 @@ def list_machines() -> list[MachineSummary]:
 
 
 def get_machine(machine_id: int) -> MachineDetail | None:
+    mark_stale_machines_offline(machine_id)
+
     with get_connection() as connection:
         row = connection.execute(
             """
@@ -187,6 +195,27 @@ def list_machine_programs(machine_id: int) -> list[MachineProgram] | None:
     return [MachineProgram(**row) for row in rows]
 
 
+def list_machine_local_admins(machine_id: int) -> list[MachineLocalAdmin] | None:
+    if not machine_exists(machine_id):
+        return None
+
+    with get_connection() as connection:
+        rows = connection.execute(
+            """
+            SELECT
+                admin_name,
+                first_seen_at,
+                last_seen_at
+            FROM machine_local_admins
+            WHERE machine_id = %s
+            ORDER BY lower(admin_name)
+            """,
+            (machine_id,),
+        ).fetchall()
+
+    return [MachineLocalAdmin(**row) for row in rows]
+
+
 def machine_exists(machine_id: int) -> bool:
     with get_connection() as connection:
         row = connection.execute(
@@ -195,3 +224,52 @@ def machine_exists(machine_id: int) -> bool:
         ).fetchone()
 
     return row is not None
+
+
+def mark_stale_machines_offline(machine_id: int | None = None) -> None:
+    query = """
+        UPDATE machines
+        SET status = 'offline'
+        WHERE status <> 'offline'
+          AND (
+            last_seen IS NULL
+            OR last_seen < now() - (%s * interval '1 minute')
+          )
+    """
+    params: list[object] = [OFFLINE_THRESHOLD_MINUTES]
+
+    if machine_id is not None:
+        query += " AND id = %s"
+        params.append(machine_id)
+
+    query += " RETURNING id, hostname, last_seen"
+
+    with get_connection() as connection:
+        with connection.transaction():
+            stale_rows = connection.execute(query, params).fetchall()
+
+            for row in stale_rows:
+                connection.execute(
+                    """
+                    INSERT INTO security_events (
+                        machine_id,
+                        event_type,
+                        severity,
+                        source,
+                        description,
+                        raw_data
+                    )
+                    VALUES (%s, 'machine_offline', 'low', 'system', %s, %s)
+                    """,
+                    (
+                        row["id"],
+                        f"Máquina {row['hostname']} sem check-in por mais de {OFFLINE_THRESHOLD_MINUTES} minutos.",
+                        Jsonb(
+                            {
+                                "hostname": row["hostname"],
+                                "last_seen": row["last_seen"].isoformat() if row["last_seen"] else None,
+                                "offline_threshold_minutes": OFFLINE_THRESHOLD_MINUTES,
+                            }
+                        ),
+                    ),
+                )

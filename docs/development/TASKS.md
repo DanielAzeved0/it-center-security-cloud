@@ -306,7 +306,7 @@ Em 2026-06-29, `python -m pytest backend\tests\test_agent_checkin.py -q` passou 
 
 [x] Registrar evidencias do teste em docs/deployment/DEPLOYMENT_HISTORY.md
 
-[ ] Atualizar docs/deployment/KNOWN_ISSUES.md se houver falha conhecida
+[x] Atualizar docs/deployment/KNOWN_ISSUES.md se houver falha conhecida
 
 ---
 
@@ -320,13 +320,13 @@ Evoluir o dashboard de visualizacao inicial para uma ferramenta de operacao diar
 
 [x] Melhorar tela de detalhes da maquina
 
-[ ] Exibir historico de metricas por maquina
+[x] Exibir historico de metricas por maquina
 
 [x] Exibir programas instalados por maquina
 
-[ ] Exibir administradores locais por maquina
+[x] Exibir administradores locais por maquina
 
-[ ] Exibir eventos de seguranca por maquina
+[x] Exibir eventos de seguranca por maquina
 
 [x] Permitir resolver alertas pela interface
 
@@ -336,13 +336,13 @@ Evoluir o dashboard de visualizacao inicial para uma ferramenta de operacao diar
 
 [x] Adicionar filtros por maquina
 
-[ ] Melhorar estados vazios quando nao houver agente
+[x] Melhorar estados vazios quando nao houver agente
 
-[ ] Melhorar indicacao de maquina online e offline
+[x] Melhorar indicacao de maquina online e offline
 
-[ ] Validar responsividade das telas principais
+[x] Validar responsividade das telas principais
 
-[ ] Atualizar docs/backend/API.md se novas chamadas forem necessarias
+[x] Atualizar docs/backend/API.md se novas chamadas forem necessarias
 
 ---
 
@@ -354,27 +354,27 @@ Concluir regras SOC ja definidas e preparar a politica para configuracao operaci
 
 ### Tarefas
 
-[ ] Implementar regra unknown_asset
+[x] Implementar regra unknown_asset
 
-[ ] Implementar regra machine_offline
+[x] Implementar regra machine_offline
 
-[ ] Definir criterio oficial de maquina conhecida
+[x] Definir criterio oficial de maquina conhecida
 
 [x] Definir janela oficial para maquina offline
 
-[ ] Melhorar validacao de RDP autorizado por politica
+[x] Melhorar validacao de RDP autorizado por politica
 
-[ ] Melhorar validacao de ferramenta remota autorizada por politica
+[x] Melhorar validacao de ferramenta remota autorizada por politica
 
 [x] Evitar duplicidade indevida de alertas abertos
 
-[ ] Criar testes para unknown_asset
+[x] Criar testes para unknown_asset
 
-[ ] Criar testes para machine_offline
+[x] Criar testes para machine_offline
 
-[ ] Atualizar docs/security/SOC_RULES.md com o status das regras
+[x] Atualizar docs/security/SOC_RULES.md com o status das regras
 
-[ ] Atualizar docs/security/ASSET_POLICY.md se novas listas forem necessarias
+[x] Atualizar docs/security/ASSET_POLICY.md se novas listas forem necessarias
 
 ---
 
@@ -386,29 +386,29 @@ Substituir controles minimos do MVP por autenticacao e governanca adequadas para
 
 ### Tarefas
 
-[ ] Definir modelo de usuarios
+[x] Definir modelo de usuarios
 
-[ ] Definir modelo de permissoes
+[x] Definir modelo de permissoes
 
-[ ] Criar tabela users
+[x] Criar tabela users
 
-[ ] Criar tabela audit_logs
+[x] Criar tabela audit_logs
 
-[ ] Implementar login
+[x] Implementar login
 
-[ ] Implementar sessoes ou JWT
+[x] Implementar sessoes ou JWT
 
-[ ] Proteger rotas administrativas do backend
+[x] Proteger rotas administrativas do backend
 
-[ ] Proteger paginas administrativas do dashboard
+[x] Proteger paginas administrativas do dashboard
 
-[ ] Registrar auditoria de acoes criticas
+[x] Registrar auditoria de acoes criticas
 
-[ ] Planejar API Key por agente
+[x] Planejar API Key por agente
 
-[ ] Atualizar docs/security/AUTH.md
+[x] Atualizar docs/security/AUTH.md
 
-[ ] Registrar decisoes relevantes em docs/development/DECISIONS.md
+[x] Registrar decisoes relevantes em docs/development/DECISIONS.md
 
 ---
 

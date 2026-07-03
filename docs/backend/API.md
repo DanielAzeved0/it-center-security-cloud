@@ -31,6 +31,22 @@ Base URL:
 /api/v1
 ```
 
+Autenticacao administrativa:
+
+```http
+Authorization: Bearer <access_token>
+```
+
+Rotas administrativas exigem Bearer token. As excecoes sao:
+
+```text
+GET /api/v1/health
+POST /api/v1/auth/login
+POST /api/v1/agent/checkin
+```
+
+`POST /api/v1/agent/checkin` continua usando `X-Agent-Api-Key`, separado do login humano.
+
 ---
 
 # Endpoints MVP
@@ -153,6 +169,70 @@ Payload invalido retorna `422 Unprocessable Entity` com a lista de campos invali
 
 ---
 
+# Auth
+
+## Login Administrativo
+
+Autentica usuario humano administrativo.
+
+```http
+POST /api/v1/auth/login
+```
+
+Exemplo de envio:
+
+```json
+{
+  "email": "admin@example.com",
+  "password": "senha"
+}
+```
+
+Resposta:
+
+```json
+{
+  "access_token": "token",
+  "token_type": "bearer",
+  "expires_in": 3600,
+  "user": {
+    "id": 1,
+    "email": "admin@example.com",
+    "name": "Admin User",
+    "role": "admin"
+  }
+}
+```
+
+Login bem-sucedido, falha de login e logout registram `audit_logs`.
+
+O primeiro usuario `admin` deve ser criado por `backend/create_admin.py`, conforme `docs/security/AUTH.md`.
+
+## Sessao Atual
+
+```http
+GET /api/v1/auth/me
+Authorization: Bearer <access_token>
+```
+
+## Logout
+
+```http
+POST /api/v1/auth/logout
+Authorization: Bearer <access_token>
+```
+
+Resposta:
+
+```json
+{
+  "status": "success",
+  "message": "Logged out"
+}
+```
+
+---
+
 # Machines
 
 ## Listar Máquinas
@@ -258,6 +338,38 @@ Resposta:
   }
 ]
 ```
+
+---
+
+# Local Admins
+
+## Administradores Locais
+
+Retorna o baseline conhecido de administradores locais de uma máquina.
+
+```http
+GET /api/v1/machines/{machine_id}/admins
+```
+
+Resposta:
+
+```json
+[
+  {
+    "admin_name": "Administrator",
+    "first_seen_at": "2026-06-24T20:00:00",
+    "last_seen_at": "2026-06-24T20:05:00"
+  }
+]
+```
+
+Origem dos dados:
+
+```text
+Tabela machine_local_admins no PostgreSQL.
+```
+
+Quando a máquina não existir, a API retorna `404 Machine not found`.
 
 ---
 
@@ -451,6 +563,7 @@ A API estará pronta para o MVP quando:
 * GET /api/v1/machines/{id} detalhar máquina.
 * GET /api/v1/machines/{id}/metrics listar métricas da máquina.
 * GET /api/v1/machines/{id}/programs listar programas da máquina.
+* GET /api/v1/machines/{id}/admins listar administradores locais da máquina.
 * GET /api/v1/security-events listar eventos.
 * GET /api/v1/alerts listar alertas.
 * PATCH /api/v1/alerts/{id}/resolve resolver alertas.

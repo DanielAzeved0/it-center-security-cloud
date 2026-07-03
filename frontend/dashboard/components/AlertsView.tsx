@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Shell } from "@/components/Shell";
 import { EmptyState, ErrorState, LoadingBlock, SeverityBadge, StatCard, StatusBadge, ToolbarButton } from "@/components/Ui";
 import { formatDateTime, requestBackend } from "@/lib/api";
-import type { AlertSummary } from "@/lib/types";
+import type { AlertSummary, AuthUser } from "@/lib/types";
 
 export function AlertsView() {
   const [alerts, setAlerts] = useState<AlertSummary[]>([]);
@@ -14,14 +14,19 @@ export function AlertsView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [resolvingId, setResolvingId] = useState<number | null>(null);
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
 
   const loadAlerts = useCallback(async () => {
     setLoading(true);
     setError(null);
 
     try {
-      const payload = await requestBackend<AlertSummary[]>("/api/v1/alerts");
-      setAlerts(payload);
+      const [alertsPayload, userPayload] = await Promise.all([
+        requestBackend<AlertSummary[]>("/api/v1/alerts"),
+        requestBackend<{ user: AuthUser }>("/api/v1/auth/me"),
+      ]);
+      setAlerts(alertsPayload);
+      setCurrentUser(userPayload.user);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro inesperado");
     } finally {
@@ -74,6 +79,7 @@ export function AlertsView() {
     [alerts, machineFilter, severityFilter, typeFilter],
   );
   const hasActiveFilters = severityFilter !== "all" || typeFilter !== "all" || machineFilter !== "all";
+  const canResolveAlerts = currentUser?.role === "admin" || currentUser?.role === "analyst";
 
   const clearFilters = () => {
     setSeverityFilter("all");
@@ -165,8 +171,9 @@ export function AlertsView() {
                       <button
                         className="primary-button"
                         type="button"
-                        disabled={alert.status === "resolved" || resolvingId === alert.id}
+                        disabled={!canResolveAlerts || alert.status === "resolved" || resolvingId === alert.id}
                         onClick={() => void resolveAlert(alert.id)}
+                        title={!canResolveAlerts ? "Seu perfil nao pode resolver alertas" : undefined}
                       >
                         {resolvingId === alert.id ? "Resolvendo" : "Resolver"}
                       </button>

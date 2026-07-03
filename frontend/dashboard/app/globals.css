@@ -159,6 +159,99 @@ a {
   gap: 8px;
 }
 
+.user-chip {
+  display: grid;
+  min-height: 42px;
+  align-content: center;
+  padding: 6px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.user-chip strong {
+  font-size: 13px;
+  line-height: 1.2;
+}
+
+.user-chip span {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.auth-loading {
+  max-width: 360px;
+  margin: 32px auto;
+}
+
+.login-screen {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: 24px;
+}
+
+.login-panel {
+  display: grid;
+  width: min(100%, 420px);
+  gap: 20px;
+  padding: 24px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+}
+
+.login-brand {
+  margin-bottom: 0;
+}
+
+.login-panel h1 {
+  margin: 0;
+  font-size: 26px;
+  line-height: 1.2;
+}
+
+.login-panel p {
+  margin: 6px 0 0;
+  color: var(--muted);
+}
+
+.login-form {
+  display: grid;
+  gap: 14px;
+}
+
+.login-form label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.login-form input {
+  min-height: 42px;
+  padding: 0 12px;
+  color: var(--text);
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.login-form input:focus-visible {
+  outline: 2px solid rgba(15, 118, 110, 0.28);
+  outline-offset: 2px;
+}
+
+.form-error {
+  padding: 10px 12px;
+  color: var(--danger);
+  background: #fff7f7;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+}
+
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -608,8 +701,83 @@ tr:last-child td {
   text-transform: uppercase;
 }
 
+.status-context {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+.status-context strong,
+.status-context span {
+  display: block;
+}
+
+.status-context span {
+  color: var(--muted);
+}
+
+.status-context.online {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+}
+
+.status-context.offline {
+  border-color: #fecaca;
+  background: #fff7f7;
+}
+
+.panel-note {
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
 .detail-metrics {
   grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.metric-history {
+  display: grid;
+  gap: 14px;
+}
+
+.metric-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.metric-summary-item {
+  min-height: 78px;
+  padding: 12px;
+  background: var(--surface-strong);
+  border-radius: 8px;
+}
+
+.metric-summary-item span {
+  display: block;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.metric-summary-item strong {
+  display: block;
+  margin-top: 8px;
+  font-size: 20px;
+}
+
+.compact-table {
+  min-width: 720px;
+}
+
+.compact-table th,
+.compact-table td {
+  padding-top: 10px;
+  padding-bottom: 10px;
 }
 
 .section-error {
@@ -704,6 +872,7 @@ progress::-moz-progress-bar {
   .stats-grid,
   .compact-stats,
   .filter-bar,
+  .metric-summary-grid,
   .metric-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -720,10 +889,18 @@ progress::-moz-progress-bar {
   }
 
   .page-header,
+  .panel-header,
   .list-item,
+  .machine-row,
   .error-state {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .header-actions,
+  .panel-actions {
+    justify-content: flex-start;
+    flex-wrap: wrap;
   }
 
   .nav-list,
@@ -732,11 +909,13 @@ progress::-moz-progress-bar {
   .filter-bar,
   .detail-grid,
   .detail-grid-wide,
+  .metric-summary-grid,
   .metric-grid {
     grid-template-columns: 1fr;
   }
 
   .machine-hero-main,
+  .status-context,
   .section-error {
     align-items: stretch;
     flex-direction: column;

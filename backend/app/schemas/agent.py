@@ -29,6 +29,7 @@ class AgentCheckinRequest(BaseModel):
     disk_usage: float = Field(..., ge=0, le=100)
     uptime_seconds: int = Field(..., ge=0)
     installed_programs: list[InstalledProgram] = Field(default_factory=list)
+    processes: list[str] = Field(default_factory=list)
     security: SecurityPayload
 
 

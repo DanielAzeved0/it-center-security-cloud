@@ -9,7 +9,7 @@ class MachineSummary(BaseModel):
     username: str | None = Field(default=None, max_length=255)
     ip_address: str | None = Field(default=None, max_length=45)
     status: str
-    last_seen: datetime
+    last_seen: datetime | None
 
 
 class MachineDetail(MachineSummary):
@@ -29,3 +29,9 @@ class MachineProgram(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
     version: str | None = Field(default=None, max_length=100)
     publisher: str | None = Field(default=None, max_length=255)
+
+
+class MachineLocalAdmin(BaseModel):
+    admin_name: str = Field(..., min_length=1, max_length=255)
+    first_seen_at: datetime
+    last_seen_at: datetime

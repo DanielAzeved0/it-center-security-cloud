@@ -13,6 +13,8 @@ O banco será responsável por armazenar:
 * Programas instalados
 * Eventos de segurança
 * Alertas
+* Usuarios administrativos
+* Logs de auditoria administrativa
 * Configurações dos agentes
 
 ---
@@ -61,6 +63,12 @@ alerts
 machines
    ↓
 agent_configs
+
+users
+
+users
+   ->
+audit_logs
 ```
 
 ---
@@ -338,6 +346,98 @@ INDEX status, severity
 
 ---
 
+# Tabela: users
+
+Armazena usuarios humanos administrativos para a governanca futura do dashboard e da API.
+
+Esta tabela nao e usada pelo agente Windows. O agente continua autenticando check-ins por `X-Agent-Api-Key`.
+
+## Campos
+
+```text
+id BIGSERIAL PRIMARY KEY
+email VARCHAR(255) NOT NULL
+name VARCHAR(255) NOT NULL
+password_hash TEXT NOT NULL
+role VARCHAR(20) NOT NULL
+status VARCHAR(20) NOT NULL DEFAULT 'pending'
+created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+last_login_at TIMESTAMPTZ NULL
+```
+
+## Regras
+
+* Cada usuario deve ter um e-mail unico para login futuro.
+* A unicidade de e-mail e case-insensitive por indice unico em `lower(email)`.
+* email, name e password_hash nao podem ser nulos nem vazios.
+* password_hash nunca deve armazenar senha em texto puro.
+* role deve aceitar apenas: admin, analyst, viewer.
+* status deve aceitar apenas: active, disabled, pending.
+* last_login_at pode ser nulo ate o primeiro login.
+* A tabela representa usuarios humanos administrativos, nao agentes.
+
+---
+
+## users
+
+```text
+UNIQUE lower(email)
+INDEX status
+INDEX role
+CHECK role IN ('admin', 'analyst', 'viewer')
+CHECK status IN ('active', 'disabled', 'pending')
+```
+
+---
+
+# Tabela: audit_logs
+
+Armazena logs de auditoria administrativa para a governanca futura do dashboard e da API.
+
+Esta tabela prepara o registro de acoes criticas, mas a captura automatica de auditoria sera implementada em task futura.
+
+## Campos
+
+```text
+id BIGSERIAL PRIMARY KEY
+actor_user_id BIGINT NULL REFERENCES users(id) ON DELETE SET NULL
+action VARCHAR(100) NOT NULL
+entity_type VARCHAR(100) NOT NULL
+entity_id VARCHAR(255) NULL
+ip_address INET NULL
+user_agent TEXT NULL
+metadata JSONB NOT NULL DEFAULT '{}'::jsonb
+created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+```
+
+## Regras
+
+* actor_user_id referencia users(id) quando houver usuario humano autenticado.
+* actor_user_id pode ser nulo para eventos de sistema.
+* Se um usuario for removido futuramente, o historico permanece com actor_user_id nulo.
+* action nao pode ser nulo nem vazio.
+* entity_type nao pode ser nulo nem vazio.
+* entity_id pode ser nulo para acoes sem entidade especifica.
+* metadata deve ser JSONB e nao deve armazenar senha, token, API Key ou segredo.
+* created_at deve ser preenchido automaticamente.
+
+---
+
+
+```text
+INDEX actor_user_id
+INDEX action
+INDEX entity_type
+INDEX created_at
+INDEX entity_type, entity_id
+FK actor_user_id -> users(id) ON DELETE SET NULL
+CHECK action <> ''
+CHECK entity_type <> ''
+```
+
+---
+
 # Relacionamentos
 
 ## machines → metrics
@@ -400,6 +500,28 @@ machines.id = agent_configs.machine_id
 
 ---
 
+## users
+
+Usuarios administrativos nao dependem de machines.
+
+```text
+users.email e o identificador unico para login futuro.
+```
+
+---
+
+## users -> audit_logs
+
+Um usuario administrativo pode aparecer como ator em muitos logs de auditoria.
+
+```text
+users.id = audit_logs.actor_user_id
+```
+
+Quando um usuario for removido futuramente, os logs devem preservar o historico com `actor_user_id` nulo.
+
+---
+
 # Integração API e Banco
 
 O backend acessa o PostgreSQL pela camada `repositories`.
@@ -445,6 +567,27 @@ postgresql://itcenter:change-me@127.0.0.1:5432/it_center_security_cloud
 ## Testes
 
 Os testes de backend limpam as tabelas com `TRUNCATE ... RESTART IDENTITY CASCADE` antes de cada cenário.
+
+---
+
+## Governanca Administrativa
+
+As tabelas `users` e `audit_logs` preparam a EPIC 12 para login administrativo, RBAC e auditoria.
+
+Nesta etapa:
+
+```text
+Nao ha endpoint de login.
+Nao ha CRUD de usuarios.
+Nao ha protecao de rotas por usuario humano.
+Nao ha captura automatica de auditoria.
+```
+
+O contrato de papeis e permissoes fica em:
+
+```text
+docs/security/AUTH.md
+```
 
 ---
 
@@ -532,17 +675,12 @@ Por isso:
 
 # Tabelas Futuras
 
-## users
-
-Para login no dashboard.
-
 ## organizations
 
 Para suporte SaaS no futuro.
 
 ## audit_logs
 
-Para registrar ações feitas no painel.
 
 ## integrations
 

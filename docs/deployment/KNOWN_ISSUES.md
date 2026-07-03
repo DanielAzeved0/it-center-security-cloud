@@ -1,5 +1,21 @@
 # Known Issues
 
+## Confirmacao EPIC 9
+
+Data:
+
+```text
+2026-07-03
+```
+
+Status:
+
+```text
+Pendencia documental confirmada.
+```
+
+As falhas e limitacoes conhecidas do fluxo fim a fim estao registradas neste documento. Nao ha novo bloqueio funcional reportado para impedir o encerramento da EPIC 9; os itens abaixo permanecem como riscos operacionais conhecidos ou limitacoes do MVP.
+
 ## DNS da Vivo com propagacao lenta
 
 Foi observado que o dominio `itcenter-daniel.chickenkiller.com` resolvia corretamente em Google DNS, Cloudflare e Quad9, mas ainda nao propagava no DNS da Vivo.

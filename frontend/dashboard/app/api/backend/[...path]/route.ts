@@ -12,10 +12,12 @@ async function proxyRequest(request: NextRequest, segments: string[]) {
   upstreamUrl.search = request.nextUrl.search;
 
   const body = request.method === "GET" || request.method === "HEAD" ? undefined : await request.text();
+  const authorization = request.headers.get("Authorization");
   const response = await fetch(upstreamUrl, {
     method: request.method,
     headers: {
       "Content-Type": request.headers.get("Content-Type") ?? "application/json",
+      ...(authorization ? { Authorization: authorization } : {}),
     },
     body,
     cache: "no-store",
@@ -37,6 +39,11 @@ export async function GET(request: NextRequest, context: { params: Promise<{ pat
 }
 
 export async function PATCH(request: NextRequest, context: { params: Promise<{ path: string[] }> }) {
+  const { path } = await context.params;
+  return proxyRequest(request, path);
+}
+
+export async function POST(request: NextRequest, context: { params: Promise<{ path: string[] }> }) {
   const { path } = await context.params;
   return proxyRequest(request, path);
 }

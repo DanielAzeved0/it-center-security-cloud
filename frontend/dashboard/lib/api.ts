@@ -8,11 +8,31 @@ export class ApiError extends Error {
   }
 }
 
+const AUTH_TOKEN_KEY = "itcenter.auth.token";
+
+export function getAuthToken(): string | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  return window.localStorage.getItem(AUTH_TOKEN_KEY);
+}
+
+export function setAuthToken(token: string): void {
+  window.localStorage.setItem(AUTH_TOKEN_KEY, token);
+}
+
+export function clearAuthToken(): void {
+  window.localStorage.removeItem(AUTH_TOKEN_KEY);
+}
+
 export async function requestBackend<T>(path: string, init?: RequestInit): Promise<T> {
+  const token = getAuthToken();
   const response = await fetch(`/api/backend${path}`, {
     ...init,
     headers: {
       "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(init?.headers ?? {}),
     },
     cache: "no-store",
@@ -41,10 +61,15 @@ export function formatDateTime(value: string | null | undefined): string {
     return "-";
   }
 
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "-";
+  }
+
   return new Intl.DateTimeFormat("pt-BR", {
     dateStyle: "short",
     timeStyle: "short",
-  }).format(new Date(value));
+  }).format(date);
 }
 
 export function formatRelativeMinutes(value: string | null | undefined): string {
@@ -52,7 +77,12 @@ export function formatRelativeMinutes(value: string | null | undefined): string 
     return "sem check-in";
   }
 
-  const minutes = Math.max(0, Math.round((Date.now() - new Date(value).getTime()) / 60000));
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "sem check-in";
+  }
+
+  const minutes = Math.max(0, Math.round((Date.now() - date.getTime()) / 60000));
 
   if (minutes < 1) {
     return "agora";

@@ -26,6 +26,12 @@ export type MachineProgram = {
   publisher: string | null;
 };
 
+export type MachineLocalAdmin = {
+  admin_name: string;
+  first_seen_at: string;
+  last_seen_at: string;
+};
+
 export type AlertSummary = {
   id: number;
   machine_id: number | null;
@@ -35,6 +41,20 @@ export type AlertSummary = {
   title: string;
   description: string;
   created_at: string;
+};
+
+export type AuthUser = {
+  id: number;
+  email: string;
+  name: string;
+  role: "admin" | "analyst" | "viewer";
+};
+
+export type LoginResponse = {
+  access_token: string;
+  token_type: "bearer";
+  expires_in: number;
+  user: AuthUser;
 };
 
 export type SecurityEvent = {
