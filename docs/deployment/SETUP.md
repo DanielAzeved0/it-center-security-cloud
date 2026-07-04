@@ -52,6 +52,7 @@ Usar esse comando para gerar pelo menos:
 ```text
 POSTGRES_PASSWORD
 AGENT_API_KEY
+AUTH_TOKEN_SECRET
 ```
 
 O arquivo `.env.production` nunca deve ser commitado.

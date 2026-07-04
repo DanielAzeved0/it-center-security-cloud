@@ -69,7 +69,7 @@ ok "Memoria disponivel ${available_mem_mb}MB"
 ok "Estrutura"
 ok "Secrets"
 
-for key in DOMAIN_NAME POSTGRES_DB POSTGRES_USER POSTGRES_PASSWORD DATABASE_URL AGENT_API_KEY; do
+for key in DOMAIN_NAME POSTGRES_DB POSTGRES_USER POSTGRES_PASSWORD DATABASE_URL AGENT_API_KEY AUTH_TOKEN_SECRET; do
   value=$(get_env "$key")
   [ -n "$value" ] || fail "$key nao foi definido em .env.production."
   case "$value" in

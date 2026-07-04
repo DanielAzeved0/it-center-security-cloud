@@ -54,7 +54,7 @@ Na VM:
 /etc/letsencrypt/live/itcenter-daniel.chickenkiller.com/privkey.pem
 ```
 
-Nao registrar valores de `POSTGRES_PASSWORD`, `DATABASE_URL`, `AGENT_API_KEY` ou senha do dashboard em commits, logs, issues ou documentacao.
+Nao registrar valores de `POSTGRES_PASSWORD`, `DATABASE_URL`, `AGENT_API_KEY`, `AUTH_TOKEN_SECRET` ou senha do dashboard em commits, logs, issues ou documentacao.
 
 ## Variaveis obrigatorias
 
@@ -68,6 +68,8 @@ POSTGRES_USER=itcenter
 POSTGRES_PASSWORD=<secret>
 DATABASE_URL=postgresql://itcenter:<secret>@postgres:5432/it_center_security_cloud
 AGENT_API_KEY=<secret>
+AUTH_TOKEN_SECRET=<secret>
+AUTH_TOKEN_EXPIRATION_MINUTES=60
 ITCENTER_API_BASE_URL=http://backend:8000
 NEXT_PUBLIC_API_BASE_URL=/api/backend
 ```
@@ -79,6 +81,7 @@ cd /opt/itcenter/app/it-center-security-cloud
 
 grep -E '^(APP_ENV|DOMAIN_NAME|POSTGRES_DB|POSTGRES_USER|ITCENTER_API_BASE_URL|NEXT_PUBLIC_API_BASE_URL)=' .env.production
 grep '^AGENT_API_KEY=' .env.production | sed 's/=.*/=<definida>/'
+grep '^AUTH_TOKEN_SECRET=' .env.production | sed 's/=.*/=<definida>/'
 grep '^POSTGRES_PASSWORD=' .env.production | sed 's/=.*/=<definida>/'
 grep '^DATABASE_URL=' .env.production | sed 's#://.*@#://<credenciais>@#'
 ```

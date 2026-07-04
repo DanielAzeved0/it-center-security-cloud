@@ -225,7 +225,7 @@ mkdir -p .secrets /var/www/certbot
 chmod 700 .secrets
 ```
 
-Edite `.env.production` com um domínio real e valores aleatórios distintos. Não reutilize `change-me` nem mantenha os valores `REPLACE_WITH...`. Para evitar caracteres que exigiriam codificação na `DATABASE_URL`, uma opção simples é gerar ambos os segredos com `openssl rand -hex 32`; o valor de `POSTGRES_PASSWORD` deve ser reproduzido literalmente na URL.
+Edite `.env.production` com um domínio real e valores aleatórios distintos. Não reutilize `change-me` nem mantenha os valores `REPLACE_WITH...`. Para evitar caracteres que exigiriam codificação na `DATABASE_URL`, uma opção simples é gerar os segredos com `openssl rand -hex 32`; o valor de `POSTGRES_PASSWORD` deve ser reproduzido literalmente na URL. Gere valores distintos para `POSTGRES_PASSWORD`, `AGENT_API_KEY` e `AUTH_TOKEN_SECRET`.
 
 Crie a credencial do dashboard com bcrypt. O arquivo não deve ser commitado:
 

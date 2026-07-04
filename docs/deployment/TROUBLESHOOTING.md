@@ -77,6 +77,20 @@ Causas comuns:
 * `DATABASE_URL` incorreto.
 * Migrations falhando.
 * Secrets inconsistentes.
+* `AUTH_TOKEN_SECRET` ausente ou ainda com placeholder apos a EPIC 12.
+
+Se os logs mostrarem falha de configuracao em producao, validar sem imprimir secrets:
+
+```bash
+grep '^AUTH_TOKEN_SECRET=' .env.production | sed 's/=.*/=<definida>/'
+grep '^AGENT_API_KEY=' .env.production | sed 's/=.*/=<definida>/'
+```
+
+Se `AUTH_TOKEN_SECRET` nao existir, gere um valor forte e adicione em `.env.production`:
+
+```bash
+openssl rand -hex 32
+```
 
 ## PostgreSQL unhealthy
 
