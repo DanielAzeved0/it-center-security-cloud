@@ -20,6 +20,14 @@ docker logs itcenter-backend
 docker logs itcenter-postgres
 ```
 
+Checagem consolidada da EPIC 13:
+
+```bash
+sh infra/scripts/ops-check.sh
+```
+
+O script retorna `FAIL` quando encontrar falha critica em Docker, Compose, containers, certificado TLS ou limites operacionais.
+
 ## Preflight falhando
 
 Executar:
@@ -175,6 +183,74 @@ sudo swapon /swapfile
 grep -q '^/swapfile ' /etc/fstab || echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
 free -h
 ```
+
+## Backup periodico nao executa
+
+Validar cron:
+
+```bash
+sudo cat /etc/cron.d/itcenter-postgres-backup
+sudo tail -n 100 /opt/itcenter/logs/postgres-backup.log
+ls -lh /opt/itcenter/backups
+```
+
+Reinstalar agendamento:
+
+```bash
+sudo sh infra/scripts/install-backup-cron.sh
+```
+
+Causas comuns:
+
+* cron ausente ou parado;
+* container `itcenter-postgres` indisponivel;
+* permissao insuficiente em `/opt/itcenter/backups`;
+* `.env.production` ausente ou com `POSTGRES_DB`/`POSTGRES_USER` incorretos.
+
+## Certificado perto do vencimento
+
+Validar:
+
+```bash
+sh infra/scripts/ops-check.sh
+```
+
+Testar renovacao:
+
+```bash
+TLS_RENEW_DRY_RUN=1 sh infra/scripts/renew-tls.sh
+```
+
+Renovar:
+
+```bash
+sh infra/scripts/renew-tls.sh
+```
+
+Causas comuns:
+
+* porta 80 bloqueada;
+* DNS apontando para IP errado;
+* webroot `/var/www/certbot` indisponivel;
+* container Nginx parado ou unhealthy.
+
+## Docker Scout falhando
+
+Executar gate:
+
+```bash
+sh infra/scripts/docker-scout-gate.sh
+```
+
+Se falhar:
+
+```bash
+docker scout recommendations postgres:16-alpine
+docker scout recommendations infra-backend:latest
+docker scout recommendations infra-frontend:latest
+```
+
+Nao publique imagens de backend ou frontend com CVEs `critical` ou `high` corrigiveis.
 
 ## Dashboard vazio
 

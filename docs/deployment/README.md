@@ -24,6 +24,7 @@ Esta pasta concentra a documentacao de setup, producao, troubleshooting e histor
 | `KNOWN_ISSUES.md` | Problemas conhecidos. |
 | `LESSONS_LEARNED.md` | Licoes aprendidas. |
 | `PRODUCTION_READINESS_REPORT.md` | Relatorio tecnico de readiness. |
+| `WEEKLY_OPERATIONS.md` | Rotina semanal da EPIC 13: backup, restore, rollback, TLS, checks e Scout. |
 
 ## Comandos principais
 
@@ -32,6 +33,7 @@ cd /opt/itcenter/app/it-center-security-cloud
 sh infra/scripts/preflight-production.sh
 sh infra/scripts/deploy.sh
 sh infra/scripts/backup.sh
+sh infra/scripts/ops-check.sh
 ```
 
 ## Ambiente atual

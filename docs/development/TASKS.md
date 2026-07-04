@@ -420,23 +420,23 @@ Reduzir risco operacional do ambiente publicado e preparar manutencao continua.
 
 ### Tarefas
 
-[ ] Automatizar backup periodico do PostgreSQL
+[x] Automatizar backup periodico do PostgreSQL
 
-[ ] Testar restore em ambiente controlado
+[~] Testar restore em ambiente controlado
 
-[ ] Validar rollback de deploy
+[~] Validar rollback de deploy
 
-[ ] Validar renovacao de certificado TLS
+[~] Validar renovacao de certificado TLS
 
-[ ] Monitorar uso de disco da VM
+[x] Monitorar uso de disco da VM
 
-[ ] Monitorar uso de memoria da VM
+[x] Monitorar uso de memoria da VM
 
-[ ] Monitorar containers unhealthy
+[x] Monitorar containers unhealthy
 
-[ ] Criar alerta para expiracao de certificado
+[x] Criar alerta para expiracao de certificado
 
-[ ] Executar Docker Scout antes de publicar imagens
+[x] Executar Docker Scout antes de publicar imagens
 
 [x] Criar CI automatico no GitHub Actions
 
@@ -459,9 +459,9 @@ Reduzir risco operacional do ambiente publicado e preparar manutencao continua.
     * smoke tests de producao aprovados;
     * dashboard publicado validado sem bug visual reportado.
 
-[ ] Documentar rotina operacional semanal
+[x] Documentar rotina operacional semanal
 
-[ ] Atualizar docs/deployment/TROUBLESHOOTING.md com novos cenarios
+[x] Atualizar docs/deployment/TROUBLESHOOTING.md com novos cenarios
 
 [ ] Atualizar docs/deployment/POSTMORTEMS.md quando houver incidente
 

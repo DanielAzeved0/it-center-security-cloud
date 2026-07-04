@@ -44,6 +44,10 @@ deploy.sh                executa preflight, build, up, healthchecks e smoke test
 rollback.sh              retorna para um Git ref anterior preservando o banco
 backup.sh                gera dump PostgreSQL compactado
 restore.sh               restaura dump mediante confirmacao explicita
+install-backup-cron.sh   instala backup periodico diario via cron
+ops-check.sh             verifica disco, memoria, containers, TLS e backup recente
+renew-tls.sh             renova certificado TLS e recarrega Nginx
+docker-scout-gate.sh     executa gate Docker Scout critical/high
 ```
 
 Na VM:
@@ -51,6 +55,18 @@ Na VM:
 ```bash
 cd /opt/itcenter/app/it-center-security-cloud
 sh infra/scripts/deploy.sh
+```
+
+Rotina operacional semanal:
+
+```bash
+sh infra/scripts/ops-check.sh
+```
+
+Runbook:
+
+```text
+docs/deployment/WEEKLY_OPERATIONS.md
 ```
 
 ## Subir tudo

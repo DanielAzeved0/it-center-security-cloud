@@ -380,6 +380,18 @@ BACKUP_DIR=/opt/itcenter/backups
 RETENTION_DAYS=7
 ```
 
+Instalar backup periodico diario na VM:
+
+```bash
+sudo sh infra/scripts/install-backup-cron.sh
+```
+
+Customizacao:
+
+```bash
+sudo BACKUP_HOUR=3 BACKUP_MINUTE=0 RETENTION_DAYS=14 sh infra/scripts/install-backup-cron.sh
+```
+
 Restore exige confirmação explícita para evitar sobrescrita acidental:
 
 ```bash
@@ -391,11 +403,27 @@ ITCENTER_RESTORE_CONFIRM=YES sh infra/scripts/restore.sh /opt/itcenter/backups/i
 Renove mensalmente (ou agende via systemd/cron) e recarregue o Nginx após a renovação:
 
 ```bash
-docker compose --env-file .env.production -f infra/docker-compose.production.yml --profile maintenance run --rm certbot renew --webroot -w /var/www/certbot
-docker compose --env-file .env.production -f infra/docker-compose.production.yml exec nginx nginx -s reload
+TLS_RENEW_DRY_RUN=1 sh infra/scripts/renew-tls.sh
+sh infra/scripts/renew-tls.sh
 ```
 
 Antes de qualquer atualização, faça backup do PostgreSQL. Migrations devem ser sempre retrocompatíveis, pois não há rollback automático de schema.
+
+## Rotina operacional semanal
+
+Runbook oficial:
+
+```text
+docs/deployment/WEEKLY_OPERATIONS.md
+```
+
+Checagem consolidada:
+
+```bash
+sh infra/scripts/ops-check.sh
+```
+
+O script verifica disco, memoria, Compose, containers, certificado TLS e backup recente. Ele retorna `FAIL` e codigo diferente de zero quando houver falha critica.
 
 ---
 
@@ -611,12 +639,10 @@ Ambiente será considerado pronto quando:
 
 # Gate de Seguranca das Imagens
 
-Antes de publicar ou considerar um build pronto para ambiente externo, executar Docker Scout nas imagens finais:
+Antes de publicar ou considerar um build pronto para ambiente externo, executar o gate Docker Scout:
 
-```powershell
-docker scout cves postgres:16-alpine --only-severity critical,high
-docker scout cves infra-backend:latest --only-severity critical,high
-docker scout cves infra-frontend:latest --only-severity critical,high
+```bash
+sh infra/scripts/docker-scout-gate.sh
 ```
 
 Quando houver vulnerabilidade critica ou alta, consultar recomendacoes:
