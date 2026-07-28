@@ -2,6 +2,27 @@
 
 Este documento registra o processo real de implantacao do IT Center Security Cloud na Oracle Cloud.
 
+## 2026-07-28 - Recuperacao de acesso, criacao do primeiro admin e correcao do loop de login
+
+Contexto: perda da chave SSH pessoal de acesso a `itcenter-edge-01`, ausencia de qualquer usuario administrativo na tabela `users` de producao, e um loop de login causado por conflito entre Basic Auth e Bearer token. Detalhes completos de cada causa raiz em `docs/deployment/POSTMORTEMS.md` (INCIDENTE 018, 019 e 020).
+
+Linha do tempo:
+
+1. Acesso SSH recuperado via workflow temporario `ssh-access-recovery.yml` (commit `b121ead`), que reaproveitou o secret `PROD_SSH_PRIVATE_KEY` ja usado pelo deploy para injetar uma nova chave publica no `authorized_keys` da VM.
+2. Uma chave privada foi exposta acidentalmente durante o processo; foi tratada como comprometida e removida do `authorized_keys` assim que uma chave limpa ficou disponivel.
+3. Workflow temporario removido do repositorio apos uso (commit `cdd85e2`).
+4. Senha do HTTP Basic Auth (`admin`, `.secrets/dashboard.htpasswd`) redefinida via `htpasswd`.
+5. Identificado que a tabela `users` estava vazia em producao. Primeiro usuario administrativo criado executando `backend/create_admin.py` manualmente dentro do container (o script nao faz parte da imagem Docker do backend).
+6. Diagnosticado loop de login: chamadas autenticadas do dashboard (`Authorization: Bearer ...`) colidiam com o `Authorization: Basic` exigido pelo Nginx em `location /`.
+7. Corrigido isentando `/api/backend/` do Basic Auth no Nginx (commit `c95586c`, ver ADR-023), aplicado na VM via `git pull` + `docker compose restart nginx`.
+8. Login administrativo validado com sucesso no navegador, dashboard operacional (`/security` exibindo eventos reais).
+
+Resultado:
+
+* Acesso SSH administrativo restaurado com chave nova, sem chaves comprometidas remanescentes no `authorized_keys`.
+* Primeiro usuario `admin` ativo criado em producao (`daniel.azevedo081205@gmail.com`).
+* Login administrativo e navegacao no dashboard funcionando de ponta a ponta em producao.
+
 ## 2026-06-30 - Deploy manual via GitHub Actions
 
 Workflow:

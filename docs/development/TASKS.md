@@ -463,7 +463,12 @@ Reduzir risco operacional do ambiente publicado e preparar manutencao continua.
 
 [x] Atualizar docs/deployment/TROUBLESHOOTING.md com novos cenarios
 
-[ ] Atualizar docs/deployment/POSTMORTEMS.md quando houver incidente
+[x] Atualizar docs/deployment/POSTMORTEMS.md quando houver incidente
+
+    Feito em 2026-07-28 apos os INCIDENTES 018, 019 e 020 (perda de
+    chave SSH, ausencia de admin em producao e loop de login por
+    conflito Basic Auth/Bearer). Item permanece como pratica continua
+    para qualquer incidente futuro, nao apenas um registro unico.
 
 ---
 

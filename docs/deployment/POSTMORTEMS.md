@@ -1392,6 +1392,264 @@ Criar smoke test futuro simulando check-in de agente em ambiente controlado.
 
 ---
 
+# INCIDENTE 018
+
+## Resumo
+
+Perda da chave SSH pessoal de acesso ao Edge Node e exposicao acidental de uma chave privada durante a recuperacao.
+
+## Severidade
+
+```text
+Alta
+```
+
+## Data
+
+```text
+2026-07-28
+```
+
+## Ambiente
+
+```text
+Producao
+Oracle Cloud
+SSH
+GitHub Actions
+```
+
+## Sintomas
+
+Nenhuma chave SSH pessoal disponivel para acessar `itcenter-edge-01`.
+
+## Impacto
+
+* Acesso administrativo a VM bloqueado.
+* Sem esse acesso nao era possivel operar backup/restore/rollback/TLS nem redefinir credenciais do dashboard.
+
+## Linha do tempo
+
+```text
+T+00 - Chave SSH pessoal ausente identificada
+T+05 - Workflow temporario ssh-access-recovery.yml criado, reaproveitando o
+       secret PROD_SSH_PRIVATE_KEY ja usado pelo deploy
+T+10 - Novo par de chaves gerado localmente
+T+12 - Conteudo da chave privada colado por engano no canal de suporte
+T+15 - Chave publica correspondente ainda assim adicionada ao
+       authorized_keys via workflow, unica opcao disponivel no momento
+T+18 - Novo par de chaves gerado corretamente
+T+20 - Chave comprometida removida do authorized_keys da VM, chave nova
+       validada com sucesso
+T+22 - Workflow temporario removido do repositorio
+```
+
+## Causa raiz
+
+Chave SSH pessoal perdida sem copia de backup. Nao havia um segundo fator de acesso administrativo a VM alem da chave SSH individual.
+
+## Correcao aplicada
+
+* Workflow `ssh-access-recovery.yml` criado, executado uma unica vez via `workflow_dispatch` reaproveitando o secret `PROD_SSH_PRIVATE_KEY` ja usado pelo deploy, e removido do repositorio logo em seguida.
+* Chave privada exposta foi tratada como comprometida: sua chave publica foi removida do `authorized_keys` assim que uma chave nova ficou disponivel.
+
+## Como validar
+
+```bash
+cat ~/.ssh/authorized_keys
+```
+
+Confirmar que restam apenas chaves conhecidas (`itcenter-edge-01`, `github-actions-itcenter` e a chave pessoal vigente).
+
+## Licoes aprendidas
+
+* Nunca colar material de chave privada em nenhum canal de texto. Se acontecer, tratar a chave como comprometida e revoga-la imediatamente, mesmo que pareca inofensivo.
+* Um workflow que injeta chaves SSH usando um secret ja existente e uma forma valida de recuperacao de ultimo recurso, mas deve ser removido do repositorio assim que usado, pois representa um vetor de escalada enquanto existir.
+* Depender de uma unica chave SSH pessoal sem backup e um ponto unico de falha para o acesso administrativo.
+
+## Melhorias futuras
+
+* Guardar uma copia de recuperacao da chave SSH pessoal em um cofre de senhas.
+* Documentar acesso alternativo via OCI Console/Serial Console como plano B, evitando depender apenas do GitHub Actions em uma proxima perda de chave.
+
+## Automacao recomendada
+
+```bash
+grep -c '^ssh-' ~/.ssh/authorized_keys
+```
+
+---
+
+# INCIDENTE 019
+
+## Resumo
+
+Nenhum usuario administrativo existia na tabela `users` em producao, apesar da EPIC 12 constar como concluida.
+
+## Severidade
+
+```text
+Alta
+```
+
+## Data
+
+```text
+2026-07-28
+```
+
+## Ambiente
+
+```text
+Producao
+PostgreSQL
+Backend
+```
+
+## Sintomas
+
+A tela de login administrativo (`/login`) respondia `{"detail":"Invalid credentials"}` para qualquer tentativa.
+
+## Impacto
+
+* Acesso administrativo ao dashboard totalmente indisponivel.
+* Nenhuma auditoria ou operacao via RBAC era possivel ate a criacao de um usuario.
+
+## Linha do tempo
+
+```text
+T+00 - Tentativa de login administrativo falhando repetidamente
+T+05 - Consulta direta SELECT id, email, name, role, status FROM users
+       retornou 0 linhas
+T+08 - Identificado que backend/create_admin.py nunca havia sido
+       executado no ambiente de producao
+T+10 - create_admin.py copiado manualmente para dentro do container,
+       ja que nao faz parte da imagem Docker do backend
+T+12 - Primeiro admin criado, porem com senha fraca por erro de
+       digitacao em variavel de shell (variavel errada referenciada)
+T+15 - Senha corrigida via atualizacao direta de password_hash usando
+       o mesmo hash_password() do backend
+```
+
+## Causa raiz
+
+A implementacao do login (EPIC 12, ADR-021, ADR-022) foi validada em ambiente de teste, mas a etapa de seed do primeiro usuario administrativo (`backend/create_admin.py`) nunca foi executada no ambiente de producao real. Esse script tambem nao faz parte da imagem Docker do backend, que copia apenas `app/`, `migrations/` e `apply_migrations.py`.
+
+## Correcao aplicada
+
+* `create_admin.py` copiado manualmente para o container (`docker cp`) e executado com `ADMIN_EMAIL`/`ADMIN_NAME`/`ADMIN_PASSWORD` para criar o primeiro admin.
+* Senha redefinida em seguida via atualizacao direta do `password_hash` (PBKDF2), reaproveitando `hash_password()` do proprio backend para manter compatibilidade com `verify_password()`.
+
+## Como validar
+
+```bash
+docker exec -i itcenter-postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT count(*) FROM users WHERE role='admin' AND status='active';"
+```
+
+## Licoes aprendidas
+
+* "Deploy concluido" nao significa "seed de dados concluido". O checklist de deploy precisa incluir a criacao do primeiro admin como etapa explicita, nao implicita.
+* Scripts de setup unico como `create_admin.py`, quando ficam fora da imagem e fora do fluxo de deploy, sao facilmente esquecidos justamente porque so importam uma vez.
+
+## Melhorias futuras
+
+* Incluir `create_admin.py` na imagem do backend ou chama-lo a partir de `deploy.sh` de forma idempotente (ele ja retorna sem sobrescrever se o e-mail existir).
+* Adicionar ao preflight ou aos smoke tests uma checagem de que existe ao menos um usuario `admin` ativo apos o deploy.
+
+## Automacao recomendada
+
+```bash
+docker exec -i itcenter-postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -tAc \
+  "SELECT count(*) FROM users WHERE role='admin' AND status='active';" | grep -qv '^0$' || exit 1
+```
+
+---
+
+# INCIDENTE 020
+
+## Resumo
+
+Loop de login no dashboard: o Basic Auth do Nginx colidia com o Bearer token emitido pelo login da aplicacao.
+
+## Severidade
+
+```text
+Alta
+```
+
+## Data
+
+```text
+2026-07-28
+```
+
+## Ambiente
+
+```text
+Producao
+Nginx
+Dashboard
+Backend
+```
+
+## Sintomas
+
+Apos preencher corretamente o Basic Auth e o login administrativo, o navegador voltava repetidamente ao prompt de Basic Auth. Chamadas para `/me`, `/machines`, `/alerts` e `/security-events` retornavam `401`.
+
+## Impacto
+
+* Dashboard inutilizavel mesmo com credenciais corretas nas duas camadas de autenticacao.
+
+## Linha do tempo
+
+```text
+T+00 - Login administrativo validado via curl, funcionando fora do navegador
+T+05 - Reproduzido no navegador: loop entre Basic Auth e tela de login
+T+10 - Network tab mostrou 401 em /api/backend/api/v1/auth/login e,
+       apos login, em /me, /machines, /alerts e /security-events
+T+15 - Identificado que essas chamadas enviam Authorization: Bearer
+       <token>, substituindo o Authorization: Basic que o Nginx espera
+       em location /
+T+18 - Nova location ^~ /api/backend/ criada no Nginx, isentando essas
+       rotas do Basic Auth, ja protegidas por RBAC/token da aplicacao
+T+20 - Alteracao commitada (c95586c), enviada ao repositorio e aplicada
+       na VM via git pull + docker compose restart nginx
+T+22 - Login validado com sucesso no navegador
+```
+
+## Causa raiz
+
+O HTTP permite apenas um cabecalho `Authorization` por requisicao. A configuracao original do Nginx aplicava `auth_basic` em `location /` sem excecao, entao qualquer chamada do dashboard que definisse `Authorization: Bearer ...` para o token da aplicacao perdia, do ponto de vista do Nginx, a credencial Basic Auth que ele exigia.
+
+## Correcao aplicada
+
+Adicionada uma `location ^~ /api/backend/` sem `auth_basic` no Nginx, mantendo o proxy para o frontend como antes. Essas rotas continuam protegidas pelo RBAC/Bearer da propria aplicacao, seguindo o mesmo padrao ja usado para `POST /api/v1/agent/checkin`. Decisao registrada em ADR-023.
+
+## Como validar
+
+```bash
+curl -s -u admin:SENHA -X POST https://itcenter-daniel.chickenkiller.com/api/backend/api/v1/auth/login -H "Content-Type: application/json" -d @login.json
+```
+
+Confirmar tambem que o dashboard permanece logado ao navegar entre paginas apos o login.
+
+## Licoes aprendidas
+
+* Basic Auth aplicado indiscriminadamente sobre toda a aplicacao conflita com qualquer esquema de autenticacao propria que tambem use o cabecalho `Authorization`.
+* Um "loop de login" deve ser investigado olhando os headers de resposta (presenca ou ausencia de `www-authenticate`) antes de suspeitar de senha errada ou cache do navegador.
+
+## Melhorias futuras
+
+* Reavaliar se o Basic Auth do MVP ainda se justifica agora que existe login administrativo completo (ADR-021, ADR-022), ou se pode ser removido em uma fase futura.
+
+## Automacao recomendada
+
+```bash
+curl -s -o /dev/null -w '%{http_code}' -u admin:SENHA https://itcenter-daniel.chickenkiller.com/api/backend/api/v1/health
+```
+
+---
+
 # Analise consolidada de causa raiz
 
 ## Erros mais recorrentes

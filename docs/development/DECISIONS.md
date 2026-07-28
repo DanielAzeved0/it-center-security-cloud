@@ -841,6 +841,38 @@ Impactos:
 
 ---
 
+# ADR-023
+
+## Data
+
+2026-07-28
+
+## Decisao
+
+Isentar as rotas `/api/backend/` do HTTP Basic Auth do Nginx, mantendo o Basic Auth apenas nas paginas e assets servidos por `location /`.
+
+## Motivo
+
+Essas rotas carregam `Authorization: Bearer <token>` da aplicacao apos o login (ADR-021, ADR-022). Como o HTTP permite apenas um cabecalho `Authorization` por requisicao, o Basic Auth aplicado indiscriminadamente quebrava toda chamada autenticada do dashboard (`/me`, `/machines`, `/alerts`, `/security-events`), causando um loop de login. Incidente registrado em `docs/deployment/POSTMORTEMS.md` (INCIDENTE 020).
+
+## Alternativas Avaliadas
+
+* Remover o Basic Auth completamente do Nginx, dependendo apenas do login da aplicacao.
+* Fazer o frontend enviar as credenciais de Basic Auth por outro mecanismo alem do cabecalho `Authorization` (ex.: cookie proprio).
+* Isentar apenas as rotas de API usadas pela SPA do Basic Auth, mantendo-o nas paginas.
+
+## Resultado
+
+Adicionada `location ^~ /api/backend/` sem `auth_basic` em `infra/nginx/nginx.conf.template`, seguindo o mesmo padrao ja usado por `POST /api/v1/agent/checkin`. As rotas seguem protegidas pelo RBAC/Bearer da propria aplicacao.
+
+Impactos:
+
+* O Basic Auth do Nginx passa a proteger apenas o carregamento inicial das paginas e assets estaticos, nao mais as chamadas de API da SPA.
+* A superficie sem Basic Auth aumenta ligeiramente, mas essas rotas ja exigiam autenticacao e RBAC proprios do backend.
+* O Basic Auth continua sendo apenas uma camada adicional do MVP; sua real necessidade deve ser reavaliada agora que o login administrativo completo (ADR-021, ADR-022) esta em producao.
+
+---
+
 ## ADR-XXX
 
 ### Data
