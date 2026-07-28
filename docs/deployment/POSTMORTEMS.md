@@ -1650,6 +1650,91 @@ curl -s -o /dev/null -w '%{http_code}' -u admin:SENHA https://itcenter-daniel.ch
 
 ---
 
+# INCIDENTE 021
+
+## Resumo
+
+Renovacao de TLS bloqueada porque a imagem `certbot/certbot:v4.21.0` referenciada no Compose de producao nunca existiu no Docker Hub.
+
+## Severidade
+
+```text
+Media
+```
+
+## Data
+
+```text
+2026-07-28
+```
+
+## Ambiente
+
+```text
+Producao
+Docker
+Certbot
+```
+
+## Sintomas
+
+```text
+docker: Error response from daemon: failed to resolve reference
+"docker.io/certbot/certbot:v4.21.0": docker.io/certbot/certbot:v4.21.0: not found
+```
+
+ao executar `TLS_RENEW_DRY_RUN=1 sh infra/scripts/renew-tls.sh`.
+
+## Impacto
+
+* Validacao de renovacao de TLS (item pendente da EPIC 13) bloqueada.
+* Uma renovacao real de certificado, se necessaria, tambem falharia com o mesmo erro.
+
+## Linha do tempo
+
+```text
+T+00 - TLS_RENEW_DRY_RUN=1 sh infra/scripts/renew-tls.sh executado
+T+01 - Erro "not found" ao puxar certbot/certbot:v4.21.0
+T+03 - Consulta direta a API do Docker Hub confirmou 404 para essa tag
+T+05 - Confirmado via GitHub Releases que a versao mais recente do
+       Certbot e v5.7.0, tag existente e valida no Docker Hub (200)
+T+07 - infra/docker-compose.production.yml atualizado para
+       certbot/certbot:v5.7.0
+```
+
+## Causa raiz
+
+O Compose de producao referenciava uma tag de imagem (`v4.21.0`) que nunca existiu no Docker Hub para `certbot/certbot`. Como o servico `certbot` roda apenas sob o profile `maintenance`, essa referencia invalida nao aparecia em nenhum smoke test ou deploy de rotina, e so foi descoberta ao validar a renovacao de TLS de fato.
+
+## Correcao aplicada
+
+Atualizada a imagem para `certbot/certbot:v5.7.0` (tag existente, confirmada via API do Docker Hub e via GitHub Releases do Certbot).
+
+## Como validar
+
+```bash
+docker compose --env-file .env.production -f infra/docker-compose.production.yml --profile maintenance pull certbot
+TLS_RENEW_DRY_RUN=1 sh infra/scripts/renew-tls.sh
+```
+
+## Licoes aprendidas
+
+* Imagens usadas apenas por profiles opcionais (`maintenance`) nao sao validadas pelos smoke tests de deploy nem pelo Docker Scout de rotina, entao uma tag invalida pode passar despercebida por muito tempo.
+* Tags de imagens externas devem ser confirmadas por uma fonte real (API do registry ou releases oficiais) antes de fixar a versao, nao apenas assumidas.
+
+## Melhorias futuras
+
+* Incluir `docker compose --profile maintenance pull` no preflight ou em uma checagem periodica, mesmo que o servico nao suba por padrao.
+* Revisar periodicamente se ha versao mais recente do Certbot compativel.
+
+## Automacao recomendada
+
+```bash
+docker compose --env-file .env.production -f infra/docker-compose.production.yml --profile maintenance config -q
+```
+
+---
+
 # Analise consolidada de causa raiz
 
 ## Erros mais recorrentes

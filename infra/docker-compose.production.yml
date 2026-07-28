@@ -95,7 +95,7 @@ services:
       - internal
 
   certbot:
-    image: certbot/certbot:v4.21.0
+    image: certbot/certbot:v5.7.0
     profiles: ["maintenance"]
     volumes:
       # Certbot precisa escrita para emitir/renovar; o Nginx monta estes caminhos somente leitura.
