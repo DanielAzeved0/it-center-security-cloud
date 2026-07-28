@@ -31,6 +31,7 @@ EPIC 11 - SOC Light Pendências
 EPIC 12 - Governança e Autenticação
 EPIC 13 - Operação e Segurança de Produção
 EPIC 14 - Melhorias Futuras
+EPIC 15 - Infraestrutura como Codigo (Terraform)
 ```
 
 ## Arquitetura
@@ -395,3 +396,25 @@ Entregas:
 Resultado Esperado:
 
 Produto comercializável.
+
+---
+
+# Fase 12
+
+Infraestrutura como Codigo
+
+Meta:
+
+Provisionar e versionar via Terraform a camada de infraestrutura Oracle Cloud sem destruir o ambiente de producao existente.
+
+Entregas:
+
+* Modulos Terraform (network e compute)
+* Import dos recursos existentes
+* Plan zero-diff validado
+* Backend remoto em OCI Object Storage
+* Documentacao de shape, availability domain, regiao e compartment antes ausente
+
+Resultado Esperado:
+
+Infraestrutura reproduzivel e auditavel em codigo, sem alterar o fluxo de deploy da aplicacao existente.

@@ -31,3 +31,16 @@ cache/
 
 .DS_Store
 Thumbs.db
+
+infra/terraform/**/.terraform/
+infra/terraform/**/*.tfstate
+infra/terraform/**/*.tfstate.*
+infra/terraform/**/terraform.tfvars
+infra/terraform/**/*.auto.tfvars
+infra/terraform/**/crash.log
+infra/terraform/**/override.tf
+infra/terraform/**/override.tf.json
+infra/terraform/**/*_override.tf
+infra/terraform/**/*_override.tf.json
+.terraformrc
+terraform.rc

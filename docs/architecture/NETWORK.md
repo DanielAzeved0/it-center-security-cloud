@@ -69,6 +69,10 @@ Bloquear externamente:
 5432/tcp
 ```
 
+## Provisionamento
+
+A VCN, as subnets e a Security List descritas neste documento passam a ser provisionadas e versionadas via Terraform a partir do ADR-024. Ver `docs/architecture/IAC.md`.
+
 ## Observacao sobre DNS
 
 Durante a implantacao foi observado atraso de propagacao no DNS da Vivo. Outros resolvers, como Google DNS, Cloudflare e Quad9, resolviam corretamente.

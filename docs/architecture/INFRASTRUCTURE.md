@@ -107,3 +107,7 @@ Nao expor publicamente:
 8000/tcp
 5432/tcp
 ```
+
+## Provisionamento
+
+A partir do ADR-024, a Infrastructure Layer descrita neste documento passa a ser provisionada e versionada via Terraform. Ver `docs/architecture/IAC.md`.

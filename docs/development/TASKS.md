@@ -519,3 +519,71 @@ Registrar evolucoes de produto fora do escopo operacional imediato.
 [ ] Billing
 
 [ ] SaaS
+
+---
+
+# EPIC 15 - Infraestrutura como Codigo (Terraform)
+
+Objetivo:
+
+Provisionar e versionar a camada de infraestrutura Oracle Cloud (VCN, subnets, security list, instancia) via Terraform, importando os recursos ja existentes em producao sem destruir ou recriar nada.
+
+### Tarefas
+
+[x] Registrar ADR-024 em docs/development/DECISIONS.md
+
+[x] Criar docs/architecture/IAC.md
+
+[x] Referenciar IAC.md a partir de INFRASTRUCTURE.md e NETWORK.md
+
+[x] Criar infra/terraform/README.md
+
+[x] Atualizar .gitignore com artefatos de Terraform
+
+[ ] Criar usuario IAM dedicado terraform-provisioner com API key propria
+
+[ ] Definir policy de escopo minimo (compartment especifico)
+
+[ ] Descobrir e registrar shape, availability domain, regiao e compartment atuais
+
+[ ] Verificar se o IP publico 147.15.78.220 e reservado ou efemero
+
+[ ] Levantar todos os OCIDs existentes (VCN, subnets, IGW, route table, security list, instancia)
+
+[ ] Criar infra/terraform/modules/network
+
+[ ] Criar infra/terraform/modules/compute
+
+[ ] Criar infra/terraform/environments/production
+
+[ ] Fixar versions.tf (provider oci e terraform)
+
+[ ] terraform init com backend local
+
+[ ] Importar VCN e validar plan sem diff
+
+[ ] Importar Internet Gateway e validar plan sem diff
+
+[ ] Importar Route Table e validar plan sem diff
+
+[ ] Importar Security List e validar plan sem diff
+
+[ ] Importar subnet publica e validar plan sem diff
+
+[ ] Importar subnet privada e validar plan sem diff
+
+[ ] Importar instancia de computacao e validar plan sem diff
+
+[ ] Importar IP publico reservado, se aplicavel
+
+[ ] Confirmar terraform plan completo em "No changes."
+
+[ ] Adicionar lifecycle prevent_destroy na instancia e na VCN
+
+[ ] Criar bucket OCI Object Storage para state remoto
+
+[ ] Migrar state para backend remoto (terraform init -migrate-state)
+
+[ ] Implementar infra/bootstrap/{01-system,02-packages,03-directories,04-docker,05-firewall,bootstrap}.sh conforme docs/deployment/BOOTSTRAP.md
+
+[ ] Documentar variavel opcional de cloud-init/bootstrap no module compute (sem ativar em producao)

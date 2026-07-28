@@ -873,6 +873,46 @@ Impactos:
 
 ---
 
+# ADR-024
+
+## Data
+
+2026-07-28
+
+## Decisao
+
+Adotar Terraform (provider oficial `oci`) para provisionar e versionar a camada de infraestrutura abaixo do sistema operacional do Edge Node (VCN, subnets, security list, instancia de computacao), introduzido via `terraform import` dos recursos ja existentes em producao — nunca destroy/recreate — mantendo os scripts de deploy/backup/restore/rollback em `infra/scripts/` inalterados e fora do escopo do Terraform.
+
+## Motivo
+
+A VM `itcenter-edge-01` roda em producao com dados reais e sua configuracao real (shape, availability domain, regiao, compartment) nunca ficou documentada em nenhum lugar do repositorio. Terraform via import fecha essa lacuna, tornando a infraestrutura auditavel em codigo e revisavel por mudanca, alinhado ao principio ja aplicado aos scripts de deploy e ao bootstrap proposto em `docs/deployment/BOOTSTRAP.md`. Tambem atende ao objetivo declarado do projeto de servir como aprendizado deliberado de Infraestrutura e DevOps.
+
+## Alternativas Avaliadas
+
+* Continuar 100% manual via Console/CLI da Oracle Cloud.
+* Documentar apenas em Markdown os parametros da VM, sem nenhuma automacao.
+* Usar Pulumi ou CDK for Terraform.
+* Usar Ansible tambem para a camada de provisionamento.
+* Adotar Terraform com import dos recursos existentes e state local migrando para backend remoto — escolhida.
+
+## Resultado
+
+* Criado `infra/terraform/` com `modules/network`, `modules/compute` e `environments/production`.
+* Documentado em `docs/architecture/IAC.md`, no mesmo padrao de `NETWORK.md`/`INFRASTRUCTURE.md`.
+* State local na introducao, com migracao planejada para backend remoto em OCI Object Storage.
+* Todos os recursos existentes (VCN, subnets, security list, instancia) serao importados sem destruir/recriar nada; `terraform plan` exigido em zero diferenca antes de qualquer apply real.
+* `docs/deployment/BOOTSTRAP.md` permanece a fonte de verdade da preparacao do host; o `user_data` do Terraform so referenciara o bootstrap apos os scripts serem implementados e testados fora de producao.
+* `.gitignore` atualizado com artefatos de Terraform.
+* Trabalho rastreado na EPIC 15 de `docs/development/TASKS.md` e na Fase 12 de `docs/development/ROADMAP.md`.
+
+Impactos:
+
+* Nova tecnologia (Terraform) entra na stack aprovada do projeto.
+* Shape, availability domain, regiao e compartment da VM passam a ser descobertos e documentados.
+* Mudancas futuras de infraestrutura passam a exigir `terraform plan` revisado antes de qualquer `apply`.
+
+---
+
 ## ADR-XXX
 
 ### Data
