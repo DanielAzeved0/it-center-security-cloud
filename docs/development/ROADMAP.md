@@ -32,6 +32,7 @@ EPIC 12 - Governança e Autenticação
 EPIC 13 - Operação e Segurança de Produção
 EPIC 14 - Melhorias Futuras
 EPIC 15 - Infraestrutura como Codigo (Terraform)
+EPIC 16 - Hardening do Agente Windows
 ```
 
 ## Arquitetura

@@ -520,6 +520,8 @@ Registrar evolucoes de produto fora do escopo operacional imediato.
 
 [ ] SaaS
 
+[ ] Avaliar reescrita do agente Windows em Go (condicional, ver ADR-025 e EPIC 16)
+
 ---
 
 # EPIC 15 - Infraestrutura como Codigo (Terraform)
@@ -587,3 +589,33 @@ Provisionar e versionar a camada de infraestrutura Oracle Cloud (VCN, subnets, s
 [ ] Implementar infra/bootstrap/{01-system,02-packages,03-directories,04-docker,05-firewall,bootstrap}.sh conforme docs/deployment/BOOTSTRAP.md
 
 [ ] Documentar variavel opcional de cloud-init/bootstrap no module compute (sem ativar em producao)
+
+---
+
+# EPIC 16 - Hardening do Agente Windows
+
+Objetivo:
+
+Corrigir lacunas concretas de robustez identificadas no agente PowerShell (agent-windows/), mantendo a linguagem atual conforme ADR-025.
+
+### Tarefas
+
+[ ] Restringir ACL de config.json (leitura apenas para SYSTEM/Administrators) para proteger o agent_api_key em texto puro
+
+[ ] Adicionar quarentena para arquivo de cache corrompido em Send-PendingAgentCheckins, evitando que um arquivo quebrado trave o reenvio dos mais novos
+
+[ ] Adicionar retencao/limite de idade para arquivos em cache/
+
+[ ] Adicionar rotacao por tamanho para logs/itcenter-agent.log
+
+[ ] Trocar medicao de CPU de Win32_Processor.LoadPercentage para Get-Counter '\Processor(_Total)\% Processor Time' amostrado
+
+[ ] Incluir apps UWP/Store (Get-AppxPackage) no inventario de programas instalados
+
+[ ] Ampliar deteccao de USB para alem de armazenamento (Win32_PnPEntity), mantendo a politica de nao ler conteudo
+
+[ ] Adicionar try/catch no nivel mais alto de Start-ItCenterAgent com log explicito de falha de configuracao
+
+[ ] Assinar os scripts do agente com certificado de code-signing e trocar ExecutionPolicy de Bypass para AllSigned ou RemoteSigned
+
+[ ] Atualizar docs/agent/TROUBLESHOOTING.md com os novos comportamentos apos o hardening

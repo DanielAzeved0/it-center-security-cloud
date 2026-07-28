@@ -913,6 +913,44 @@ Impactos:
 
 ---
 
+# ADR-025
+
+## Data
+
+2026-07-28
+
+## Decisao
+
+Manter o agente Windows em PowerShell (reafirmando o ADR-005). Nao reescrever em Python. Registrar Go como candidata a uma eventual reescrita futura, condicionada a necessidade real de robustez/escala que o hardening incremental em PowerShell nao resolva.
+
+## Motivo
+
+Uma avaliacao do codigo atual (`agent-windows/itcenter-agent.ps1`, `install-agent.ps1`, `uninstall-agent.ps1`) identificou lacunas reais de robustez: chave de API em texto puro no `config.json`, fila de cache offline sem tratamento de arquivo corrompido (um unico arquivo quebrado trava o reenvio de todos os mais novos), sem rotacao de `logs/`/`cache/`, medicao de CPU via `Win32_Processor.LoadPercentage` (conhecida por ser imprecisa), inventario de programas que nao cobre apps UWP/Store, deteccao de USB restrita a armazenamento, ausencia de try/catch no nivel mais alto de `Start-ItCenterAgent`, e scripts nao assinados.
+
+Nenhuma dessas lacunas e causada pela linguagem — sao gaps de implementacao que existiriam igualmente em Python. Trocar de linguagem agora pagaria o custo de reescrever toda a coleta WMI/registro, o instalador e os testes, sem resolver os problemas reais, e iria contra o ADR-005 (PowerShell ja vem em todo Windows; Python exigiria runtime pre-instalado ou um binario PyInstaller de dezenas de MB, o mesmo atrito que o ADR-005 buscava evitar).
+
+Go, ao contrario de Python, resolveria uma limitacao real caso o projeto decida migrar futuramente: compila para um binario nativo estatico sem runtime, mais facil de assinar (Authenticode) e com tipagem forte, mas isso so se justifica se o hardening incremental em PowerShell (EPIC 16) se mostrar insuficiente.
+
+## Alternativas Avaliadas
+
+* Reescrever o agente em Python.
+* Reescrever o agente em Go imediatamente.
+* Reescrever o agente em C#/.NET.
+* Manter PowerShell e corrigir as lacunas concretas incrementalmente, registrando Go como opcao futura condicional — escolhida.
+
+## Resultado
+
+* Agente Windows permanece em PowerShell.
+* Lacunas concretas identificadas viram checklist na EPIC 16 (`docs/development/TASKS.md`).
+* Avaliacao de reescrita em Go registrada como item condicional na EPIC 14 (Melhorias Futuras), a ser retomada somente se o hardening incremental nao for suficiente.
+
+Impactos:
+
+* Nenhuma mudanca de stack agora; nenhum ADR de linguagem e necessario ate uma decisao futura de fato tomar esse caminho.
+* Esforco de curto prazo vai para corrigir os itens concretos de robustez, nao para uma reescrita.
+
+---
+
 ## ADR-XXX
 
 ### Data
