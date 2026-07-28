@@ -422,11 +422,31 @@ Reduzir risco operacional do ambiente publicado e preparar manutencao continua.
 
 [x] Automatizar backup periodico do PostgreSQL
 
-[~] Testar restore em ambiente controlado
+[x] Testar restore em ambiente controlado
 
-[~] Validar rollback de deploy
+    Validado em 2026-07-28: backup fresco gerado
+    (itcenter-postgres-20260728T180730Z.sql.gz) e restaurado com
+    ITCENTER_RESTORE_CONFIRM=YES sh infra/scripts/restore.sh contra
+    o banco de producao. Schema recriado, todas as tabelas restauradas
+    com contagens de linhas consistentes com o backup, backend
+    saudavel (/api/v1/health) e dashboard funcional apos o restore.
 
-[~] Validar renovacao de certificado TLS
+[x] Validar rollback de deploy
+
+    Validado em 2026-07-28: backup executado antes do teste, rollback
+    de c682c7e para f27d00c concluido com sucesso (containers
+    rebuilded e saudaveis, volume postgres_data preservado sem
+    reiniciar o Postgres), seguido de rollforward de volta para
+    c682c7e com sucesso.
+
+[x] Validar renovacao de certificado TLS
+
+    Validado em 2026-07-28: simulacao (TLS_RENEW_DRY_RUN=1) concluiu
+    "all simulated renewals succeeded"; renovacao real corretamente
+    identificou que o certificado so expira em 2026-09-24 e nao
+    tentou renovar (comportamento esperado do Certbot). Durante a
+    validacao foi descoberta e corrigida a tag invalida da imagem
+    certbot/certbot:v4.21.0 (INCIDENTE 021 em POSTMORTEMS.md).
 
 [x] Monitorar uso de disco da VM
 

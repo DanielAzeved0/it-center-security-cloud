@@ -23,6 +23,16 @@ Resultado:
 * Primeiro usuario `admin` ativo criado em producao (`daniel.azevedo081205@gmail.com`).
 * Login administrativo e navegacao no dashboard funcionando de ponta a ponta em producao.
 
+## 2026-07-28 - Validacao de TLS, rollback e restore (fechamento da EPIC 13)
+
+Contexto: ultimos tres itens pendentes da EPIC 13 validados em sequencia, do menor para o maior risco.
+
+1. **TLS**: `TLS_RENEW_DRY_RUN=1 sh infra/scripts/renew-tls.sh` concluiu "all simulated renewals succeeded". Durante essa validacao foi descoberta a tag inexistente `certbot/certbot:v4.21.0` (INCIDENTE 021), corrigida para `v5.7.0` (commit `c682c7e`). Apos a correcao, a renovacao real (`sh infra/scripts/renew-tls.sh`) confirmou corretamente que o certificado so expira em 2026-09-24 e nao tentou renovar.
+2. **Rollback**: backup gerado, `sh infra/scripts/rollback.sh f27d00c` executado com sucesso (containers reconstruidos e saudaveis, `postgres_data` preservado sem reiniciar o Postgres), seguido de `sh infra/scripts/rollback.sh c682c7e` para retornar ao estado atual. Dashboard validado funcional apos o rollforward.
+3. **Restore**: backup fresco gerado (`itcenter-postgres-20260728T180730Z.sql.gz`) e restaurado com `ITCENTER_RESTORE_CONFIRM=YES sh infra/scripts/restore.sh` contra o proprio banco de producao. Schema recriado do zero, todas as tabelas restauradas com contagens consistentes com o backup, `/api/v1/health` respondendo `healthy` e dashboard funcional apos o restore.
+
+Resultado: os tres itens `[~]` da EPIC 13 (`Testar restore em ambiente controlado`, `Validar rollback de deploy`, `Validar renovacao de certificado TLS`) ficam `[x]` em `docs/development/TASKS.md`. EPIC 13 considerada concluida, restando apenas a atualizacao continua de `POSTMORTEMS.md` quando houver incidente futuro.
+
 ## 2026-06-30 - Deploy manual via GitHub Actions
 
 Workflow:
