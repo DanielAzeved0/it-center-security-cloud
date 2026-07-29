@@ -96,6 +96,27 @@ Limitação conhecida:
 
 * HTTP Basic é o controle de acesso administrativo mínimo para a primeira publicação. Login com usuários, sessões, RBAC e auditoria continua sendo requisito da Fase de Governança antes de qualquer uso multiusuário/SaaS.
 
+### Auditoria de segurança do frontend (2026-07-29)
+
+Revisão completa de `frontend/dashboard/` (nenhuma chave de banco ou de backend encontrada no código ou em `.env` versionado). Achados e prioridade de risco, rastreados na EPIC 17 de `docs/development/TASKS.md`:
+
+Prioridade Alta:
+
+* Token de autenticação guardado em `localStorage` em vez de cookie `httpOnly` — detalhado em `docs/security/AUTH.md`.
+* Ausência de security headers (`Content-Security-Policy`, `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`) configurados no próprio Next.js (`next.config.mjs`). Não confirmado se o Nginx já cobre esses headers para o dashboard; se não cobrir, é a única linha de defesa contra clickjacking/MIME sniffing.
+
+Prioridade Média:
+
+* `app/api/backend/[...path]/route.ts` aceita fallback para `NEXT_PUBLIC_API_BASE_URL`. Hoje só é lido no route handler (server-only, não vaza para o bundle client), mas o prefixo `NEXT_PUBLIC_` sinaliza uso client-side e pode vazar a URL do backend no bundle público se reaproveitado futuramente em um client component.
+* Não existe `middleware.ts`; a checagem de sessão acontece só dentro do componente `Shell` no client, sem gate no edge.
+* `npm audit` no frontend não pôde ser validado no ambiente atual de desenvolvimento (proxy corporativo bloqueia o registry com certificado self-signed); falta rotina alternativa de auditoria de dependências do frontend.
+
+Prioridade Baixa:
+
+* `.dockerignore` do frontend não exclui `.env*`; não há vazamento hoje (nenhum `.env` existe no repositório), mas é uma prevenção ausente contra embutir `NEXT_PUBLIC_*` de um `.env` local no build da imagem.
+* O proxy `/api/backend/[...path]` repassa qualquer path para o backend sem allowlist explícita de rotas.
+* Mensagens de erro do backend (`detail`) são exibidas diretamente na UI sem filtragem adicional do frontend.
+
 ---
 
 # Requisitos Obrigatórios

@@ -33,6 +33,7 @@ EPIC 13 - Operação e Segurança de Produção
 EPIC 14 - Melhorias Futuras
 EPIC 15 - Infraestrutura como Codigo (Terraform)
 EPIC 16 - Hardening do Agente Windows
+EPIC 17 - Hardening do Dashboard (Frontend)
 ```
 
 ## Arquitetura
@@ -444,3 +445,25 @@ Entregas:
 Resultado Esperado:
 
 Agente Windows mais resiliente e auditavel, mantendo PowerShell como linguagem oficial.
+
+---
+
+# Fase 14
+
+Hardening do Dashboard (Frontend)
+
+Meta:
+
+Corrigir os riscos identificados na auditoria de seguranca do frontend de 2026-07-29 (token de sessao em localStorage, ausencia de security headers, falta de middleware de sessao, fallback de env var no proxy interno, auditoria de dependencias bloqueada), mantendo Next.js/React como stack oficial.
+
+Entregas:
+
+* Token de sessao migrado para cookie httpOnly
+* Security headers configurados no Next.js (CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy)
+* Middleware de sessao no edge
+* Fallback NEXT_PUBLIC_API_BASE_URL removido do proxy interno
+* Rotina de auditoria de dependencias do frontend (npm audit) restabelecida fora do proxy corporativo local
+
+Resultado Esperado:
+
+Dashboard com superficie de ataque client-side reduzida e defesa em profundidade equivalente ao restante da plataforma, sem trocar a stack atual.

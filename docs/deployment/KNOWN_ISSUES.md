@@ -96,6 +96,34 @@ Risco:
 
 * Qualquer nova rota publica adicionada sob `location /` que tambem exija Bearer token reproduzira o mesmo loop de login (INCIDENTE 020 em `POSTMORTEMS.md`) se nao for isenta de Basic Auth da mesma forma.
 
+## Auditoria de dependencias do frontend bloqueada no ambiente de desenvolvimento
+
+Durante a auditoria de seguranca do frontend em 2026-07-29, `npm audit` em `frontend/dashboard/` falhou com `self-signed certificate in certificate chain` ao tentar acessar `registry.npmjs.org` a partir do ambiente de desenvolvimento atual (proxy corporativo intercepta TLS).
+
+Risco:
+
+* Nao ha confirmacao automatizada de CVEs em `next@16.2.9`/`react@19.2.3` e demais dependencias diretas do dashboard alem do que o Docker Scout ja cobre na imagem final (ver `docs/security/SECURITY.md`).
+
+Mitigacao atual:
+
+* `docker scout cves infra-frontend:latest --only-severity critical,high` continua sendo a validacao oficial antes de publicar a imagem (ja documentado em `docs/security/SECURITY.md`).
+
+Evolucao esperada:
+
+* Rodar `npm audit` em um ambiente com acesso direto ao registry (ex.: CI do GitHub Actions, que nao passa pelo proxy corporativo local) e registrar o resultado na rotina semanal (`docs/deployment/WEEKLY_OPERATIONS.md`). Rastreado na EPIC 17 de `docs/development/TASKS.md`.
+
+## .dockerignore do frontend nao exclui arquivos .env*
+
+`frontend/dashboard/.dockerignore` hoje so ignora `node_modules`, `.next` e `*.log`. Nao existe nenhum `.env` no repositorio, entao nao ha vazamento ativo, mas o `Dockerfile` faz `COPY . .` no estagio de build sem essa exclusao.
+
+Risco:
+
+* Se um `.env.local` for criado no futuro para desenvolvimento e esquecido, valores de `NEXT_PUBLIC_*` seriam embutidos estaticamente no build da imagem Docker.
+
+Evolucao esperada:
+
+* Adicionar `.env*` ao `.dockerignore` do frontend como prevencao. Rastreado na EPIC 17 de `docs/development/TASKS.md`.
+
 ## PostgreSQL no mesmo Edge Node
 
 No MVP, PostgreSQL roda no mesmo host por custo zero.

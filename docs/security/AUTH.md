@@ -191,6 +191,25 @@ Regras:
 * Logout registra auditoria; o token expira naturalmente.
 * Erros de login sao genericos para nao enumerar usuarios.
 
+### Risco conhecido: token guardado em localStorage no frontend
+
+Auditoria de seguranca do frontend em 2026-07-29 (`frontend/dashboard/lib/api.ts`) confirmou que o dashboard guarda o `access_token` em `localStorage` do navegador, nao em cookie `httpOnly`.
+
+Classificacao: **Alta** (ver EPIC 17 em `docs/development/TASKS.md`).
+
+Motivo da prioridade:
+
+* E o unico dado de sessao do usuario humano; se qualquer vetor de XSS surgir no futuro (hoje nao ha nenhum identificado no codigo atual), o token pode ser lido e exfiltrado por JavaScript.
+* Cookie `httpOnly` eliminaria esse vetor especifico, pois o token deixaria de ser acessivel via `document`/`window` para script no navegador.
+
+Mitigacao atual:
+
+* O frontend nao usa `dangerouslySetInnerHTML`, `eval` ou HTML nao sanitizado em nenhum componente (confirmado por revisao completa em 2026-07-29), reduzindo a chance de um XSS aparecer.
+
+Evolucao planejada:
+
+* Migrar para cookie `httpOnly` + `Secure` + `SameSite=Strict`, setado pelo backend/BFF no login, com o proxy `/api/backend` lendo o cookie em vez de exigir `Authorization` manual do client. Isso exige revisar o contrato de `ADR-022` antes de implementar.
+
 ## Auditoria
 
 Tabela:

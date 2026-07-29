@@ -82,6 +82,8 @@ PostgreSQL:
 * Dashboard ainda usa Basic Auth no MVP.
 * Banco roda no mesmo host por custo zero.
 * Windows Agent ainda precisa evoluir assinatura, criptografia e retry inteligente.
+* Frontend (Next.js) nao possui `middleware.ts`: a checagem de sessao roda so no client (componente `Shell`), sem gate no edge antes de renderizar paginas protegidas.
+* Frontend nao define security headers (CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy) no proprio `next.config.mjs`; depende inteiramente do Nginx cobrir essa camada, sem confirmacao registrada de que cobre.
 
 ## Evolucao recomendada
 
@@ -91,3 +93,6 @@ PostgreSQL:
 * Rotacao de secrets.
 * Wazuh.
 * Prometheus, Loki e Grafana.
+* Migrar o token de sessao do dashboard de `localStorage` para cookie `httpOnly` (ver `docs/security/AUTH.md` e EPIC 17).
+* Adicionar `middleware.ts` no frontend para gate de sessao no edge.
+* Confirmar ou adicionar security headers no frontend (ver EPIC 17 em `docs/development/TASKS.md`).
