@@ -8,7 +8,34 @@ Execute na VM:
 cd /opt/itcenter/app/it-center-security-cloud
 ```
 
-## 1. Checagem operacional
+## 1. Secrets obrigatorios
+
+Antes de deploy, valide sem imprimir os valores reais:
+
+```bash
+grep '^AGENT_API_KEY=' .env.production | sed 's/=.*/=<definida>/'
+grep '^AUTH_TOKEN_SECRET=' .env.production | sed 's/=.*/=<definida>/'
+grep '^POSTGRES_PASSWORD=' .env.production | sed 's/=.*/=<definida>/'
+grep '^DATABASE_URL=' .env.production | sed 's#://.*@#://<credenciais>@#'
+grep '^AUTH_TOKEN_EXPIRATION_MINUTES=' .env.production
+```
+
+Se `AUTH_TOKEN_SECRET` estiver ausente, gerar e gravar na VM:
+
+```bash
+AUTH_SECRET=$(openssl rand -hex 32)
+
+if grep -q '^AUTH_TOKEN_SECRET=' .env.production; then
+  sed -i "s/^AUTH_TOKEN_SECRET=.*/AUTH_TOKEN_SECRET=$AUTH_SECRET/" .env.production
+else
+  printf '\nAUTH_TOKEN_SECRET=%s\n' "$AUTH_SECRET" >> .env.production
+fi
+
+grep -q '^AUTH_TOKEN_EXPIRATION_MINUTES=' .env.production || printf 'AUTH_TOKEN_EXPIRATION_MINUTES=60\n' >> .env.production
+chmod 600 .env.production
+```
+
+## 2. Checagem operacional
 
 ```bash
 sh infra/scripts/ops-check.sh
@@ -35,7 +62,7 @@ CERT_EXPIRY_FAIL_DAYS=7
 BACKUP_MAX_AGE_HOURS=30
 ```
 
-## 2. Backup periodico
+## 3. Backup periodico
 
 Instalar agendamento diario via cron:
 
@@ -65,7 +92,7 @@ sh infra/scripts/backup.sh
 ls -lh /opt/itcenter/backups
 ```
 
-## 3. Restore controlado
+## 4. Restore controlado
 
 Restore nunca deve ser executado automaticamente em producao.
 
@@ -82,7 +109,7 @@ Antes de qualquer restore:
 * confirmar que o arquivo de dump pertence ao ambiente correto;
 * validar que o restore sera executado em ambiente controlado ou explicitamente autorizado.
 
-## 4. Rollback
+## 5. Rollback
 
 Antes de rollback:
 
@@ -98,7 +125,7 @@ sh infra/scripts/rollback.sh <git-ref-estavel>
 
 O rollback preserva o volume `postgres_data`. Migrations precisam continuar retrocompativeis.
 
-## 5. TLS
+## 6. TLS
 
 Validar renovacao sem alterar certificado real:
 
@@ -119,7 +146,7 @@ sh infra/scripts/ops-check.sh
 curl -I https://itcenter-daniel.chickenkiller.com
 ```
 
-## 6. Docker Scout
+## 7. Docker Scout
 
 Antes de publicar novas imagens:
 
@@ -129,7 +156,7 @@ sh infra/scripts/docker-scout-gate.sh
 
 O gate falha se Docker Scout encontrar CVEs `critical` ou `high` nas imagens configuradas.
 
-## 7. Registro operacional
+## 8. Registro operacional
 
 Registrar em `docs/deployment/DEPLOYMENT_HISTORY.md` quando houver:
 
