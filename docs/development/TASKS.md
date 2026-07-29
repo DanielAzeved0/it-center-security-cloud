@@ -544,21 +544,54 @@ Provisionar e versionar a camada de infraestrutura Oracle Cloud (VCN, subnets, s
 
 [ ] Criar usuario IAM dedicado terraform-provisioner com API key propria
 
-[ ] Definir policy de escopo minimo (compartment especifico)
+    Policy de escopo minimo redigida em infra/terraform/README.md
+    ("Usuario IAM e policy de escopo minimo"); criacao do usuario/grupo
+    no Console OCI e a geracao da API key continuam manuais, pendentes.
+
+[x] Definir policy de escopo minimo (compartment especifico)
+
+    Redigida em infra/terraform/README.md: inspect all-resources,
+    manage virtual-network-family, manage instance-family e use
+    volume-family, restritos ao compartment do Edge Node.
 
 [ ] Descobrir e registrar shape, availability domain, regiao e compartment atuais
 
+    Runbook de comandos oci CLI somente-leitura documentado em
+    infra/terraform/README.md ("Descoberta dos parametros reais");
+    execucao real pendente (requer terraform-provisioner configurado).
+
 [ ] Verificar se o IP publico 147.15.78.220 e reservado ou efemero
+
+    Comando `oci network public-ip list` e o criterio de decisao
+    (lifetime RESERVED vs EPHEMERAL) documentados no mesmo runbook;
+    execucao real pendente.
 
 [ ] Levantar todos os OCIDs existentes (VCN, subnets, IGW, route table, security list, instancia)
 
-[ ] Criar infra/terraform/modules/network
+[x] Criar infra/terraform/modules/network
 
-[ ] Criar infra/terraform/modules/compute
+    main.tf, variables.tf e outputs.tf criados (VCN, subnets, IGW,
+    route table e security list), parametrizados por variavel, sem
+    OCID hardcoded, com prevent_destroy na VCN. Ainda nao importado
+    contra producao.
 
-[ ] Criar infra/terraform/environments/production
+[x] Criar infra/terraform/modules/compute
 
-[ ] Fixar versions.tf (provider oci e terraform)
+    main.tf, variables.tf e outputs.tf criados (instancia
+    itcenter-edge-01), com prevent_destroy, ignore_changes em
+    source_details e variavel enable_bootstrap_user_data desligada
+    por padrao. Ainda nao importado contra producao.
+
+[x] Criar infra/terraform/environments/production
+
+    main.tf (provider oci + modulos), variables.tf e
+    terraform.tfvars.example criados. terraform.tfvars real com os
+    valores de producao ainda nao existe (depende da descoberta acima).
+
+[x] Fixar versions.tf (provider oci e terraform)
+
+    infra/terraform/environments/production/versions.tf criado:
+    terraform >= 1.6, provider oracle/oci ~> 5.0.
 
 [ ] terraform init com backend local
 

@@ -25,6 +25,62 @@ Usuario IAM dedicado "terraform-provisioner" com escopo minimo no compartment do
 
 A chave de API do usuario IAM fica fora da arvore do repositorio (nunca dentro de `infra/terraform/`, mesmo estando no `.gitignore`).
 
+## Usuario IAM e policy de escopo minimo
+
+O usuario `terraform-provisioner` e o grupo que o contem sao criados manualmente no Console OCI (Identity & Security > Domains > Users/Groups) — nao ha automacao para essa etapa, pois exige privilegio administrativo.
+
+Policy sugerida, restrita ao compartment do Edge Node (substituir `<nome-do-compartment>` pelo valor real, descoberto na secao seguinte):
+
+```text
+Allow group TerraformProvisioners to inspect all-resources in compartment <nome-do-compartment>
+Allow group TerraformProvisioners to manage virtual-network-family in compartment <nome-do-compartment>
+Allow group TerraformProvisioners to manage instance-family in compartment <nome-do-compartment>
+Allow group TerraformProvisioners to use volume-family in compartment <nome-do-compartment>
+```
+
+Motivo do escopo:
+
+```text
+inspect all-resources        -> necessario para "terraform plan"/"import" enxergarem qualquer recurso do compartment sem conceder escrita
+manage virtual-network-family -> VCN, subnets, internet gateway, route table, security list (modulo network)
+manage instance-family        -> a instancia itcenter-edge-01 (modulo compute)
+use volume-family              -> volume de boot da instancia, sem permissao de apagar volumes por engano
+```
+
+Nao conceder `manage` sobre `all-resources`, nem qualquer permissao de IAM, Object Storage (fora do bucket de state, criado depois) ou outros compartments. A chave de API do usuario e gerada no Console apos a criacao e entregue fora do repositorio (variavel de ambiente local ou gerenciador de segredos).
+
+## Descoberta dos parametros reais (rodar localmente, somente leitura)
+
+Estes comandos usam a `oci` CLI configurada com a chave do `terraform-provisioner` (ou uma sessao com permissao de leitura equivalente) e nao alteram nada. Rode localmente e registre o resultado — nenhum deles esta disponivel no ambiente onde este repositorio e editado.
+
+```bash
+# Compartment (assumindo que o Edge Node esta no root compartment do tenancy; ajustar se houver compartment dedicado)
+oci iam compartment list --compartment-id-in-subtree true --all
+
+# Availability domains da regiao configurada
+oci iam availability-domain list
+
+# Instancia itcenter-edge-01: OCID, shape e availability-domain
+oci compute instance list --compartment-id <compartment-ocid> --display-name itcenter-edge-01
+
+# Detalhe do shape e da configuracao da instancia encontrada acima
+oci compute instance get --instance-id <instance-ocid>
+
+# VCNs do compartment
+oci network vcn list --compartment-id <compartment-ocid>
+
+# Subnets, internet gateway, route table e security list da VCN encontrada acima
+oci network subnet list --compartment-id <compartment-ocid> --vcn-id <vcn-ocid>
+oci network internet-gateway list --compartment-id <compartment-ocid> --vcn-id <vcn-ocid>
+oci network route-table list --compartment-id <compartment-ocid> --vcn-id <vcn-ocid>
+oci network security-list list --compartment-id <compartment-ocid> --vcn-id <vcn-ocid>
+
+# IP publico: confirmar se e reservado (lifetime "RESERVED") ou efemero (lifetime "EPHEMERAL")
+oci network public-ip list --compartment-id <compartment-ocid> --scope REGION
+```
+
+Registrar o resultado (compartment OCID, shape, availability domain, regiao, todos os OCIDs de rede, `lifetime` do IP publico) em `infra/terraform/environments/production/terraform.tfvars` (nunca versionado — ver `terraform.tfvars.example`). Se o IP publico aparecer com `lifetime: EPHEMERAL`, ele nao deve ser referenciado como recurso `oci_core_public_ip` importavel isolado — nesse caso, reservar o IP antes de prosseguir com qualquer import, para nao arriscar troca-lo em um `apply` futuro.
+
 ## Introducao segura (import, nunca destroy/recreate)
 
 A instancia `itcenter-edge-01` ja roda em producao com dados reais. A sequencia abaixo e obrigatoria:

@@ -1,0 +1,43 @@
+# Copiar para terraform.tfvars (nunca versionado, ver .gitignore) e preencher
+# com os valores reais descobertos via oci CLI (ver infra/terraform/README.md,
+# secao "Descoberta dos parametros reais").
+
+tenancy_ocid      = "ocid1.tenancy.oc1..aaaaaaaa_EXEMPLO"
+user_ocid         = "ocid1.user.oc1..aaaaaaaa_EXEMPLO"
+fingerprint       = "aa:bb:cc:dd:ee:ff:00:11:22:33:44:55:66:77:88:99"
+private_key_path  = "/caminho/fora/do/repositorio/terraform-provisioner.pem"
+region            = "sa-saopaulo-1"
+
+compartment_id      = "ocid1.compartment.oc1..aaaaaaaa_EXEMPLO"
+public_subnet_cidr  = "10.0.0.0/24"
+private_subnet_cidr = "10.0.1.0/24"
+
+ingress_security_rules = [
+  {
+    protocol    = "6"
+    source      = "0.0.0.0/0"
+    description = "SSH"
+    tcp_port    = 22
+  },
+  {
+    protocol    = "6"
+    source      = "0.0.0.0/0"
+    description = "HTTP"
+    tcp_port    = 80
+  },
+  {
+    protocol    = "6"
+    source      = "0.0.0.0/0"
+    description = "HTTPS"
+    tcp_port    = 443
+  },
+]
+
+availability_domain = "abCD:SA-SAOPAULO-1-AD-1"
+instance_shape      = "VM.Standard.A1.Flex"
+instance_shape_config = {
+  ocpus         = 2
+  memory_in_gbs = 12
+}
+instance_image_id            = "ocid1.image.oc1.sa-saopaulo-1.aaaaaaaa_EXEMPLO"
+instance_ssh_authorized_keys = "ssh-rsa AAAA... exemplo@local"
