@@ -2,7 +2,7 @@
 
 > Plataforma full stack para monitoramento, inventário, observabilidade e segurança de máquinas Windows, com agente PowerShell, API FastAPI, PostgreSQL, dashboard web e práticas iniciais de SOC/Blue Team.
 
-Status: Fases 0 a 5 concluídas | Ambiente local Docker operacional | Produção publicada na Oracle Cloud | Agente Windows integrado ao check-in.
+Status: Fases 0 a 9 concluídas (governança/autenticação e operação/segurança de produção validadas em produção real) | Fase 12 (Terraform/IaC) em andamento | Ambiente local Docker operacional | Produção publicada na Oracle Cloud | Agente Windows integrado ao check-in.
 
 ---
 
@@ -149,6 +149,7 @@ No MVP, todos os containers de produção executam no nó de borda `itcenter-edg
 | Frontend         | Next.js, TypeScript    |
 | Agente           | PowerShell             |
 | Infraestrutura   | Docker, Docker Compose |
+| IaC              | Terraform (VCN, subnets, security list e instância — ADR-024) |
 | Proxy            | Nginx                  |
 | Hospedagem       | Oracle Cloud Free Tier |
 | Segurança futura | Wazuh, OpenVAS         |
@@ -518,7 +519,7 @@ docker compose -f infra/docker-compose.yml down -v
 * Nginx
 * HTTPS
 
-### Fase 6 - Agente Windows em Produção
+### Fase 6 - Agente Windows em Produção — concluída
 
 * Instalação controlada
 * Tarefa Agendada do Windows
@@ -526,7 +527,7 @@ docker compose -f infra/docker-compose.yml down -v
 * Logs e cache padronizados
 * Check-in real em produção
 
-### Fase 7 - Validação Fim a Fim e Dashboard Operacional
+### Fase 7 - Validação Fim a Fim e Dashboard Operacional — concluída
 
 * Fluxo Windows Agent -> Nginx -> FastAPI -> PostgreSQL -> Dashboard
 * Detalhes da máquina
@@ -534,17 +535,18 @@ docker compose -f infra/docker-compose.yml down -v
 * Eventos por máquina
 * Filtros operacionais
 
-### Fase 8 - Governança
+### Fase 8 - Governança — concluída
 
 * Login
 * Perfis e controle de acesso
 * Auditoria
 
-### Fase 9 - Operação e Segurança de Produção
+### Fase 9 - Operação e Segurança de Produção — concluída
 
 * Backup automático
-* Restore testado
-* Rollback validado
+* Restore testado em produção
+* Rollback validado em produção (com rollforward)
+* Renovação de certificado TLS validada em produção
 * Monitoramento básico da VM
 * Gate de imagens Docker
 
@@ -558,6 +560,21 @@ docker compose -f infra/docker-compose.yml down -v
 * Multiempresa
 * Multiusuário
 * SaaS
+
+### Fase 12 - Infraestrutura como Código — em andamento
+
+* Módulos Terraform (network e compute)
+* Import dos recursos Oracle Cloud já existentes, sem destroy/recreate
+* `terraform plan` zero-diff validado
+* Backend de state remoto em OCI Object Storage
+
+### Fase 13 - Hardening do Agente Windows
+
+* ACL restrita em `config.json` (protege `agent_api_key`)
+* Quarentena de cache corrompido e rotação de logs/cache
+* Medição de CPU mais precisa
+* Inventário cobrindo apps UWP/Store
+* Scripts assinados (code-signing)
 
 ---
 

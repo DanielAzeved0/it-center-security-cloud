@@ -18,6 +18,7 @@ Esta pasta descreve a arquitetura do IT Center Security Cloud.
 | `NETWORK.md` | Rede, DNS, portas e isolamento. |
 | `CONTAINERS.md` | Containers e responsabilidades. |
 | `SECURITY.md` | Seguranca da arquitetura de producao. |
+| `IAC.md` | Provisionamento via Terraform da camada de infraestrutura (ADR-024). |
 
 ## Visao resumida
 

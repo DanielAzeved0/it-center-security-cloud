@@ -187,6 +187,7 @@ docs/development/DECISIONS.md
 * Docker
 * Docker Compose
 * Nginx
+* Terraform (somente para VCN, subnets, security list e instância do Edge Node — ver ADR-024 e `docs/architecture/IAC.md`)
 
 ---
 

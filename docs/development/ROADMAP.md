@@ -419,3 +419,28 @@ Entregas:
 Resultado Esperado:
 
 Infraestrutura reproduzivel e auditavel em codigo, sem alterar o fluxo de deploy da aplicacao existente.
+
+---
+
+# Fase 13
+
+Hardening do Agente Windows
+
+Meta:
+
+Corrigir lacunas concretas de robustez identificadas no agente PowerShell (ADR-025), sem trocar de linguagem.
+
+Entregas:
+
+* ACL restrita em config.json para proteger o agent_api_key em texto puro
+* Quarentena para arquivo de cache corrompido
+* Retencao/limite de idade para cache e rotacao de logs
+* Medicao de CPU mais precisa
+* Inventario cobrindo apps UWP/Store
+* Deteccao de USB alem de armazenamento
+* Tratamento de erro no nivel mais alto do agente
+* Scripts assinados e ExecutionPolicy mais restritiva
+
+Resultado Esperado:
+
+Agente Windows mais resiliente e auditavel, mantendo PowerShell como linguagem oficial.

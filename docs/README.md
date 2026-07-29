@@ -86,6 +86,7 @@ curl -I https://itcenter-daniel.chickenkiller.com
 | `architecture/ARCHITECTURE.md` | Arquitetura oficial do sistema. |
 | `architecture/DATA_FLOW.md` | Fluxos principais de comunicacao. |
 | `architecture/FUTURE_ARCHITECTURE.md` | Plano de evolucao arquitetural futura. |
+| `architecture/IAC.md` | Provisionamento via Terraform da infraestrutura Oracle Cloud (ADR-024). |
 | `deployment/SETUP.md` | Preparacao do ambiente. |
 | `deployment/PRODUCTION.md` | Estrategia e operacao de producao. |
 | `deployment/TROUBLESHOOTING.md` | Diagnostico de falhas. |
