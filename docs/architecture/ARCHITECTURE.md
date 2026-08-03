@@ -38,7 +38,7 @@ Camadas oficiais:
 * Platform Layer: Nginx, TLS com Let's Encrypt, reverse proxy, scripts de deploy, backup, restore e rollback.
 * Application Layer: Next.js, FastAPI e agente Windows.
 * Data Layer: PostgreSQL, volume `postgres_data`, migrations e dumps em `/opt/itcenter/backups`.
-* Security Layer: camada transversal com firewall, Security Lists, HTTPS, Basic Auth, `X-Agent-Api-Key`, segredos fora do Git, hardening do Nginx e isolamento por rede Docker.
+* Security Layer: camada transversal com firewall, Security Lists, HTTPS, login administrativo Bearer/RBAC, Basic Auth (camada extra de borda), `X-Agent-Api-Key`, segredos fora do Git, hardening do Nginx e isolamento por rede Docker.
 
 Fluxo funcional:
 
@@ -325,236 +325,43 @@ PostgreSQL
 
 # Tabelas
 
-## machines
+A fonte de verdade sobre schema, campos, índices e constraints é `docs/backend/DATABASE.md` (ver `docs/development/CONTRIBUTING.md`, seção "Fonte da Verdade"). Não duplique campos aqui — liste apenas os nomes das tabelas para orientação arquitetural:
 
 ```text
-id
-hostname
-username
-ip
-os
-last_seen
-status
-created_at
-updated_at
-```
-
----
-
-## metrics
-
-```text
-id
-machine_id
-cpu_usage
-ram_usage
-disk_usage
-uptime
-created_at
-```
-
----
-
-## installed_programs
-
-```text
-id
-machine_id
-name
-version
-publisher
-```
-
----
-
-## machine_local_admins
-
-```text
-id
-machine_id
-admin_name
-first_seen_at
-last_seen_at
-```
-
----
-
-## security_events
-
-```text
-id
-machine_id
-event_type
-severity
-source
-description
-raw_data
-created_at
-```
-
----
-
-## alerts
-
-```text
-id
-machine_id
-alert_type
-severity
-status
-title
-description
-created_at
-resolved_at
-```
-
----
-
-## agent_configs
-
-```text
-id
-machine_id
-agent_version
-checkin_interval_minutes
-collect_inventory
-collect_security
-collect_metrics
-created_at
-updated_at
+machines
+metrics
+installed_programs
+machine_local_admins
+security_events
+alerts
+agent_configs
+users
+audit_logs
 ```
 
 ---
 
 # API
 
-Base URL
+Base URL:
 
 ```text
 /api/v1
 ```
 
----
-
-## Health Check
-
-GET
+A fonte de verdade sobre rotas, contratos de request/response e regras de segurança é `docs/backend/API.md`. Visão arquitetural por grupo de endpoints:
 
 ```text
-/api/v1/health
+/api/v1/health                          health check
+/api/v1/auth/login, /me, /logout         login administrativo (Bearer HMAC, ADR-022)
+/api/v1/agent/checkin                    check-in do agente (X-Agent-Api-Key)
+/api/v1/machines, /machines/{id}         inventário de máquinas
+/api/v1/machines/{id}/metrics            métricas históricas
+/api/v1/machines/{id}/programs           programas instalados
+/api/v1/machines/{id}/admins             administradores locais
+/api/v1/security-events                  eventos de segurança (SOC Light)
+/api/v1/alerts, /alerts/{id}/resolve     alertas e resolução
 ```
-
-Retorno:
-
-```json
-{
-  "status": "healthy",
-  "service": "it-center-security-cloud"
-}
-```
-
----
-
-## Agent Check-in
-
-POST
-
-```text
-/api/v1/agent/checkin
-```
-
-Responsável por:
-
-```text
-Receber dados do agente
-Atualizar máquina
-Salvar métricas
-Gerar eventos
-```
-
----
-
-## Machines
-
-GET
-
-```text
-/api/v1/machines
-```
-
-Lista máquinas cadastradas.
-
----
-
-## Machine Details
-
-GET
-
-```text
-/api/v1/machines/{id}
-```
-
-Retorna detalhes da máquina.
-
----
-
-## Machine Metrics
-
-GET
-
-```text
-/api/v1/machines/{id}/metrics
-```
-
-Lista metricas da maquina.
-
----
-
-## Installed Programs
-
-GET
-
-```text
-/api/v1/machines/{id}/programs
-```
-
-Lista programas instalados da maquina.
-
----
-
-## Security Events
-
-GET
-
-```text
-/api/v1/security-events
-```
-
-Lista eventos de segurança.
-
----
-
-## Alerts
-
-GET
-
-```text
-/api/v1/alerts
-```
-
-Lista alertas.
-
----
-
-## Resolve Alert
-
-PATCH
-
-```text
-/api/v1/alerts/{id}/resolve
-```
-
-Resolve um alerta aberto.
 
 ---
 
@@ -777,72 +584,7 @@ Em produção, o Nginx executa no `itcenter-edge-01` e é o único container com
 
 # Roadmap Técnico
 
-## Sprint 1
-
-Infraestrutura Base
-
-Entregas:
-
-* Repositório
-* Docker Compose
-* PostgreSQL
-* FastAPI
-
----
-
-## Sprint 2
-
-Primeira API
-
-Entregas:
-
-* Endpoint Health
-* Endpoint Check-in
-
----
-
-## Sprint 3
-
-Agente
-
-Entregas:
-
-* Coleta básica
-* Envio para API
-
----
-
-## Sprint 4
-
-Banco
-
-Entregas:
-
-* Persistência
-* Consulta de máquinas
-
----
-
-## Sprint 5
-
-Dashboard
-
-Entregas:
-
-* Máquinas Online
-* Inventário
-
----
-
-## Sprint 6
-
-SOC Light
-
-Entregas:
-
-* Eventos
-* Alertas
-* Segurança
+O roadmap detalhado (fases e EPICs) vive em `docs/development/ROADMAP.md` e `docs/development/TASKS.md` — não duplicado aqui. Resumo histórico: a base do MVP (infraestrutura, primeira API, agente, banco, dashboard, SOC Light) corresponde às EPICs 1-6; produção, governança/autenticação e hardening vieram nas EPICs 7-18.
 
 ---
 

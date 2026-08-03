@@ -1,3 +1,5 @@
+> **ARQUIVO LEGADO — não é sobre o agente Windows.** Este arquivo era um prompt genérico de instruções para agentes de IA (anterior ao `CLAUDE.md` da raiz do projeto e aos subagents nativos em `.claude/agents/`, que hoje são a fonte de verdade sobre como agentes de IA devem trabalhar neste repositório — ver ADR-026 e `docs/development/AI_WORKFLOW.md`). Mantido apenas por histórico; não usar como referência.
+
 Você é um agente de desenvolvimento do projeto
 IT Center Security Cloud.
 

@@ -1,6 +1,6 @@
 # Security Architecture
 
-Este documento descreve os controles de seguranca aplicados na infraestrutura.
+Este documento resume os controles de seguranca aplicados na **infraestrutura** (rede, containers, TLS, secrets). A fonte de verdade completa sobre seguranca do projeto — incluindo API, autenticacao, auditoria de imagens e achados do frontend — e `docs/security/SECURITY.md` (ver `docs/development/CONTRIBUTING.md`, secao "Fonte da Verdade"). Nao duplique aqui achados ou politicas que pertencem a esse documento.
 
 ## Principios
 
@@ -25,20 +25,14 @@ Nginx aplica:
 
 ## Autenticacao
 
-Dashboard:
+Dois mecanismos, detalhados em `docs/security/AUTH.md`:
 
 ```text
-HTTP Basic Auth
-.secrets/dashboard.htpasswd
+Usuarios humanos: login administrativo com Bearer token HMAC SHA-256, RBAC (admin/analyst/viewer)
+Agente Windows: header X-Agent-Api-Key, sem RBAC
 ```
 
-Agente:
-
-```text
-X-Agent-Api-Key
-```
-
-O endpoint do agente nao usa Basic Auth porque precisa ser consumido automaticamente por maquinas Windows. A protecao fica na API Key validada pelo backend.
+O Nginx ainda aplica HTTP Basic Auth (`.secrets/dashboard.htpasswd`) como camada extra de borda sobre paginas/assets estaticos, mas isso nao substitui o login da aplicacao (ADR-023). O endpoint do agente nao usa Basic Auth nem o login humano porque precisa ser consumido automaticamente por maquinas Windows; a protecao fica na API Key validada pelo backend.
 
 ## Segredos
 
@@ -79,20 +73,16 @@ PostgreSQL:
 
 ## Riscos residuais
 
-* Dashboard ainda usa Basic Auth no MVP.
+* Nginx ainda mantem Basic Auth como camada extra redundante ao login administrativo (ver ADR-023).
 * Banco roda no mesmo host por custo zero.
-* Windows Agent ainda precisa evoluir assinatura, criptografia e retry inteligente.
-* Frontend (Next.js) nao possui `middleware.ts`: a checagem de sessao roda so no client (componente `Shell`), sem gate no edge antes de renderizar paginas protegidas.
-* Frontend nao define security headers (CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy) no proprio `next.config.mjs`; depende inteiramente do Nginx cobrir essa camada, sem confirmacao registrada de que cobre.
+* Windows Agent ainda nao tem scripts assinados (code-signing pendente na EPIC 16; as demais lacunas de robustez ja foram corrigidas).
+* Achados de seguranca do frontend (EPIC 17: token em `localStorage`, ausencia de `middleware.ts` e de security headers) estao detalhados e priorizados em `docs/security/SECURITY.md` — nao duplicados aqui.
 
 ## Evolucao recomendada
 
-* Login com usuarios.
-* RBAC.
-* Auditoria.
-* Rotacao de secrets.
+* Rate limit basico na API.
+* Rotacao de secrets (incluindo API Key por agente).
+* Assinatura de codigo do agente Windows (EPIC 16, bloqueado por certificado).
 * Wazuh.
 * Prometheus, Loki e Grafana.
-* Migrar o token de sessao do dashboard de `localStorage` para cookie `httpOnly` (ver `docs/security/AUTH.md` e EPIC 17).
-* Adicionar `middleware.ts` no frontend para gate de sessao no edge.
-* Confirmar ou adicionar security headers no frontend (ver EPIC 17 em `docs/development/TASKS.md`).
+* Reavaliar a necessidade do Basic Auth do Nginx agora que o login administrativo esta em producao (ADR-023).

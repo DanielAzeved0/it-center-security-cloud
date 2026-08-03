@@ -34,6 +34,9 @@ retry_initial_delay_seconds
 retry_max_delay_seconds
 log_path
 cache_path
+log_max_size_kb
+log_max_backups
+cache_retention_days
 collect_inventory
 collect_metrics
 collect_security
@@ -42,6 +45,16 @@ collect_security
 O valor `agent_api_key` deve ser igual ao `AGENT_API_KEY` usado pelo backend.
 
 O agente ainda aceita os campos legados `api_key` e `interval_minutes` para compatibilidade.
+
+Hardening da EPIC 16 (contrato completo em `docs/agent/CHECKIN.md`):
+
+```text
+config.json tem a ACL restrita a SYSTEM/Administrators pelo instalador.
+Arquivo de cache corrompido e movido para cache/quarantine/ em vez de travar o reenvio dos demais.
+Arquivos de cache (incluindo quarentena) com mais de cache_retention_days (padrao 30) sao removidos automaticamente.
+logs/itcenter-agent.log e rotacionado por tamanho ao atingir log_max_size_kb (padrao 5120 KB), mantendo log_max_backups (padrao 3) backups.
+Falha de configuracao/inicializacao e capturada no nivel mais alto e registrada com [ERROR] antes de propagar o erro.
+```
 
 `server_url` pode ser informado como raiz do ambiente publicado:
 

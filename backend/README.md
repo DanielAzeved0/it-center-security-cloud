@@ -38,6 +38,8 @@ backend/requirements.txt
 ```text
 AGENT_API_KEY
 DATABASE_URL
+AUTH_TOKEN_SECRET
+AUTH_TOKEN_EXPIRATION_MINUTES
 ```
 
 No Docker Compose, `DATABASE_URL` aponta para o servico interno `postgres`.

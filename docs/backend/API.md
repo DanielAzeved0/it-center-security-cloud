@@ -477,9 +477,7 @@ Resposta:
 
 ## Segurança
 
-No MVP inicial, endpoints administrativos podem funcionar sem login apenas em ambiente local/laboratório.
-
-O endpoint de check-in do agente deverá exigir API Key desde a primeira implementação.
+O endpoint de check-in do agente exige API Key desde a primeira implementação.
 
 Header oficial:
 
@@ -487,13 +485,13 @@ Header oficial:
 X-Agent-Api-Key
 ```
 
-Antes de expor na internet, será obrigatório implementar:
+Estado atual (EPIC 12/13):
 
 ```text
-Autenticação no dashboard
-HTTPS
-Rate limit básico
-Logs de auditoria
+Autenticação no dashboard: implementada (Bearer token HMAC SHA-256, ver docs/security/AUTH.md).
+HTTPS: implementado (Nginx em produção).
+Logs de auditoria: implementados (audit_logs — login, falha de login, logout, resolução de alerta).
+Rate limit básico: ainda não implementado.
 ```
 
 ---
@@ -527,6 +525,8 @@ RDP habilitado
 Falhas excessivas de login
 Novo administrador local
 USB conectado
+Hostname fora da allowlist de ativos conhecidos (unknown_asset)
+Máquina sem check-in por mais de 10 minutos (machine_offline)
 ```
 
 ---

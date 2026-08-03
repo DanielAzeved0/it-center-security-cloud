@@ -2,7 +2,7 @@
 
 > Plataforma full stack para monitoramento, inventário, observabilidade e segurança de máquinas Windows, com agente PowerShell, API FastAPI, PostgreSQL, dashboard web e práticas iniciais de SOC/Blue Team.
 
-Status: Fases 0 a 9 concluídas (governança/autenticação e operação/segurança de produção validadas em produção real) | Fase 12 (Terraform/IaC) em andamento | Ambiente local Docker operacional | Produção publicada na Oracle Cloud | Agente Windows integrado ao check-in.
+Status: Fases 0 a 9 concluídas (governança/autenticação e operação/segurança de produção validadas em produção real) | Fase 12 (Terraform/IaC) em andamento (import ainda não executado) | Fase 13 (hardening do agente Windows) concluída, exceto assinatura de código, pendente de certificado | Fase 14 (hardening do dashboard) e Fase 15 (orquestração de agentes de IA, ADR-026) — ver Roadmap | Ambiente local Docker operacional | Produção publicada na Oracle Cloud | Agente Windows integrado ao check-in.
 
 ---
 
@@ -162,6 +162,9 @@ No MVP, todos os containers de produção executam no nó de borda `itcenter-edg
 it-center-security-cloud/
 |-- README.md
 |-- PROJECT_PLAN.md
+|-- .claude/
+|   |-- agents/
+|   `-- commands/
 |-- backend/
 |   `-- app/
 |-- frontend/
@@ -171,7 +174,8 @@ it-center-security-cloud/
 |   |-- docker-compose.yml
 |   |-- docker-compose.production.yml
 |   |-- nginx/
-|   `-- scripts/
+|   |-- scripts/
+|   `-- terraform/
 `-- docs/
     |-- README.md
     |-- architecture/
@@ -264,24 +268,24 @@ Manter o MVP com custo zero.
 
 O ambiente local usa `infra/docker-compose.yml`. Para produção, a proposta de bootstrap versionado do Edge Node está documentada em `docs/deployment/BOOTSTRAP.md`. A publicação usa `infra/scripts/deploy.sh` e `infra/docker-compose.production.yml`, que publica apenas o Nginx nas portas 80 e 443; os demais serviços permanecem na rede interna do Docker. O procedimento completo, incluindo DNS, certificado TLS, credencial administrativa, preflight, backup, rollback e renovação de certificado, está em `docs/deployment/PRODUCTION.md`.
 
-Comando principal de producao na VM:
+Comando principal de produção na VM:
 
 ```bash
 cd /opt/itcenter/app/it-center-security-cloud
 sh infra/scripts/deploy.sh
 ```
 
-### Producao atual
+### Produção atual
 
 ```text
-Dominio: itcenter-daniel.chickenkiller.com
+Domínio: itcenter-daniel.chickenkiller.com
 IP publico: 147.15.78.220
 VM: Oracle Cloud Ubuntu 24.04 LTS
 Rede Docker: itcenter-network
 Entrada publica: Nginx 80/443
 ```
 
-Fluxo de comunicacao:
+Fluxo de comunicação:
 
 ```mermaid
 flowchart TD
@@ -293,14 +297,14 @@ flowchart TD
     backend --> postgres[PostgreSQL]
 ```
 
-Somente o Nginx expoe portas publicas. PostgreSQL, FastAPI e Next.js permanecem internos na rede Docker.
+Somente o Nginx expõe portas públicas. PostgreSQL, FastAPI e Next.js permanecem internos na rede Docker.
 
-### Guias de producao
+### Guias de produção
 
 | Guia | Finalidade |
 | --- | --- |
 | `docs/deployment/ORACLE_CLOUD.md` | Implantacao completa na Oracle Cloud. |
-| `docs/deployment/SETUP.md` | Preparacao do ambiente de producao. |
+| `docs/deployment/SETUP.md` | Preparação do ambiente de produção. |
 | `docs/deployment/HTTPS.md` | DNS, Certbot, TLS e renovacao. |
 | `docs/deployment/DEPLOYMENT_HISTORY.md` | Historico real da implantacao feita. |
 | `docs/deployment/TROUBLESHOOTING.md` | Diagnostico operacional. |
@@ -342,9 +346,9 @@ Destino:
 /opt/itcenter/backups
 ```
 
-### HTTPS e dominio
+### HTTPS e domínio
 
-O dominio atual e:
+O domínio atual é:
 
 ```text
 itcenter-daniel.chickenkiller.com
@@ -357,7 +361,7 @@ Certificados esperados:
 /etc/letsencrypt/live/itcenter-daniel.chickenkiller.com/privkey.pem
 ```
 
-Se um provedor local nao resolver o dominio, valide com resolvers publicos:
+Se um provedor local não resolver o domínio, valide com resolvers públicos:
 
 ```bash
 dig @8.8.8.8 itcenter-daniel.chickenkiller.com
@@ -367,23 +371,23 @@ dig @9.9.9.9 itcenter-daniel.chickenkiller.com
 
 ### Agente Windows
 
-O agente Windows ja esta integrado ao ambiente publicado. O check-in de producao usa `POST /api/v1/agent/checkin` via HTTPS e autentica com o header `X-Agent-Api-Key`, que deve ser igual ao `AGENT_API_KEY` definido na VM.
+O agente Windows já está integrado ao ambiente publicado. O check-in de produção usa `POST /api/v1/agent/checkin` via HTTPS e autentica com o header `X-Agent-Api-Key`, que deve ser igual ao `AGENT_API_KEY` definido na VM.
 
 Estado atual do agente:
 
-* Instalacao controlada por script PowerShell.
-* Execucao periodica por Tarefa Agendada do Windows.
-* Cache offline e reenvio de check-ins pendentes.
+* Instalação controlada por script PowerShell, com ACL restrita em `config.json` (EPIC 16).
+* Execução periódica por Tarefa Agendada do Windows.
+* Cache offline e reenvio de check-ins pendentes, com quarentena de arquivo corrompido e retenção por idade (EPIC 16).
 * Retry inteligente para timeout, falha de rede, HTTP 408, HTTP 429 e respostas 5xx.
 * Troubleshooting operacional documentado em `docs/agent/TROUBLESHOOTING.md`.
 
-Proximas evolucoes do agente:
+Próximas evoluções do agente:
 
+* Assinatura de código (code-signing) — pendente de certificado.
 * Separar o agente como produto independente.
-* Adicionar atualizacao automatica.
-* Avaliar servico Windows nativo.
-* Expandir inventario, metricas e eventos de seguranca.
-* Adicionar compressao, criptografia e assinatura de payloads.
+* Adicionar atualização automática.
+* Avaliar serviço Windows nativo.
+* Adicionar compressão, criptografia e assinatura de payloads.
 
 ### Troubleshooting rapido
 
@@ -415,10 +419,10 @@ cp .env.example .env
 docker compose -f infra/docker-compose.yml up --build
 ```
 
-No Windows, se o terminal estiver em `C:\Users\Famili Azevedo`, entre na raiz do projeto antes:
+No Windows, se o terminal não estiver na raiz do projeto, entre nela antes:
 
 ```powershell
-cd "C:\Users\Famili Azevedo\Desktop\it-center-security-cloud"
+cd "<caminho-local>\it-center-security-cloud"
 docker compose -f infra/docker-compose.yml up --build
 ```
 
@@ -428,7 +432,7 @@ Em segundo plano:
 docker compose -f infra/docker-compose.yml up --build -d
 ```
 
-Servicos iniciados:
+Serviços iniciados:
 
 ```text
 postgres
@@ -568,13 +572,27 @@ docker compose -f infra/docker-compose.yml down -v
 * `terraform plan` zero-diff validado
 * Backend de state remoto em OCI Object Storage
 
-### Fase 13 - Hardening do Agente Windows
+### Fase 13 - Hardening do Agente Windows — concluída, exceto assinatura de código
 
 * ACL restrita em `config.json` (protege `agent_api_key`)
-* Quarentena de cache corrompido e rotação de logs/cache
-* Medição de CPU mais precisa
+* Quarentena de cache corrompido e retenção por idade
+* Rotação de logs por tamanho
+* Medição de CPU mais precisa (Get-Counter, com fallback)
 * Inventário cobrindo apps UWP/Store
-* Scripts assinados (code-signing)
+* Detecção de USB além de armazenamento
+* Scripts assinados (code-signing) — pendente, depende de certificado
+
+### Fase 14 - Hardening do Dashboard (Frontend) — em andamento
+
+* Auditoria de segurança do frontend concluída (achados em `docs/security/SECURITY.md`)
+* Migração do token de autenticação de `localStorage` para cookie `httpOnly`
+* Security headers e `middleware.ts` no Next.js
+
+### Fase 15 - Orquestração de Agentes de IA — concluída
+
+* Subagents e slash commands nativos do Claude Code (`.claude/agents/`, `.claude/commands/`)
+* Pipeline `/feature` via Workflow tool
+* Sem Strix/OpenAI/Gemini nem framework próprio (ADR-026, `docs/development/AI_WORKFLOW.md`)
 
 ---
 

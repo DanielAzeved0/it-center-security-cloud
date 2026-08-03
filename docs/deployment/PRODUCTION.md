@@ -245,7 +245,7 @@ Com o DNS já propagado e as portas 80/443 liberadas, emita o certificado antes 
 sudo docker run --rm -p 80:80 \
   -v /etc/letsencrypt:/etc/letsencrypt \
   -v /var/lib/letsencrypt:/var/lib/letsencrypt \
-  certbot/certbot:v4.21.0 certonly --standalone \
+  certbot/certbot:v5.7.0 certonly --standalone \
   -d SEU_DOMINIO --email SEU_EMAIL --agree-tos --no-eff-email
 ```
 
@@ -568,19 +568,11 @@ externamente.
 
 # Backups
 
-Banco:
+Backup manual, agendamento periódico via cron e restore já estão implementados e documentados em "Backup e restore" (seção anterior) e na rotina semanal (`docs/deployment/WEEKLY_OPERATIONS.md`).
 
-O script versionado `infra/scripts/backup.sh` executa backup manual do PostgreSQL.
+Retenção padrão: 7 dias (configurável via `RETENTION_DAYS`).
 
-Backup periodico ainda deve ser agendado como tarefa operacional da Fase 9.
-
-Retenção:
-
-7 dias.
-
-Local:
-
-`/opt/itcenter/backups`
+Local: `/opt/itcenter/backups`.
 
 ---
 

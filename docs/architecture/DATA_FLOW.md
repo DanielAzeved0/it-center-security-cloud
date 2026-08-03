@@ -40,11 +40,12 @@ POST /api/v1/agent/checkin
 ## Consulta do dashboard
 
 1. O usuario acessa o dashboard por HTTPS.
-2. O Nginx exige HTTP Basic Auth.
-3. O Nginx encaminha a requisicao para o Next.js.
-4. O Next.js consulta o backend pela rede interna.
-5. O backend consulta o PostgreSQL.
-6. O dashboard renderiza maquinas, metricas, eventos e alertas.
+2. O Nginx exige HTTP Basic Auth como camada extra de borda (paginas e assets estaticos; rotas `/api/backend/` ficam isentas por carregarem o Bearer token da aplicacao — ADR-023).
+3. O usuario faz login administrativo na aplicacao (Bearer token HMAC SHA-256, RBAC admin/analyst/viewer — ver `docs/security/AUTH.md`).
+4. O Nginx encaminha a requisicao para o Next.js.
+5. O Next.js consulta o backend pela rede interna, repassando o Bearer token.
+6. O backend valida o token/RBAC e consulta o PostgreSQL.
+7. O dashboard renderiza maquinas, metricas, eventos e alertas.
 
 ## Fluxo interno Docker
 

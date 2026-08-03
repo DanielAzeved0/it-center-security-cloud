@@ -114,15 +114,17 @@ Meta:
 
 Substituir controles temporarios de MVP por controles de identidade mais fortes.
 
-Entregas recomendadas:
+Concluido (EPIC 12, ADR-021/ADR-022):
 
-* Manter Basic Auth apenas como protecao simples de borda enquanto nao houver login de aplicacao.
-* Implementar login no dashboard.
-* Adicionar usuarios administrativos.
-* Criar perfis e permissoes.
-* Registrar auditoria de acoes sensiveis.
+* Login no dashboard (Bearer token HMAC SHA-256).
+* Usuarios administrativos (`users`) com perfis e permissoes (`admin`/`analyst`/`viewer`).
+* Auditoria de acoes sensiveis (`audit_logs`: login, falha de login, logout, resolucao de alerta).
+
+Entregas recomendadas restantes:
+
 * Evoluir `AGENT_API_KEY` global para credenciais por agente ou por tenant.
-* Permitir rotacao e revogacao de credenciais.
+* Permitir rotacao e revogacao de credenciais do agente.
+* Reavaliar a necessidade do Basic Auth do Nginx agora que o login administrativo esta em producao (ADR-023).
 
 Resultado esperado:
 
@@ -218,9 +220,9 @@ Escala com justificativa tecnica, sem overengineering antecipado.
 ## Ordem recomendada
 
 ```text
-1. Estabilizar MVP
-2. Profissionalizar agente Windows
-3. Adicionar autenticacao e auditoria
+1. Estabilizar MVP (concluido)
+2. Adicionar autenticacao e auditoria (concluido, EPIC 12)
+3. Profissionalizar agente Windows (EPIC 16, exceto assinatura de codigo)
 4. Transformar regras SOC em politicas configuraveis
 5. Criar estrategia de retencao e agregacao de dados
 6. Adicionar observabilidade

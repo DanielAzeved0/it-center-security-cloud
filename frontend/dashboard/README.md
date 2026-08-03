@@ -67,6 +67,7 @@ http://127.0.0.1:3000
 ## Telas
 
 ```text
+/login     Login administrativo (Bearer token, RBAC)
 /          Dashboard operacional
 /machines  Inventario, metricas e programas
 /alerts    Alertas e acao de resolver

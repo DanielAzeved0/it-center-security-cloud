@@ -65,6 +65,7 @@ Antes de escrever código, consulte:
 * docs/security/SOC_RULES.md
 * docs/security/ASSET_POLICY.md
 * docs/development/DECISIONS.md
+* docs/development/AI_WORKFLOW.md
 
 ---
 
@@ -125,6 +126,27 @@ docs/security/ASSET_POLICY.md
 Responsável:
 
 docs/development/ROADMAP.md e docs/development/TASKS.md
+
+---
+
+## Orquestração de Agentes de IA
+
+Responsável:
+
+docs/development/AI_WORKFLOW.md
+
+---
+
+# Padrão de Documentação
+
+Dois estilos são válidos neste projeto, dependendo do papel do arquivo:
+
+* **`README.md` de pasta (índice/navegação):** título único em `#`, seções em `##`, sem `---` entre elas. Usado por `docs/README.md`, `docs/development/README.md`, `docs/*/README.md` e os READMEs de `backend/`, `frontend/dashboard/`, `infra/`, `agent-windows/`.
+* **Documento de conteúdo/política (fonte de verdade de um assunto):** título em `#`, cada seção principal também em `#` (não `##`), separadas por uma linha `---`. Usado por `DECISIONS.md`, `TASKS.md`, `CONTRIBUTING.md`, `DATABASE.md`, `API.md`, `ARCHITECTURE.md`, `CHECKIN.md`, entre outros.
+
+Não misture os dois estilos dentro do mesmo arquivo.
+
+Português com acentuação completa é o padrão do projeto (alinhado ao idioma de trabalho da equipe). Documentos ou trechos sem acento existem por dívida histórica, não por convenção — ao editar um trecho por outro motivo, corrija a acentuação da frase que você já está tocando; não é necessário abrir uma tarefa só para reacentuar texto que não está sendo alterado.
 
 ---
 

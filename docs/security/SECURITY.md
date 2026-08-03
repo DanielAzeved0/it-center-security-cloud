@@ -46,18 +46,18 @@ Toda ação crítica deverá gerar logs.
 
 ## Proteção da API
 
-MVP:
+Implementado:
 
-* API Key obrigatória para agentes
+* API Key obrigatória para agentes (`X-Agent-Api-Key`)
 * Validação de payloads
 * Erros sem detalhes internos
+* Login administrativo com Bearer token assinado por HMAC SHA-256 (ADR-022, não JWT)
+* RBAC (`admin`/`analyst`/`viewer`)
+* Logs de auditoria (login, falha de login, logout, resolução de alerta)
 
 Futuro:
 
-* JWT
-* RBAC
 * Rate limit
-* Logs de auditoria completos
 
 ---
 
@@ -81,20 +81,16 @@ Futuro:
 
 ## Segurança do Dashboard
 
-MVP local/laboratório:
+Duas camadas, desde a EPIC 12 (ADR-021, ADR-022):
 
-* Pode operar sem login apenas enquanto não estiver exposto na internet
-
-Antes de exposição externa:
-
-* O Nginx exige autenticação HTTP Basic para todo o dashboard e para a proxy interna `/api/backend/*`.
-* O arquivo de credenciais fica em `.secrets/dashboard.htpasswd`, fora do Git e montado somente em leitura.
+* Login administrativo da aplicação: Bearer token HMAC SHA-256, senha em PBKDF2-SHA256, papéis `admin`/`analyst`/`viewer` — contrato completo em `docs/security/AUTH.md`.
+* O Nginx ainda exige HTTP Basic Auth como camada extra de borda para as páginas e assets estáticos (`.secrets/dashboard.htpasswd`, fora do Git, montado somente em leitura) — isso não substitui o login da aplicação (ADR-023).
 * O endpoint público do agente é limitado a `POST /api/v1/agent/checkin`; ele não recebe Basic Auth porque valida obrigatoriamente `X-Agent-Api-Key` no FastAPI.
 * Endpoints internos do backend não são expostos em portas públicas.
 
 Limitação conhecida:
 
-* HTTP Basic é o controle de acesso administrativo mínimo para a primeira publicação. Login com usuários, sessões, RBAC e auditoria continua sendo requisito da Fase de Governança antes de qualquer uso multiusuário/SaaS.
+* O Basic Auth do Nginx é redundante agora que o login administrativo completo está em produção; sua real necessidade deve ser reavaliada (ver ADR-023).
 
 ### Auditoria de segurança do frontend (2026-07-29)
 

@@ -239,7 +239,7 @@ Primeiros recursos SOC.
 
 Status:
 
-Concluido.
+Concluído.
 
 ---
 
@@ -264,7 +264,7 @@ Primeira versão pública.
 
 Status:
 
-Concluido.
+Concluído.
 
 ---
 
@@ -469,3 +469,24 @@ Entregas:
 Resultado Esperado:
 
 Dashboard com superficie de ataque client-side reduzida e defesa em profundidade equivalente ao restante da plataforma, sem trocar a stack atual.
+
+---
+
+# Fase 15
+
+Orquestracao de Agentes de IA — concluida
+
+Meta:
+
+Configurar o Claude Code para atuar como especialistas de dominio (backend, frontend, devops, security, architecture, documentation) usando apenas recursos nativos, em vez de um framework Python proprio com multiplos providers externos (ADR-026).
+
+Entregas:
+
+* Subagents em `.claude/agents/` (backend, frontend, devops, security, architecture, documentation)
+* Slash commands em `.claude/commands/` que delegam a cada subagent
+* Pipeline `/feature` via Workflow tool nativa (architecture -> implementation -> review + security -> docs)
+* `docs/development/AI_WORKFLOW.md` documentando a convencao e o que foi deliberadamente descartado (Strix, OpenAI, Gemini, cache de tarefas, CLI propria)
+
+Resultado Esperado:
+
+Especialistas de dominio dentro do Claude Code sem nenhuma tecnologia nova na stack e sem dado do projeto trafegando para APIs de IA de terceiros.

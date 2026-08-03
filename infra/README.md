@@ -4,6 +4,8 @@ Infraestrutura local e de producao do IT Center Security Cloud.
 
 O arquivo `docker-compose.yml` é exclusivo para desenvolvimento local. Para publicar na Oracle Cloud, use `docker-compose.production.yml` e siga o procedimento em `docs/deployment/PRODUCTION.md`; não exponha o Compose local diretamente na internet.
 
+A camada abaixo do sistema operacional (VCN, subnets, security list, instância) é provisionada via Terraform em `infra/terraform/` (ver `infra/terraform/README.md`, `docs/architecture/IAC.md` e ADR-024) — fora do escopo deste Compose e dos scripts abaixo.
+
 ## Bootstrap do Edge Node
 
 O bootstrap versionado ainda esta documentado como proposta em:
@@ -74,14 +76,14 @@ docs/deployment/WEEKLY_OPERATIONS.md
 Na raiz do projeto:
 
 ```powershell
-cd "C:\Users\Famili Azevedo\Desktop\it-center-security-cloud"
+cd "<caminho-local>\it-center-security-cloud"
 docker compose -f infra/docker-compose.yml up --build
 ```
 
 Em segundo plano:
 
 ```powershell
-cd "C:\Users\Famili Azevedo\Desktop\it-center-security-cloud"
+cd "<caminho-local>\it-center-security-cloud"
 docker compose -f infra/docker-compose.yml up --build -d
 ```
 
@@ -96,27 +98,27 @@ Postgres:  127.0.0.1:5432
 ## Verificar status
 
 ```powershell
-cd "C:\Users\Famili Azevedo\Desktop\it-center-security-cloud"
+cd "<caminho-local>\it-center-security-cloud"
 docker compose -f infra/docker-compose.yml ps
 ```
 
 Logs:
 
 ```powershell
-cd "C:\Users\Famili Azevedo\Desktop\it-center-security-cloud"
+cd "<caminho-local>\it-center-security-cloud"
 docker compose -f infra/docker-compose.yml logs -f backend frontend
 ```
 
 ## Parar
 
 ```powershell
-cd "C:\Users\Famili Azevedo\Desktop\it-center-security-cloud"
+cd "<caminho-local>\it-center-security-cloud"
 docker compose -f infra/docker-compose.yml down
 ```
 
 Remover banco e volume local:
 
 ```powershell
-cd "C:\Users\Famili Azevedo\Desktop\it-center-security-cloud"
+cd "<caminho-local>\it-center-security-cloud"
 docker compose -f infra/docker-compose.yml down -v
 ```

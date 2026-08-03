@@ -989,24 +989,24 @@ Impactos:
 
 ---
 
-## ADR-XXX
+# ADR-XXX
 
-### Data
+## Data
 
 YYYY-MM-DD
 
-### Decisão
+## Decisão
 
 Descrição da decisão.
 
-### Motivo
+## Motivo
 
 Justificativa.
 
-### Alternativas Avaliadas
+## Alternativas Avaliadas
 
 Lista de alternativas.
 
-### Resultado
+## Resultado
 
 Decisão final.

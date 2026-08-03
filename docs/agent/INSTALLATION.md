@@ -80,7 +80,8 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install-agent.ps1 `
 9. Criar cache\
 10. Copiar scripts do agente
 11. Gerar config.json
-12. Registrar Tarefa Agendada ITCenterAgent
+12. Restringir ACL de config.json a SYSTEM/Administrators (EPIC 16)
+13. Registrar Tarefa Agendada ITCenterAgent
 ```
 
 ## Preflight de rede do instalador
@@ -151,11 +152,16 @@ Schema:
   "retry_max_delay_seconds": 15,
   "log_path": "C:\\Program Files\\ITCenterAgent\\logs",
   "cache_path": "C:\\Program Files\\ITCenterAgent\\cache",
+  "log_max_size_kb": 5120,
+  "log_max_backups": 3,
+  "cache_retention_days": 30,
   "collect_inventory": true,
   "collect_metrics": true,
   "collect_security": true
 }
 ```
+
+Desde a EPIC 16, o instalador restringe a ACL deste arquivo a `SYSTEM`/`Administrators`, protegendo o `agent_api_key` em texto puro contra leitura por usuarios comuns.
 
 ## Comando de desinstalacao
 
@@ -188,10 +194,13 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\Program Files\ITCent
 * Local padrao de cache offline.
 * Preflight de conectividade antes da instalacao.
 * Retry inteligente para falhas temporarias.
+* ACL de `config.json` restrita a SYSTEM/Administrators (EPIC 16).
+* Quarentena de cache corrompido e retencao por idade em `cache\` (EPIC 16).
+* Rotacao de `logs\itcenter-agent.log` por tamanho (EPIC 16).
 
 ## Requisitos pendentes
 
-* Instalador assinado.
+* Instalador/scripts assinados (code-signing) — bloqueado por depender de certificado.
 * Atualizacao automatica.
 * Servico Windows nativo.
 * Criptografia e assinatura de payloads.
@@ -206,6 +215,7 @@ C:\Program Files\ITCenterAgent\
 |-- uninstall-agent.ps1
 |-- logs\
 `-- cache\
+    `-- quarantine\
 ```
 
 ## Validacoes manuais esperadas

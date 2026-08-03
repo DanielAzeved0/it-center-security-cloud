@@ -393,9 +393,9 @@ CHECK status IN ('active', 'disabled', 'pending')
 
 # Tabela: audit_logs
 
-Armazena logs de auditoria administrativa para a governanca futura do dashboard e da API.
+Armazena logs de auditoria administrativa do dashboard e da API.
 
-Esta tabela prepara o registro de acoes criticas, mas a captura automatica de auditoria sera implementada em task futura.
+A captura automatica de auditoria ja esta implementada (EPIC 12, ADR-022): login, falha de login, logout e resolucao de alerta registram uma linha em audit_logs.
 
 ## Campos
 
@@ -424,6 +424,7 @@ created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 
 ---
 
+## audit_logs
 
 ```text
 INDEX actor_user_id
@@ -572,15 +573,15 @@ Os testes de backend limpam as tabelas com `TRUNCATE ... RESTART IDENTITY CASCAD
 
 ## Governanca Administrativa
 
-As tabelas `users` e `audit_logs` preparam a EPIC 12 para login administrativo, RBAC e auditoria.
+As tabelas `users` e `audit_logs` sustentam o login administrativo, RBAC e auditoria implementados na EPIC 12 (ADR-021, ADR-022).
 
-Nesta etapa:
+Estado atual:
 
 ```text
-Nao ha endpoint de login.
-Nao ha CRUD de usuarios.
-Nao ha protecao de rotas por usuario humano.
-Nao ha captura automatica de auditoria.
+Ha endpoint de login: POST /api/v1/auth/login.
+Rotas administrativas exigem Bearer token e sao protegidas por RBAC (admin/analyst/viewer).
+Ha captura automatica de auditoria: login, falha de login, logout e resolucao de alerta.
+CRUD de usuarios (criacao/edicao de contas pelo proprio dashboard) continua fora do escopo do MVP.
 ```
 
 O contrato de papeis e permissoes fica em:
@@ -599,10 +600,12 @@ As migrations ficam em:
 backend/migrations/
 ```
 
-Migration inicial:
+Migrations aplicadas:
 
 ```text
 backend/migrations/001_initial_schema.sql
+backend/migrations/002_users.sql
+backend/migrations/003_audit_logs.sql
 ```
 
 ## Execucao via Docker
@@ -679,9 +682,6 @@ Por isso:
 
 Para suporte SaaS no futuro.
 
-## audit_logs
-
-
 ## integrations
 
 Para integração com e-mail, Telegram, Slack ou webhook.
@@ -705,3 +705,5 @@ O banco inicial estará pronto quando existirem as tabelas:
 * agent_configs
 
 e todas estiverem relacionadas corretamente com machine_id.
+
+A governança administrativa (EPIC 12) acrescenta `users` e `audit_logs`, sem depender de `machine_id`.

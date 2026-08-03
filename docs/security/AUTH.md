@@ -272,7 +272,7 @@ GET /api/v1/security-events
 Excecoes previstas:
 
 ```text
-GET /health
+GET /api/v1/health
 POST /api/v1/agent/checkin
 ```
 

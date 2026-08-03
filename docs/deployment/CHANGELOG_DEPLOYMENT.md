@@ -1,5 +1,7 @@
 # Diario de implantacao da infraestrutura
 
+> **Historico congelado em 2026-06-26.** Este documento parou de ser atualizado; o historico de deploys continua em `docs/deployment/DEPLOYMENT_HISTORY.md` (inclui os eventos de 2026-06-30 e 2026-07-28, entre outros). Mantido aqui apenas pelo contexto tecnico detalhado do deploy inicial — registre novos deploys em `DEPLOYMENT_HISTORY.md`.
+
 Este documento registra a implantacao da infraestrutura de producao do IT Center Security Cloud na Oracle Cloud.
 
 O objetivo e manter um historico tecnico claro, auditavel e reutilizavel para futuras implantacoes, troubleshooting, onboarding e recuperacao de desastres.
