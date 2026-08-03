@@ -76,7 +76,7 @@ http://127.0.0.1:3000
 
 ## Seguranca de dependencias
 
-O dashboard usa Next.js `16.2.9` e `picomatch` `4.0.4`.
+O dashboard usa Next.js `16.2.12`, `picomatch` `4.0.4` e `overrides` de `postcss`/`sharp` (`8.5.25`/`0.35.3`) em `package.json` para fechar CVEs high de dependencias internas do Next que a versao atual ainda nao corrigiu.
 
 Durante o build Docker, o script abaixo substitui o `picomatch` compilado dentro do Next.js pela versao corrigida instalada no projeto:
 

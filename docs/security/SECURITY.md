@@ -180,7 +180,8 @@ Backend:
 
 Frontend:
 
-* Next.js atualizado para `16.2.9`.
+* Next.js atualizado para `16.2.12` em 2026-08-03 (`npm audit --audit-level=high` no CI apontou 3 CVEs high em `next@16.2.9` — bypass de middleware/proxy, SSRF em rewrites e DoS em Server Actions; `16.2.12` corrige todas).
+* `postcss` e `sharp` fixados via `overrides` em `package.json` (`8.5.25` e `0.35.3`) porque `next@16.2.12` ainda declara essas duas dependencias internas em versoes vulneraveis (XSS/path traversal no PostCSS, CVEs de libvips no sharp) — mesmo padrao do fix de `picomatch` abaixo, aplicado via `npm overrides` em vez de patch de arquivo porque sao dependencias normais, nao codigo vendorizado.
 * `picomatch` fixado em `4.0.4`.
 * O build executa `scripts/security/patch-next-picomatch.js` para substituir o `picomatch` compilado dentro do Next por `4.0.4`.
 * A imagem final remove o `npm` global do runtime para evitar dependencias internas nao usadas, incluindo `picomatch` vulneravel empacotado pelo npm da imagem base.

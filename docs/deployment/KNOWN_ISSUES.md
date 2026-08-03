@@ -102,15 +102,16 @@ Durante a auditoria de seguranca do frontend em 2026-07-29, `npm audit` em `fron
 
 Risco:
 
-* Nao ha confirmacao automatizada de CVEs em `next@16.2.9`/`react@19.2.3` e demais dependencias diretas do dashboard alem do que o Docker Scout ja cobre na imagem final (ver `docs/security/SECURITY.md`).
+* Nao ha confirmacao automatizada de CVEs em `next@16.2.12`/`react@19.2.3` e demais dependencias diretas do dashboard a partir do ambiente de desenvolvimento local, alem do que o Docker Scout ja cobre na imagem final (ver `docs/security/SECURITY.md`).
 
 Mitigacao atual:
 
 * `docker scout cves infra-frontend:latest --only-severity critical,high` continua sendo a validacao oficial antes de publicar a imagem (ja documentado em `docs/security/SECURITY.md`).
+* O passo `Audit frontend dependencies` do workflow `ci.yml` (GitHub Actions, sem o proxy corporativo local) roda `npm audit --audit-level=high` a cada push/PR e ja provou seu valor em 2026-08-03: pegou 3 CVEs high reais em `next@16.2.9` (bypass de middleware/proxy, SSRF em rewrites, DoS em Server Actions) e mais duas em dependencias internas do Next (`postcss`, `sharp`). Corrigido com bump para `next@16.2.12` e `overrides` de `postcss`/`sharp` em `package.json` (ver `docs/security/SECURITY.md`).
 
 Evolucao esperada:
 
-* Rodar `npm audit` em um ambiente com acesso direto ao registry (ex.: CI do GitHub Actions, que nao passa pelo proxy corporativo local) e registrar o resultado na rotina semanal (`docs/deployment/WEEKLY_OPERATIONS.md`). Rastreado na EPIC 17 de `docs/development/TASKS.md`.
+* Se for necessario rodar `npm audit`/`npm install` localmente antes de abrir PR, o bloqueio de TLS pode ser contornado pontualmente exportando a cadeia de certificado do proxy/antivirus (`openssl s_client -connect registry.npmjs.org:443 -showcerts`) e apontando `NODE_EXTRA_CA_CERTS` para esse arquivo — nao adicionar isso como configuracao permanente do repositorio nem desabilitar `strict-ssl`.
 
 ## .dockerignore do frontend nao exclui arquivos .env*
 
