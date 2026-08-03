@@ -99,6 +99,7 @@ curl -I https://itcenter-daniel.chickenkiller.com
 | `agent/TROUBLESHOOTING.md` | Diagnostico operacional do agente Windows. |
 | `development/CONTRIBUTING.md` | Regras de contribuicao. |
 | `development/ROADMAP.md` | Roadmap do projeto. |
+| `development/AI_WORKFLOW.md` | Orquestracao de agentes de IA no Claude Code (ADR-026). |
 
 ## Estado atual
 

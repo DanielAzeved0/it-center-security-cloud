@@ -686,3 +686,29 @@ Corrigir os riscos concretos identificados na auditoria de seguranca do frontend
 ### Tarefas - Documentacao
 
 [ ] Atualizar docs/security/AUTH.md, docs/security/SECURITY.md e docs/architecture/SECURITY.md removendo cada risco da lista conforme for corrigido
+
+---
+
+# EPIC 18 - Orquestracao de Agentes de IA (Claude Code nativo)
+
+Objetivo:
+
+Configurar o Claude Code para atuar como especialistas de dominio (backend, frontend, devops, security, architecture, documentation) usando apenas recursos nativos (subagents, slash commands, Workflow tool), conforme ADR-026. Sem framework Python proprio, sem Strix/OpenAI/Gemini.
+
+### Tarefas
+
+[x] Criar subagents em .claude/agents/ (backend, frontend, devops, security, architecture, documentation)
+
+[x] Criar slash commands em .claude/commands/ (/backend, /frontend, /devops, /security, /architecture, /docs)
+
+[x] Criar comando /feature com pipeline via Workflow tool (architecture -> implementation -> review + security -> docs)
+
+[x] Criar docs/development/AI_WORKFLOW.md documentando a convencao e o que foi descartado
+
+[x] Registrar ADR-026 em docs/development/DECISIONS.md
+
+### Tarefas - Futuro (fora de escopo agora)
+
+[ ] Avaliar Strix isolado para teste de seguranca autorizado (pentest formal), como decisao propria com ADR proprio, se e quando surgir necessidade real
+
+[ ] Configurar hooks em .claude/settings.json somente se aparecer um gatilho concreto (ex.: rodar pytest automaticamente apos editar backend/)

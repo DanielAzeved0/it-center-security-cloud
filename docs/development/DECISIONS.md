@@ -951,6 +951,44 @@ Impactos:
 
 ---
 
+# ADR-026
+
+## Data
+
+2026-08-03
+
+## Decisão
+
+Adotar apenas recursos nativos do Claude Code (subagents em `.claude/agents/`, slash commands em `.claude/commands/` e a ferramenta Workflow para pipelines) para orquestrar agentes especializados por domínio (backend, frontend, devops, security, architecture, documentation) neste repositório. Não adotar Strix, OpenAI ou Gemini como providers do fluxo de codificação, e não construir um framework Python próprio de orquestração (`.agent/`, `AgentManager`, abstração de `Provider`).
+
+## Motivo
+
+Um plano externo de "Agent Manager" foi avaliado para dar ao Claude Code acesso a agentes especializados como se fossem Skills nativas. A maior parte do que o plano propunha (roteador de tarefas, biblioteca de prompts por skill, pipeline engine, CLI própria) já existe nativamente no Claude Code via subagents, slash commands e a ferramenta Workflow — construir uma camada Python paralela reimplementaria isso sem necessidade concreta, o que viola a regra de "não adicionar tecnologias sem justificativa" (`docs/development/CONTRIBUTING.md`).
+
+Adicionar OpenAI ou Gemini como providers colocaria código, documentação interna e potencialmente dados operacionais trafegando para APIs de terceiros sem que exista hoje um problema concreto que justifique essa exposição — um risco desproporcional para um produto de segurança (`docs/security/SECURITY.md`) sem nenhum mecanismo de mascaramento de segredos implementado. Strix é um agente de teste de segurança autônomo (pentest); usá-lo como parte do fluxo diário de codificação misturaria um agente com potencial de execução autônoma no próprio ambiente do produto sem um gate de aprovação humana e sem escopo isolado.
+
+## Alternativas Avaliadas
+
+* Implementar o framework Python completo do plano original, com abstração de `Provider` para Strix, Claude, OpenAI e Gemini, roteador customizado em YAML, cache de tarefas e CLI própria.
+* Implementar apenas o framework Python (sem os providers externos), reimplementando em Python o que subagents/commands/Workflow já fazem no Claude Code.
+* Usar somente subagents, slash commands e a ferramenta Workflow nativos do Claude Code, sem providers externos — escolhida.
+
+## Resultado
+
+* Seis subagents criados em `.claude/agents/`: `backend`, `frontend`, `devops` (inclui responsabilidades de SRE, dado que o projeto roda em uma única VM sem equipe de SRE dedicada), `security`, `architecture` e `documentation`.
+* Seis slash commands em `.claude/commands/` (`/backend`, `/frontend`, `/devops`, `/security`, `/architecture`, `/docs`) que delegam ao subagent correspondente.
+* Um comando `/feature` que usa a ferramenta Workflow nativa para o pipeline `architecture → implementation → (review + security em paralelo) → docs`.
+* Convenção documentada em `docs/development/AI_WORKFLOW.md`.
+* Strix, OpenAI, Gemini, cache de tarefas, CLI própria e logging customizado ficam fora de escopo por ora; qualquer um deles exigiria um ADR próprio se uma necessidade concreta e isolada aparecer (ex.: um pentest formal e autorizado via Strix antes de um lançamento público).
+
+Impactos:
+
+* Nenhuma tecnologia nova entra na stack aprovada do projeto (subagents/commands/Workflow são recursos do Claude Code, a ferramenta que já era usada para desenvolver o projeto).
+* Nenhum dado do projeto passa a trafegar para APIs de IA de terceiros.
+* Mudanças de código e infraestrutura do produto continuam seguindo o fluxo normal de `docs/development/CONTRIBUTING.md`; o que muda é apenas como as tarefas são roteadas para o contexto certo dentro do Claude Code.
+
+---
+
 ## ADR-XXX
 
 ### Data

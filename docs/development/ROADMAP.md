@@ -34,6 +34,7 @@ EPIC 14 - Melhorias Futuras
 EPIC 15 - Infraestrutura como Codigo (Terraform)
 EPIC 16 - Hardening do Agente Windows
 EPIC 17 - Hardening do Dashboard (Frontend)
+EPIC 18 - Orquestracao de Agentes de IA (Claude Code nativo)
 ```
 
 ## Arquitetura
@@ -123,6 +124,7 @@ Politicas autorizadas -> EPIC 11
 ADR-013 -> mantém a integração direta FastAPI + PostgreSQL
 ADR-014 -> padroniza execução local integrada com Docker Compose
 ADR-015 -> padroniza gate de seguranca das imagens Docker
+ADR-026 -> orquestracao de agentes de IA com recursos nativos do Claude Code
 ```
 
 ---
