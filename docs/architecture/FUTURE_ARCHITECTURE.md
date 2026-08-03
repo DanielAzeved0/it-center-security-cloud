@@ -169,26 +169,28 @@ Resultado esperado:
 
 Banco previsivel, menor risco de crescimento descontrolado e operacao mais simples.
 
-### Fase F - Observabilidade
+### Fase F - Observabilidade — em planejamento real (ADR-030, EPIC 21)
 
 Meta:
 
-Adicionar visibilidade operacional sem mudar o contrato atual da aplicacao.
+Adicionar visibilidade operacional da **infraestrutura** (Edge Node e containers) sem mudar o contrato atual da aplicacao e sem duplicar a coleta de metricas por maquina que o agente Windows ja faz (`metrics`, EPIC 3; retencao planejada na Fase E acima).
 
 Entregas recomendadas:
 
 * Manter logs em `stdout` e `stderr`.
-* Adicionar dashboards de saude com Prometheus e Grafana quando houver necessidade real.
+* `node_exporter` para metricas de host (CPU/RAM/disco/rede da VM) e cAdvisor (ou metricas nativas do Docker) para saude dos containers.
+* Prometheus com scrape config apontando para essas duas fontes; Grafana com dashboard(s) pre-configurado(s) para saude do Edge Node — nenhum dos dois exposto publicamente (Nginx continua unico ponto de entrada).
 * Adicionar Loki ou Promtail para logs centralizados.
 * Criar alertas para containers unhealthy.
 * Criar alertas para disco baixo e memoria baixa.
 * Criar alerta para certificado perto do vencimento.
 * Criar alerta para falha de backup.
-* Registrar metricas de check-in do agente, latencia da API e volume de eventos.
+* Registrar metricas de latencia da API e volume de check-ins/eventos (comportamento da plataforma, nao substitui `metrics` por maquina).
+* Validar impacto de recursos no free tier (`infra/scripts/ops-check.sh`) antes de ativar em producao.
 
 Resultado esperado:
 
-Capacidade de diagnosticar incidentes mais rapido sem aumentar demais a complexidade do MVP.
+Capacidade de diagnosticar incidentes mais rapido sem aumentar demais a complexidade do MVP, e sem duplicar responsabilidade com o pipeline de metricas do agente.
 
 ### Fase G - Escala e separacao de servicos
 
@@ -217,7 +219,7 @@ Resultado esperado:
 
 Escala com justificativa tecnica, sem overengineering antecipado.
 
-### Fase H - Hub de integracao com ferramentas open source
+### Fase H - Hub de integracao com ferramentas open source — RustDesk e Snipe-IT em planejamento real (EPIC 19)
 
 Meta:
 
@@ -225,12 +227,13 @@ O IT Center nao deve substituir ferramentas maduras e consolidadas do mercado. E
 
 Ferramentas avaliadas:
 
-* **Snipe-IT** (ITAM — gestao de ativos): fonte oficial de inventario administrativo (computadores, notebooks, impressoras, monitores, licencas, garantias, historico de movimentacao, usuario responsavel, localizacao). O IT Center consome a API REST do Snipe-IT, sincroniza automaticamente computadores novos detectados pelo agente (existe -> atualiza; nao existe -> cria) e exibe/abre o ativo sem sair do dashboard.
-* **RustDesk**: acesso remoto seguro entre tecnico e equipamento (open source, com opcao de auto-hospedagem). O IT Center armazena o ID do RustDesk de cada equipamento, verifica se o host esta online, permite iniciar uma sessao remota com um clique e associa a sessao ao ativo correspondente.
-* **Prometheus + Grafana**: coleta/armazenamento (Prometheus) e visualizacao (Grafana) de metricas de CPU, RAM, disco, rede, processos, servicos, containers e banco. O IT Center nao substitui o Grafana: consome metricas do Prometheus, pode incorporar dashboards do Grafana quando necessario, gera alertas internos com base nessas metricas e apresenta indicadores resumidos na tela principal — o Grafana permanece o ambiente avancado de analise.
-* **NetBox**: source of truth da infraestrutura (data centers, racks, switches, roteadores, firewalls, VLANs, redes, prefixos, IPAM, conexoes fisicas, topologia). O IT Center consulta dispositivos cadastrados, exibe IPs/VLANs, relaciona equipamentos aos ativos e mostra localizacao/racks/conexoes fisicas, sem duplicar o papel de source of truth do NetBox.
+* **Snipe-IT** (ITAM — gestao de ativos) — em planejamento real (ADR-028, EPIC 19): fonte oficial de inventario administrativo (computadores, notebooks, impressoras, monitores, licencas, garantias, historico de movimentacao, usuario responsavel, localizacao). O IT Center consome a API REST do Snipe-IT, sincroniza automaticamente computadores novos detectados pelo agente (existe -> atualiza; nao existe -> cria) e exibe/abre o ativo sem sair do dashboard.
+* **RustDesk** — em planejamento real (ADR-027, EPIC 19): acesso remoto seguro entre tecnico e equipamento (open source, com opcao de auto-hospedagem, ja reconhecido em `docs/security/ASSET_POLICY.md`). O IT Center armazena o ID do RustDesk de cada equipamento e permite iniciar uma sessao remota com um clique associado ao ativo correspondente.
+* **NetBox** — ainda aspiracional (sem ADR/EPIC): source of truth da infraestrutura (data centers, racks, switches, roteadores, firewalls, VLANs, redes, prefixos, IPAM, conexoes fisicas, topologia). O IT Center consultaria dispositivos cadastrados, exibiria IPs/VLANs e relacionaria equipamentos aos ativos, sem duplicar o papel de source of truth do NetBox. Valor real depende do projeto operar em ambientes com infraestrutura de rede propria a gerenciar (racks, switches) — nao e o caso do MVP atual (uma unica VM).
 
-Modelo de integracao (padrao comum as quatro ferramentas):
+Observabilidade (Prometheus + Grafana) saiu desta lista: o escopo correto para essas duas ferramentas e a **infraestrutura** do proprio IT Center (Edge Node/containers), nao um dominio por-ativo como os tres acima — ver Fase F (Observabilidade), ADR-030 e EPIC 21.
+
+Modelo de integracao (padrao comum as ferramentas do hub):
 
 ```text
 Projeto Externo -> API REST -> Integration Service -> Banco do IT Center -> Frontend
@@ -242,13 +245,12 @@ Entregas recomendadas:
 * Implementar cada integracao como um servico desacoplado (Integration Service), que pode ser ativado, desativado ou substituido sem impactar o restante da plataforma.
 * Armazenar no banco do IT Center apenas o necessario para consulta rapida e relacionamento interno (ex.: ID do ativo no Snipe-IT, ID do host no RustDesk), evitando duplicar dados que ja tem fonte oficial externa.
 * Sincronizacao automatica de novos ativos detectados pelo agente com o Snipe-IT (criar ou atualizar).
-* Botao de acesso remoto por ativo integrado ao RustDesk, com status online/offline.
-* Dashboard simplificado alimentado por Prometheus, com Grafana como camada avancada opcional.
-* Consulta de infraestrutura de rede (IPs, VLANs, topologia) via NetBox associada ao ativo correspondente.
+* Botao de acesso remoto por ativo integrado ao RustDesk.
+* Consulta de infraestrutura de rede (IPs, VLANs, topologia) via NetBox associada ao ativo correspondente, quando/se essa integracao avancar.
 
 Resultado esperado:
 
-Experiencia unificada para o operador — Snipe-IT como fonte de inventario/ITAM, RustDesk para acesso remoto, Prometheus+Grafana para metricas/observabilidade e NetBox como fonte de infraestrutura/IPAM/topologia — sem o IT Center assumir a responsabilidade tecnica de nenhuma dessas quatro especialidades.
+Experiencia unificada para o operador — Snipe-IT como fonte de inventario/ITAM e RustDesk para acesso remoto no curto prazo; NetBox como fonte de infraestrutura/IPAM/topologia se e quando o projeto operar em ambientes que justifiquem — sem o IT Center assumir a responsabilidade tecnica de nenhuma dessas especialidades.
 
 ## Ordem recomendada
 
@@ -258,9 +260,9 @@ Experiencia unificada para o operador — Snipe-IT como fonte de inventario/ITAM
 3. Profissionalizar agente Windows (EPIC 16, exceto assinatura de codigo)
 4. Transformar regras SOC em politicas configuraveis
 5. Criar estrategia de retencao e agregacao de dados
-6. Adicionar observabilidade
+6. Adicionar observabilidade de infraestrutura (Prometheus + Grafana, ADR-030, EPIC 21)
 7. Separar servicos somente quando a carga justificar
-8. Avaliar hub de integracao com ferramentas externas (Snipe-IT, RustDesk, Prometheus/Grafana, NetBox) somente apos o MVP estar estavel
+8. Hub de integracao: RustDesk e Snipe-IT (ADR-027/028, EPIC 19), depois relatorios/dashboard executivo (ADR-029, EPIC 20); NetBox somente se o projeto operar em ambiente que justifique
 ```
 
 ## Principios de decisao

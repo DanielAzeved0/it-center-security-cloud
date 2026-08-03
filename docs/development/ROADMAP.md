@@ -35,6 +35,9 @@ EPIC 15 - Infraestrutura como Codigo (Terraform)
 EPIC 16 - Hardening do Agente Windows
 EPIC 17 - Hardening do Dashboard (Frontend)
 EPIC 18 - Orquestracao de Agentes de IA (Claude Code nativo)
+EPIC 19 - Hub de Integracao: RustDesk e Snipe-IT
+EPIC 20 - Relatorios PDF e Dashboard Executivo
+EPIC 21 - Observabilidade de Infraestrutura (Prometheus + Grafana)
 ```
 
 ## Arquitetura
@@ -125,6 +128,10 @@ ADR-013 -> mantém a integração direta FastAPI + PostgreSQL
 ADR-014 -> padroniza execução local integrada com Docker Compose
 ADR-015 -> padroniza gate de seguranca das imagens Docker
 ADR-026 -> orquestracao de agentes de IA com recursos nativos do Claude Code
+ADR-027 -> RustDesk como acesso remoto integrado (EPIC 19)
+ADR-028 -> integracao com Snipe-IT como fonte de ITAM (EPIC 19)
+ADR-029 -> ReportLab para relatorios PDF e dashboard executivo (EPIC 20)
+ADR-030 -> Prometheus + Grafana para observabilidade de infraestrutura (EPIC 21)
 ```
 
 ---
@@ -491,3 +498,64 @@ Entregas:
 Resultado Esperado:
 
 Especialistas de dominio dentro do Claude Code sem nenhuma tecnologia nova na stack e sem dado do projeto trafegando para APIs de IA de terceiros.
+
+---
+
+# Fase 16
+
+Hub de Integracao: RustDesk e Snipe-IT — planejamento concluido (ADR-027, ADR-028), implementacao pendente
+
+Meta:
+
+Entregar as duas integracoes do Hub (Fase H de `docs/architecture/FUTURE_ARCHITECTURE.md`) priorizadas em 2026-08-03 por menor esforco e maior valor imediato: RustDesk (acesso remoto) e Snipe-IT (ITAM).
+
+Entregas:
+
+* RustDesk: coluna `machines.rustdesk_id`, endpoint `PATCH /api/v1/machines/{id}/rustdesk`, botao "Conectar" no detalhe da maquina, RBAC restrito a admin/analyst.
+* Snipe-IT: servico de integracao desacoplado, secrets `SNIPEIT_BASE_URL`/`SNIPEIT_API_TOKEN`, coluna `machines.snipeit_asset_id`, sincronizacao automatica no check-in, link "Ver no Snipe-IT" no dashboard.
+
+Resultado Esperado:
+
+Acesso remoto e inventario administrativo integrados ao dashboard sem o IT Center reimplementar nenhuma das duas especialidades.
+
+---
+
+# Fase 17
+
+Relatorios PDF e Dashboard Executivo — planejamento concluido (ADR-029), implementacao pendente
+
+Meta:
+
+Entregar exportacao de relatorios em PDF e uma visao executiva resumida do dashboard.
+
+Entregas:
+
+* Biblioteca `reportlab` no backend (compativel com a base Alpine do ADR-015).
+* Endpoint agregado `GET /api/v1/dashboard/summary`.
+* Tela "Dashboard Executivo" no frontend.
+* Endpoint(s) de exportacao PDF.
+
+Resultado Esperado:
+
+Visao executiva e relatorios exportaveis, sem mudanca de arquitetura nem dependencia externa nova.
+
+---
+
+# Fase 18
+
+Observabilidade de Infraestrutura (Prometheus + Grafana) — planejamento concluido (ADR-030), implementacao pendente
+
+Meta:
+
+Monitorar o Edge Node e os containers, com escopo corrigido para nao duplicar o pipeline de metricas por maquina que o agente Windows ja mantem (Fase E, EPIC 3).
+
+Entregas:
+
+* `node_exporter` e cAdvisor (ou metricas nativas do Docker) no Compose de producao.
+* Prometheus com scrape config; Grafana com dashboard(s) de saude do Edge Node.
+* Prometheus/Grafana nao expostos publicamente (Nginx continua unico ponto de entrada).
+* Validacao de impacto de recursos no free tier antes de ativar (`infra/scripts/ops-check.sh`).
+
+Resultado Esperado:
+
+Visibilidade operacional da infraestrutura sem aumentar a superficie publica nem duplicar responsabilidade com o agente.

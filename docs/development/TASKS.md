@@ -506,13 +506,9 @@ Registrar evolucoes de produto fora do escopo operacional imediato.
 
 [ ] Multiempresa
 
-[ ] Relatorios PDF
-
-[ ] Dashboard Executivo
-
 [ ] Integracao Microsoft 365
 
-[ ] Integracao Active Directory
+[ ] Integracao Active Directory (avaliar depois; nao entrou no lote priorizado em 2026-08-03)
 
 [ ] Vulnerability Management
 
@@ -520,13 +516,7 @@ Registrar evolucoes de produto fora do escopo operacional imediato.
 
 [ ] SaaS
 
-[ ] Hub de integracao com ferramentas open source maduras, em vez de substitui-las (arquitetura detalhada em docs/architecture/FUTURE_ARCHITECTURE.md, Fase H)
-
-[ ] Integracao Snipe-IT (ITAM: inventario, patrimonio, garantia, licencas, historico de movimentacao)
-
-[ ] Integracao RustDesk (acesso remoto por ativo, com ID do host e status online/offline)
-
-[ ] Integracao Prometheus + Grafana (metricas e observabilidade, sem substituir o Grafana)
+[ ] Hub de integracao com ferramentas open source maduras, em vez de substitui-las (arquitetura detalhada em docs/architecture/FUTURE_ARCHITECTURE.md, Fase H). RustDesk e Snipe-IT saíram daqui e ganharam plano concreto na EPIC 19; NetBox continua aspiracional.
 
 [ ] Integracao NetBox (source of truth de infraestrutura de rede, IPAM e topologia)
 
@@ -722,3 +712,83 @@ Configurar o Claude Code para atuar como especialistas de dominio (backend, fron
 [ ] Avaliar Strix isolado para teste de seguranca autorizado (pentest formal), como decisao propria com ADR proprio, se e quando surgir necessidade real
 
 [ ] Configurar hooks em .claude/settings.json somente se aparecer um gatilho concreto (ex.: rodar pytest automaticamente apos editar backend/)
+
+---
+
+# EPIC 19 - Hub de Integracao: RustDesk e Snipe-IT
+
+Objetivo:
+
+Implementar as duas primeiras integracoes do Hub (Fase H de `docs/architecture/FUTURE_ARCHITECTURE.md`), priorizadas em 2026-08-03 por serem as de menor esforco e maior valor imediato de produto. Somente planejamento/documentacao nesta rodada; implementacao em ciclo proprio (ver ADR-027 e ADR-028).
+
+### Tarefas - RustDesk (ADR-027)
+
+[ ] Adicionar coluna `machines.rustdesk_id` (nullable) via migration
+
+[ ] Endpoint `PATCH /api/v1/machines/{id}/rustdesk` para admin/analyst cadastrarem o ID (viewer sem acesso de escrita)
+
+[ ] Botao "Conectar" em `MachineDetailView` (abre `rustdesk://connect?id=...` via URI customizado do RustDesk)
+
+[ ] Indicar no `MachinesView`/`MachineDetailView` se a maquina tem RustDesk cadastrado
+
+[ ] Atualizar `docs/backend/DATABASE.md`, `docs/backend/API.md` e `docs/security/AUTH.md` no momento da implementacao (nao antes, para nao descrever schema/endpoint que ainda nao existe)
+
+### Tarefas - Snipe-IT (ADR-028)
+
+[ ] Criar servico de integracao (`app/services/snipeit.py`) consumindo a API REST do Snipe-IT
+
+[ ] Adicionar `SNIPEIT_BASE_URL` e `SNIPEIT_API_TOKEN` como secrets, nunca versionados (`.env.production.example`, `docs/security/SECURITY.md`)
+
+[ ] Adicionar coluna `machines.snipeit_asset_id` (nullable) via migration
+
+[ ] Sincronizacao automatica no check-in: existe no Snipe-IT -> atualiza; nao existe -> cria (falha do Snipe-IT nao bloqueia o check-in)
+
+[ ] Link "Ver no Snipe-IT" no `MachineDetailView` (aponta para a URL do ativo, sem espelhar todos os campos do Snipe-IT no banco do IT Center)
+
+[ ] Atualizar `docs/backend/DATABASE.md`, `docs/backend/API.md` e `docs/security/SECURITY.md` no momento da implementacao
+
+---
+
+# EPIC 20 - Relatorios PDF e Dashboard Executivo
+
+Objetivo:
+
+Entregar exportacao de relatorios em PDF e uma visao executiva resumida do dashboard (ADR-029). Somente planejamento/documentacao nesta rodada.
+
+### Tarefas
+
+[ ] Escolher e adicionar ao backend a biblioteca de geracao de PDF (ver alternativas avaliadas na ADR-029)
+
+[ ] Endpoint agregado `GET /api/v1/dashboard/summary` (maquinas online/offline, alertas por severidade, eventos recentes) para alimentar a tela executiva sem N chamadas do frontend
+
+[ ] Tela "Dashboard Executivo" no frontend (nova rota; leitura liberada para `admin`/`analyst`/`viewer`, mesmo padrao de RBAC das telas atuais)
+
+[ ] Endpoint(s) de exportacao PDF (ex.: `GET /api/v1/machines/{id}/report.pdf`, `GET /api/v1/reports/executive.pdf`)
+
+[ ] Botao de exportar PDF na tela executiva e/ou no detalhe da maquina
+
+[ ] Atualizar `docs/backend/API.md` e `frontend/dashboard/README.md` no momento da implementacao
+
+---
+
+# EPIC 21 - Observabilidade de Infraestrutura (Prometheus + Grafana)
+
+Objetivo:
+
+Monitorar o Edge Node e os containers — nao as maquinas Windows monitoradas pelo agente, que ja tem metricas proprias (`metrics`, EPIC 3) e plano de retencao proprio (Fase E de `docs/architecture/FUTURE_ARCHITECTURE.md`). Escopo corrigido em 2026-08-03: a ideia original de "Prometheus + Grafana" na EPIC 14 arriscava duplicar o pipeline de metricas do agente; aqui o alvo e a infraestrutura (ADR-030, Fase F de `docs/architecture/FUTURE_ARCHITECTURE.md`). Somente planejamento/documentacao nesta rodada.
+
+### Tarefas
+
+[ ] Adicionar `node_exporter` (metricas de host: CPU/RAM/disco/rede da VM) ao `infra/docker-compose.production.yml`
+
+[ ] Adicionar cAdvisor ou metricas nativas do Docker para saude dos containers
+
+[ ] Adicionar Prometheus com scrape config apontando para `node_exporter`/cAdvisor
+
+[ ] Adicionar Grafana com dashboard(s) pre-configurado(s) para saude do Edge Node
+
+[ ] Garantir que Prometheus/Grafana NAO sejam expostos publicamente (Nginx continua unico ponto de entrada; acesso via tunel SSH ou rota autenticada)
+
+[ ] Validar impacto de recursos (RAM/disco) no free tier antes de ativar em producao (ver `infra/scripts/ops-check.sh`)
+
+[ ] Atualizar `docs/architecture/ARCHITECTURE.md`, `docs/architecture/CONTAINERS.md`, `docs/architecture/NETWORK.md` e `docs/security/SECURITY.md` no momento da implementacao

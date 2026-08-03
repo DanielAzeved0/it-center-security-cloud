@@ -989,6 +989,145 @@ Impactos:
 
 ---
 
+# ADR-027
+
+## Data
+
+2026-08-03
+
+## Decisão
+
+Adotar RustDesk (já reconhecido como ferramenta remota autorizada em `docs/security/ASSET_POLICY.md`) como mecanismo de acesso remoto integrado ao dashboard. O IT Center passa a armazenar o ID do RustDesk por máquina (`machines.rustdesk_id`) e oferece um botão "Conectar" na tela de detalhe do ativo. O IT Center não embute, não substitui e não reimplementa o protocolo do RustDesk — apenas referencia o ID e abre o cliente já instalado na máquina do operador.
+
+## Motivo
+
+Acesso remoto seguro é um domínio de segurança sensível (protocolo de rede, criptografia, autenticação de sessão) já resolvido por ferramentas maduras. Reimplementar esse protocolo do zero seria caro e arriscado. O RustDesk já é uma ferramenta conhecida e autorizada neste projeto — `docs/security/ASSET_POLICY.md` e `docs/security/SOC_RULES.md` já geram o evento `remote_access_tool_detected` (severidade `low`, sem alerta) quando ele é detectado numa máquina — então formalizar uma integração de "conectar com um clique" é uma extensão natural do que já existe, não uma tecnologia nova sendo introduzida no ecossistema.
+
+## Alternativas Avaliadas
+
+* Manter apenas o reconhecimento passivo via `ASSET_POLICY.md`/SOC, sem nenhum botão de ação no dashboard.
+* Integrar com AnyDesk ou TeamViewer (soluções proprietárias, exigem licença/custo recorrente, contradizendo o princípio de custo zero do MVP).
+* Integrar com RustDesk (open source, auto-hospedável, já autorizado) — escolhida.
+
+## Resultado
+
+* v1 é cadastro manual do `rustdesk_id` por `admin`/`analyst` via um novo endpoint `PATCH /api/v1/machines/{id}/rustdesk` — sem coleta automática pelo agente PowerShell nesta primeira versão, para não expandir o escopo do agente (ver ADR-025) antes de validar o valor da integração.
+* `viewer` não pode cadastrar nem usar o botão de conectar (RBAC consistente com o padrão já usado para resolver alertas).
+* Planejamento detalhado na Fase H de `docs/architecture/FUTURE_ARCHITECTURE.md`; backlog em EPIC 19 (`docs/development/TASKS.md`).
+* `docs/backend/DATABASE.md`, `docs/backend/API.md` e `docs/security/AUTH.md` serão atualizados no momento da implementação, não antes — para não descrever schema/endpoint que ainda não existe.
+
+Impactos:
+
+* Nenhuma tecnologia nova entra na stack para rodar (RustDesk já é usado pelos operadores fora do IT Center); só passa a ser referenciado por ID no banco.
+* Superfície de ataque nova mínima: `rustdesk_id` é um identificador, não uma credencial; o RBAC já existente cobre quem pode usá-lo.
+
+---
+
+# ADR-028
+
+## Data
+
+2026-08-03
+
+## Decisão
+
+Integrar o IT Center com o Snipe-IT via API REST, adotando o Snipe-IT como fonte oficial de ITAM (inventário administrativo: patrimônio, garantia, licenças, histórico de movimentação). O IT Center passa a armazenar apenas `machines.snipeit_asset_id` (referência) e sincroniza automaticamente máquinas novas detectadas pelo agente, sem duplicar os campos administrativos do Snipe-IT no próprio banco.
+
+## Motivo
+
+A tabela `machines` hoje só guarda dado técnico/de segurança (hostname, IP, status, métricas) — não tem nem deveria ganhar campos de patrimônio, garantia ou histórico de movimentação, que são um domínio de especialidade próprio (ITAM). Em vez de construir isso do zero, o modelo de Hub de Integração (Fase H) resolve isso integrando com uma ferramenta madura via API, mantendo o Snipe-IT como responsável por esse domínio.
+
+## Alternativas Avaliadas
+
+* Adicionar campos de ITAM (patrimônio, garantia, licença) diretamente em `machines`, crescendo o escopo do banco do IT Center para um domínio que não é sua especialidade.
+* Construir um módulo de ITAM próprio dentro do IT Center.
+* Integrar com Snipe-IT via API REST, mantendo o Snipe-IT como fonte de verdade do ITAM — escolhida.
+
+## Resultado
+
+* Novo serviço de integração `app/services/snipeit.py`, isolado (pode ser desativado sem afetar o restante da plataforma, conforme princípio da Fase H).
+* Novos secrets `SNIPEIT_BASE_URL` e `SNIPEIT_API_TOKEN`, nunca versionados — seguem a mesma política de `.env.production`/`.secrets/` já aplicada a `AGENT_API_KEY`/`AUTH_TOKEN_SECRET`.
+* Sincronização automática no check-in do agente: existe no Snipe-IT → atualiza; não existe → cria. Falha de comunicação com o Snipe-IT não deve bloquear o check-in em si (o Snipe-IT é um enriquecimento, não uma dependência crítica do fluxo principal).
+* Dashboard ganha um link "Ver no Snipe-IT" no detalhe da máquina, em vez de espelhar todos os campos do ativo.
+* Planejamento detalhado na Fase H de `docs/architecture/FUTURE_ARCHITECTURE.md`; backlog em EPIC 19 (`docs/development/TASKS.md`).
+
+Impactos:
+
+* Primeira dependência externa de dados do projeto (fora de Terraform/Oracle Cloud, que é infraestrutura, não dado de produto). Precisa de monitoramento próprio de disponibilidade do Snipe-IT antes de produção.
+* `docs/backend/DATABASE.md`, `docs/backend/API.md` e `docs/security/SECURITY.md` serão atualizados no momento da implementação.
+
+---
+
+# ADR-029
+
+## Data
+
+2026-08-03
+
+## Decisão
+
+Adicionar geração de relatórios em PDF ao backend e uma tela "Dashboard Executivo" no frontend, alimentada por um novo endpoint agregado (`GET /api/v1/dashboard/summary`) em vez de múltiplas chamadas do frontend às rotas já existentes.
+
+## Motivo
+
+Relatórios exportáveis e uma visão executiva resumida são valor de produto direto para quem opera um dashboard de monitoramento/segurança (comum em ferramentas do setor) e têm esforço baixo comparado aos outros itens de "Melhorias Futuras" — não exigem integração externa nem mudança de arquitetura, só uma biblioteca de geração de PDF no backend e um endpoint de agregação.
+
+## Alternativas Avaliadas
+
+* **WeasyPrint** (Python, converte HTML/CSS para PDF): API de mais alto nível, mas depende de bibliotecas de sistema (Cairo, Pango, GDK-PixBuf) que não existem na imagem `python:3.13-alpine` adotada no ADR-015; instalá-las infla a imagem e reabre a superfície de CVEs que o ADR-015 trabalhou para reduzir.
+* **ReportLab** (Python puro, API de desenho/baixo nível): sem dependências de sistema, compatível com a imagem Alpine atual sem mudança de base; layout é mais verboso de escrever, mas suficiente para relatórios tabulares/simples como os deste projeto.
+* Gerar o PDF inteiramente no client (`jsPDF`/similar no Next.js): evita tocar no backend, mas limita reuso de dados já normalizados no backend e forçaria lógica de formatação duplicada entre frontend e backend.
+* **ReportLab** — escolhida, por manter a base Alpine do backend intacta (ADR-015).
+
+## Resultado
+
+* Backend ganha a dependência `reportlab` (Python puro) em `backend/requirements.txt`, sem mudança na imagem base.
+* Novo endpoint agregado `GET /api/v1/dashboard/summary` (máquinas online/offline, alertas por severidade, eventos recentes) evita que a tela executiva precise de N chamadas separadas.
+* Endpoint(s) de exportação (`GET /api/v1/machines/{id}/report.pdf`, `GET /api/v1/reports/executive.pdf`), com o mesmo RBAC de leitura das telas atuais (`admin`/`analyst`/`viewer`).
+* Backlog em EPIC 20 (`docs/development/TASKS.md`).
+
+Impactos:
+
+* Uma dependência nova no backend (`reportlab`), compatível com a política de imagem mínima do ADR-015 — sem impacto na base Alpine.
+* `docs/backend/API.md` e `frontend/dashboard/README.md` serão atualizados no momento da implementação.
+
+---
+
+# ADR-030
+
+## Data
+
+2026-08-03
+
+## Decisão
+
+Adotar Prometheus + Grafana para observar a **infraestrutura** do projeto (o Edge Node e os containers Docker) — não as máquinas Windows monitoradas pelo agente, que já têm coleta e persistência próprias (`metrics`, EPIC 3) com plano de retenção definido na Fase E de `docs/architecture/FUTURE_ARCHITECTURE.md`. Prometheus/Grafana não substituem esse pipeline nem o dashboard atual; monitoram a VM/containers que sustentam o produto.
+
+## Motivo
+
+A ideia original de "Prometheus + Grafana" na EPIC 14 (Melhorias Futuras) não tinha escopo definido e arriscava duplicar o que o agente PowerShell já coleta por máquina. `docs/architecture/FUTURE_ARCHITECTURE.md` já previa esse mesmo par de ferramentas na Fase F (Observabilidade) especificamente para "visibilidade operacional sem mudar o contrato atual da aplicação" — ou seja, para a infraestrutura, não para o domínio de negócio. Esta ADR apenas corrige o escopo e formaliza a decisão de tecnologia, alinhando com o que já estava planejado na Fase F.
+
+## Alternativas Avaliadas
+
+* Netdata (binário único, mais simples de operar, menor pegada de recursos) — mais leve, mas menos usado no mercado como referência de observabilidade "padrão da indústria", o que reduz o valor de aprendizado/portfólio que o projeto busca (ver `docs/development/CONTRIBUTING.md`, "Objetivo Final").
+* Monitoramento nativo da Oracle Cloud (sem containers extras) — menor controle e menos transferível como conhecimento para outros ambientes.
+* Prometheus + Grafana (padrão de mercado, já mencionado na Fase F) — escolhida.
+
+## Resultado
+
+* `node_exporter` para métricas de host (CPU/RAM/disco/rede da VM) e cAdvisor (ou métricas nativas do Docker) para saúde dos containers.
+* Prometheus com scrape config apontando para essas duas fontes; Grafana com dashboard(s) pré-configurado(s) para saúde do Edge Node.
+* Prometheus e Grafana **não** são expostos publicamente — Nginx continua o único ponto de entrada (princípio já estabelecido em `docs/architecture/SECURITY.md`); acesso via túnel SSH ou rota autenticada.
+* Impacto de recursos (RAM/disco) no free tier deve ser validado com `infra/scripts/ops-check.sh` antes de ativar em produção — a VM já roda Postgres/backend/frontend/Nginx com folga limitada.
+* Backlog em EPIC 21 (`docs/development/TASKS.md`); Fase F de `docs/architecture/FUTURE_ARCHITECTURE.md` atualizada para refletir este escopo.
+
+Impactos:
+
+* Três containers novos no Compose de produção — primeiro crescimento real da topologia desde o MVP inicial; precisa validar recursos antes de ativar.
+* `docs/architecture/ARCHITECTURE.md`, `docs/architecture/CONTAINERS.md`, `docs/architecture/NETWORK.md` e `docs/security/SECURITY.md` serão atualizados no momento da implementação.
+
+---
+
 # ADR-XXX
 
 ## Data
