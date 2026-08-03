@@ -520,6 +520,16 @@ Registrar evolucoes de produto fora do escopo operacional imediato.
 
 [ ] SaaS
 
+[ ] Hub de integracao com ferramentas open source maduras, em vez de substitui-las (arquitetura detalhada em docs/architecture/FUTURE_ARCHITECTURE.md, Fase H)
+
+[ ] Integracao Snipe-IT (ITAM: inventario, patrimonio, garantia, licencas, historico de movimentacao)
+
+[ ] Integracao RustDesk (acesso remoto por ativo, com ID do host e status online/offline)
+
+[ ] Integracao Prometheus + Grafana (metricas e observabilidade, sem substituir o Grafana)
+
+[ ] Integracao NetBox (source of truth de infraestrutura de rede, IPAM e topologia)
+
 [ ] Avaliar reescrita do agente Windows em Go (condicional, ver ADR-025 e EPIC 16)
 
 ---

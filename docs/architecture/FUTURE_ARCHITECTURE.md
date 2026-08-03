@@ -217,6 +217,39 @@ Resultado esperado:
 
 Escala com justificativa tecnica, sem overengineering antecipado.
 
+### Fase H - Hub de integracao com ferramentas open source
+
+Meta:
+
+O IT Center nao deve substituir ferramentas maduras e consolidadas do mercado. Em vez disso, deve atuar como uma plataforma central (hub) que integra solucoes open source especialistas via API REST, autenticacao por token e Webhooks quando disponiveis, mantendo uma interface unica para operadores, tecnicos e administradores. Cada ferramenta externa continua responsavel pelo seu dominio de especialidade; o IT Center nao duplica esse papel.
+
+Ferramentas avaliadas:
+
+* **Snipe-IT** (ITAM — gestao de ativos): fonte oficial de inventario administrativo (computadores, notebooks, impressoras, monitores, licencas, garantias, historico de movimentacao, usuario responsavel, localizacao). O IT Center consome a API REST do Snipe-IT, sincroniza automaticamente computadores novos detectados pelo agente (existe -> atualiza; nao existe -> cria) e exibe/abre o ativo sem sair do dashboard.
+* **RustDesk**: acesso remoto seguro entre tecnico e equipamento (open source, com opcao de auto-hospedagem). O IT Center armazena o ID do RustDesk de cada equipamento, verifica se o host esta online, permite iniciar uma sessao remota com um clique e associa a sessao ao ativo correspondente.
+* **Prometheus + Grafana**: coleta/armazenamento (Prometheus) e visualizacao (Grafana) de metricas de CPU, RAM, disco, rede, processos, servicos, containers e banco. O IT Center nao substitui o Grafana: consome metricas do Prometheus, pode incorporar dashboards do Grafana quando necessario, gera alertas internos com base nessas metricas e apresenta indicadores resumidos na tela principal — o Grafana permanece o ambiente avancado de analise.
+* **NetBox**: source of truth da infraestrutura (data centers, racks, switches, roteadores, firewalls, VLANs, redes, prefixos, IPAM, conexoes fisicas, topologia). O IT Center consulta dispositivos cadastrados, exibe IPs/VLANs, relaciona equipamentos aos ativos e mostra localizacao/racks/conexoes fisicas, sem duplicar o papel de source of truth do NetBox.
+
+Modelo de integracao (padrao comum as quatro ferramentas):
+
+```text
+Projeto Externo -> API REST -> Integration Service -> Banco do IT Center -> Frontend
+```
+
+Entregas recomendadas:
+
+* Consumir a API REST de cada ferramenta com autenticacao por token; usar Webhooks quando a ferramenta oferecer.
+* Implementar cada integracao como um servico desacoplado (Integration Service), que pode ser ativado, desativado ou substituido sem impactar o restante da plataforma.
+* Armazenar no banco do IT Center apenas o necessario para consulta rapida e relacionamento interno (ex.: ID do ativo no Snipe-IT, ID do host no RustDesk), evitando duplicar dados que ja tem fonte oficial externa.
+* Sincronizacao automatica de novos ativos detectados pelo agente com o Snipe-IT (criar ou atualizar).
+* Botao de acesso remoto por ativo integrado ao RustDesk, com status online/offline.
+* Dashboard simplificado alimentado por Prometheus, com Grafana como camada avancada opcional.
+* Consulta de infraestrutura de rede (IPs, VLANs, topologia) via NetBox associada ao ativo correspondente.
+
+Resultado esperado:
+
+Experiencia unificada para o operador — Snipe-IT como fonte de inventario/ITAM, RustDesk para acesso remoto, Prometheus+Grafana para metricas/observabilidade e NetBox como fonte de infraestrutura/IPAM/topologia — sem o IT Center assumir a responsabilidade tecnica de nenhuma dessas quatro especialidades.
+
 ## Ordem recomendada
 
 ```text
@@ -227,6 +260,7 @@ Escala com justificativa tecnica, sem overengineering antecipado.
 5. Criar estrategia de retencao e agregacao de dados
 6. Adicionar observabilidade
 7. Separar servicos somente quando a carga justificar
+8. Avaliar hub de integracao com ferramentas externas (Snipe-IT, RustDesk, Prometheus/Grafana, NetBox) somente apos o MVP estar estavel
 ```
 
 ## Principios de decisao
