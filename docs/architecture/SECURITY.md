@@ -76,7 +76,7 @@ PostgreSQL:
 * Nginx ainda mantem Basic Auth como camada extra redundante ao login administrativo (ver ADR-023).
 * Banco roda no mesmo host por custo zero.
 * Windows Agent ainda nao tem scripts assinados (code-signing pendente na EPIC 16; as demais lacunas de robustez ja foram corrigidas).
-* Achados de seguranca do frontend (EPIC 17: token em `localStorage`, ausencia de `middleware.ts` e de security headers) estao detalhados e priorizados em `docs/security/SECURITY.md` — nao duplicados aqui.
+* EPIC 17 (hardening do frontend) concluida: cookie `httpOnly` de sessao, `middleware.ts`, CSP e demais itens corrigidos — detalhes em `docs/security/SECURITY.md`, nao duplicados aqui.
 
 ## Evolucao recomendada
 

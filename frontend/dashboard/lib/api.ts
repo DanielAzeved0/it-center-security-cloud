@@ -8,31 +8,11 @@ export class ApiError extends Error {
   }
 }
 
-const AUTH_TOKEN_KEY = "itcenter.auth.token";
-
-export function getAuthToken(): string | null {
-  if (typeof window === "undefined") {
-    return null;
-  }
-
-  return window.localStorage.getItem(AUTH_TOKEN_KEY);
-}
-
-export function setAuthToken(token: string): void {
-  window.localStorage.setItem(AUTH_TOKEN_KEY, token);
-}
-
-export function clearAuthToken(): void {
-  window.localStorage.removeItem(AUTH_TOKEN_KEY);
-}
-
 export async function requestBackend<T>(path: string, init?: RequestInit): Promise<T> {
-  const token = getAuthToken();
   const response = await fetch(`/api/backend${path}`, {
     ...init,
     headers: {
       "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(init?.headers ?? {}),
     },
     cache: "no-store",

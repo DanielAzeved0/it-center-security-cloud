@@ -452,7 +452,7 @@ Agente Windows mais resiliente e auditavel, mantendo PowerShell como linguagem o
 
 # Fase 14
 
-Hardening do Dashboard (Frontend)
+Hardening do Dashboard (Frontend) — concluida
 
 Meta:
 
@@ -460,11 +460,12 @@ Corrigir os riscos identificados na auditoria de seguranca do frontend de 2026-0
 
 Entregas:
 
-* Token de sessao migrado para cookie httpOnly
-* Security headers configurados no Next.js (CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy)
-* Middleware de sessao no edge
-* Fallback NEXT_PUBLIC_API_BASE_URL removido do proxy interno
-* Rotina de auditoria de dependencias do frontend (npm audit) restabelecida fora do proxy corporativo local
+* Token de sessao migrado para cookie httpOnly + Secure (condicional a HTTPS real) + SameSite=Strict, setado e lido pelo proxy `/api/backend`
+* `Content-Security-Policy` configurada em `next.config.mjs`; `X-Frame-Options`, `X-Content-Type-Options` e `Referrer-Policy` deliberadamente nao duplicados (ja aplicados pelo Nginx em producao)
+* `middleware.ts` com gate de sessao no edge (checagem de presenca do cookie)
+* Fallback `NEXT_PUBLIC_API_BASE_URL` removido do proxy interno; allowlist explicita de rotas adicionada
+* Rotina de auditoria de dependencias do frontend (`npm audit --audit-level=high`) restabelecida via CI, fora do proxy corporativo local
+* Confirmado que mensagens de erro (`detail`) do backend nao vazam detalhes internos
 
 Resultado Esperado:
 

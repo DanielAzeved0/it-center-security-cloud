@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ApiError, requestBackend, setAuthToken } from "@/lib/api";
+import { ApiError, requestBackend } from "@/lib/api";
 import type { LoginResponse } from "@/lib/types";
 
 export function LoginView() {
@@ -22,11 +22,10 @@ export function LoginView() {
     setError(null);
 
     try {
-      const payload = await requestBackend<LoginResponse>("/api/v1/auth/login", {
+      await requestBackend<LoginResponse>("/api/v1/auth/login", {
         method: "POST",
         body: JSON.stringify({ email, password }),
       });
-      setAuthToken(payload.access_token);
       router.replace("/");
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {

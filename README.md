@@ -2,7 +2,7 @@
 
 > Plataforma full stack para monitoramento, inventário, observabilidade e segurança de máquinas Windows, com agente PowerShell, API FastAPI, PostgreSQL, dashboard web e práticas iniciais de SOC/Blue Team.
 
-Status: Fases 0 a 9 concluídas (governança/autenticação e operação/segurança de produção validadas em produção real) | Fase 12 (Terraform/IaC) em andamento (import ainda não executado) | Fase 13 (hardening do agente Windows) concluída, exceto assinatura de código, pendente de certificado | Fase 14 (hardening do dashboard) e Fase 15 (orquestração de agentes de IA, ADR-026) — ver Roadmap | Ambiente local Docker operacional | Produção publicada na Oracle Cloud | Agente Windows integrado ao check-in.
+Status: Fases 0 a 9 concluídas (governança/autenticação e operação/segurança de produção validadas em produção real) | Fase 12 (Terraform/IaC) em andamento (import ainda não executado) | Fase 13 (hardening do agente Windows) concluída, exceto assinatura de código, pendente de certificado | Fase 14 (hardening do dashboard) e Fase 15 (orquestração de agentes de IA, ADR-026) concluídas — ver Roadmap | Ambiente local Docker operacional | Produção publicada na Oracle Cloud | Agente Windows integrado ao check-in.
 
 ---
 
@@ -582,11 +582,12 @@ docker compose -f infra/docker-compose.yml down -v
 * Detecção de USB além de armazenamento
 * Scripts assinados (code-signing) — pendente, depende de certificado
 
-### Fase 14 - Hardening do Dashboard (Frontend) — em andamento
+### Fase 14 - Hardening do Dashboard (Frontend) — concluída
 
-* Auditoria de segurança do frontend concluída (achados em `docs/security/SECURITY.md`)
-* Migração do token de autenticação de `localStorage` para cookie `httpOnly`
-* Security headers e `middleware.ts` no Next.js
+* Token de autenticação migrado de `localStorage` para cookie `httpOnly` + `Secure` + `SameSite=Strict`
+* `Content-Security-Policy` no Next.js e `middleware.ts` com gate de sessão no edge
+* Allowlist de rotas e remoção do fallback `NEXT_PUBLIC_API_BASE_URL` no proxy interno
+* `npm audit` restabelecido via CI
 
 ### Fase 15 - Orquestração de Agentes de IA — concluída
 

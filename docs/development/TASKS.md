@@ -673,29 +673,29 @@ Corrigir os riscos concretos identificados na auditoria de seguranca do frontend
 
 ### Tarefas - Prioridade Alta
 
-[ ] Migrar o token de autenticacao de localStorage para cookie httpOnly + Secure + SameSite=Strict, setado no login e lido pelo proxy /api/backend a partir do cookie (revisar contrato do ADR-022 antes de implementar)
+[x] Migrar o token de autenticacao de localStorage para cookie httpOnly + Secure + SameSite=Strict, setado no login e lido pelo proxy /api/backend a partir do cookie (revisar contrato do ADR-022 antes de implementar)
 
-[ ] Adicionar security headers no frontend (Content-Security-Policy, X-Frame-Options, X-Content-Type-Options, Referrer-Policy) via next.config.mjs, apos confirmar quais ja sao aplicados pelo Nginx para evitar duplicidade
+[x] Adicionar security headers no frontend (Content-Security-Policy, X-Frame-Options, X-Content-Type-Options, Referrer-Policy) via next.config.mjs, apos confirmar quais ja sao aplicados pelo Nginx para evitar duplicidade (CSP adicionada; os outros 3 ja vem do Nginx e nao foram duplicados)
 
 ### Tarefas - Prioridade Media
 
-[ ] Remover o fallback NEXT_PUBLIC_API_BASE_URL do proxy app/api/backend/[...path]/route.ts, mantendo somente ITCENTER_API_BASE_URL
+[x] Remover o fallback NEXT_PUBLIC_API_BASE_URL do proxy app/api/backend/[...path]/route.ts, mantendo somente ITCENTER_API_BASE_URL
 
-[ ] Criar middleware.ts no frontend para checar sessao no edge antes de renderizar paginas protegidas
+[x] Criar middleware.ts no frontend para checar sessao no edge antes de renderizar paginas protegidas
 
-[ ] Restabelecer auditoria de dependencias do frontend (npm audit) rodando em ambiente com acesso direto ao registry (ex.: GitHub Actions) e registrar na rotina semanal
+[x] Restabelecer auditoria de dependencias do frontend (npm audit) rodando em ambiente com acesso direto ao registry (ex.: GitHub Actions) e registrar na rotina semanal
 
 ### Tarefas - Prioridade Baixa
 
-[ ] Adicionar .env* ao .dockerignore do frontend como prevencao
+[x] Adicionar .env* ao .dockerignore do frontend como prevencao
 
-[ ] Avaliar allowlist explicita de rotas no proxy /api/backend/[...path] em vez de repassar qualquer path
+[x] Avaliar allowlist explicita de rotas no proxy /api/backend/[...path] em vez de repassar qualquer path (implementada)
 
-[ ] Confirmar com o backend se mensagens de erro (campo detail) podem vazar detalhes internos antes de continuar exibindo-as diretamente na UI
+[x] Confirmar com o backend se mensagens de erro (campo detail) podem vazar detalhes internos antes de continuar exibindo-as diretamente na UI (confirmado: nenhum detail interpola exceção interna)
 
 ### Tarefas - Documentacao
 
-[ ] Atualizar docs/security/AUTH.md, docs/security/SECURITY.md e docs/architecture/SECURITY.md removendo cada risco da lista conforme for corrigido
+[x] Atualizar docs/security/AUTH.md, docs/security/SECURITY.md e docs/architecture/SECURITY.md removendo cada risco da lista conforme for corrigido
 
 ---
 

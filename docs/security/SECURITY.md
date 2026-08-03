@@ -92,26 +92,18 @@ Limitação conhecida:
 
 * O Basic Auth do Nginx é redundante agora que o login administrativo completo está em produção; sua real necessidade deve ser reavaliada (ver ADR-023).
 
-### Auditoria de segurança do frontend (2026-07-29)
+### Auditoria de segurança do frontend (2026-07-29) — corrigida na EPIC 17
 
-Revisão completa de `frontend/dashboard/` (nenhuma chave de banco ou de backend encontrada no código ou em `.env` versionado). Achados e prioridade de risco, rastreados na EPIC 17 de `docs/development/TASKS.md`:
+Revisão completa de `frontend/dashboard/` (nenhuma chave de banco ou de backend encontrada no código ou em `.env` versionado). Todos os achados abaixo (`docs/development/TASKS.md`, EPIC 17) foram corrigidos:
 
-Prioridade Alta:
-
-* Token de autenticação guardado em `localStorage` em vez de cookie `httpOnly` — detalhado em `docs/security/AUTH.md`.
-* Ausência de security headers (`Content-Security-Policy`, `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`) configurados no próprio Next.js (`next.config.mjs`). Não confirmado se o Nginx já cobre esses headers para o dashboard; se não cobrir, é a única linha de defesa contra clickjacking/MIME sniffing.
-
-Prioridade Média:
-
-* `app/api/backend/[...path]/route.ts` aceita fallback para `NEXT_PUBLIC_API_BASE_URL`. Hoje só é lido no route handler (server-only, não vaza para o bundle client), mas o prefixo `NEXT_PUBLIC_` sinaliza uso client-side e pode vazar a URL do backend no bundle público se reaproveitado futuramente em um client component.
-* Não existe `middleware.ts`; a checagem de sessão acontece só dentro do componente `Shell` no client, sem gate no edge.
-* `npm audit` no frontend não pôde ser validado no ambiente atual de desenvolvimento (proxy corporativo bloqueia o registry com certificado self-signed); falta rotina alternativa de auditoria de dependências do frontend.
-
-Prioridade Baixa:
-
-* `.dockerignore` do frontend não exclui `.env*`; não há vazamento hoje (nenhum `.env` existe no repositório), mas é uma prevenção ausente contra embutir `NEXT_PUBLIC_*` de um `.env` local no build da imagem.
-* O proxy `/api/backend/[...path]` repassa qualquer path para o backend sem allowlist explícita de rotas.
-* Mensagens de erro do backend (`detail`) são exibidas diretamente na UI sem filtragem adicional do frontend.
+* Token de autenticação migrado de `localStorage` para cookie `itcenter_session` (`httpOnly` + `Secure` condicional a HTTPS real + `SameSite=Strict`), setado pelo proxy `/api/backend` no login — detalhado em `docs/security/AUTH.md`.
+* `Content-Security-Policy` adicionada em `next.config.mjs`. `X-Frame-Options`, `X-Content-Type-Options` e `Referrer-Policy` **não** foram duplicados no Next.js: o Nginx já os aplica globalmente em produção (`infra/nginx/nginx.conf.template`) — duplicar geraria o mesmo header duas vezes sem ganho real.
+* Removido o fallback `NEXT_PUBLIC_API_BASE_URL` do proxy; só `ITCENTER_API_BASE_URL` é aceito (sempre definido tanto local quanto em produção).
+* Criado `middleware.ts`: bloqueia `/`, `/machines`, `/alerts` e `/security` sem o cookie de sessão presente, redirecionando para `/login` no edge. A validade do token continua sendo checada em `/api/v1/auth/me` (`Shell.tsx`) — o middleware só verifica presença do cookie, não sua validade.
+* `npm audit --audit-level=high` roda no job `frontend` do CI (`.github/workflows/ci.yml`), com acesso direto ao registry (sem o proxy corporativo que bloqueia o comando localmente); registrado em `docs/deployment/WEEKLY_OPERATIONS.md`.
+* `.dockerignore` do frontend agora exclui `.env`, `.env.local` e `.env*.local`.
+* O proxy `/api/backend/[...path]` agora valida uma allowlist explícita de prefixos (`api/v1/health`, `api/v1/auth/*`, `api/v1/machines*`, `api/v1/alerts*`, `api/v1/security-events`) e responde 404 para qualquer outro path.
+* Confirmado (revisão de todo `backend/app/routes/*.py`): nenhum `HTTPException(detail=...)` interpola exceção ou erro interno — são strings estáticas genéricas ("Invalid credentials", "Machine not found" etc.) e não há handler genérico expondo stack trace. Não há vazamento de detalhes internos via `detail`.
 
 ---
 

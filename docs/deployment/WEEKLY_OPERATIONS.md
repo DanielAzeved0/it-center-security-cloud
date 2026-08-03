@@ -156,7 +156,11 @@ sh infra/scripts/docker-scout-gate.sh
 
 O gate falha se Docker Scout encontrar CVEs `critical` ou `high` nas imagens configuradas.
 
-## 8. Registro operacional
+## 8. Auditoria de dependencias do frontend
+
+O job `frontend` do CI (`.github/workflows/ci.yml`) roda `npm audit --audit-level=high` a cada PR/push em `main`, com acesso direto ao registry (sem o proxy corporativo que bloqueia esse comando no ambiente local). Consultar o resultado do workflow antes de mesclar quando houver alerta.
+
+## 9. Registro operacional
 
 Registrar em `docs/deployment/DEPLOYMENT_HISTORY.md` quando houver:
 

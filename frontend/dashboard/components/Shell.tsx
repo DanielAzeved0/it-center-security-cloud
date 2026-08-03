@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useState } from "react";
-import { ApiError, clearAuthToken, requestBackend } from "@/lib/api";
+import { requestBackend } from "@/lib/api";
 import type { AuthUser } from "@/lib/types";
 
 const navItems = [
@@ -33,14 +33,7 @@ export function Shell({ title, subtitle, children, actions }: ShellProps) {
     try {
       const payload = await requestBackend<{ user: AuthUser }>("/api/v1/auth/me");
       setCurrentUser(payload.user);
-    } catch (err) {
-      if (err instanceof ApiError && err.status === 401) {
-        clearAuthToken();
-        router.replace("/login");
-        return;
-      }
-
-      clearAuthToken();
+    } catch {
       router.replace("/login");
     } finally {
       setCheckingAuth(false);
@@ -55,9 +48,8 @@ export function Shell({ title, subtitle, children, actions }: ShellProps) {
     try {
       await requestBackend("/api/v1/auth/logout", { method: "POST" });
     } catch {
-      // Logout local continua mesmo se o token ja tiver expirado no backend.
+      // O cookie de sessao e limpo pelo proxy mesmo se a chamada ao backend falhar.
     } finally {
-      clearAuthToken();
       router.replace("/login");
     }
   };

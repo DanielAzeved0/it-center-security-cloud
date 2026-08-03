@@ -191,24 +191,24 @@ Regras:
 * Logout registra auditoria; o token expira naturalmente.
 * Erros de login sao genericos para nao enumerar usuarios.
 
-### Risco conhecido: token guardado em localStorage no frontend
+### Sessao do dashboard: cookie httpOnly (EPIC 17)
 
-Auditoria de seguranca do frontend em 2026-07-29 (`frontend/dashboard/lib/api.ts`) confirmou que o dashboard guarda o `access_token` em `localStorage` do navegador, nao em cookie `httpOnly`.
+Desde a EPIC 17, o dashboard nao guarda mais o `access_token` em `localStorage`. O proxy interno `/api/backend` (`frontend/dashboard/app/api/backend/[...path]/route.ts`, server-side) passou a ser o unico ponto que conhece o token:
 
-Classificacao: **Alta** (ver EPIC 17 em `docs/development/TASKS.md`).
+```text
+Login (POST /api/v1/auth/login): o proxy recebe access_token/expires_in do backend, seta o cookie itcenter_session (httpOnly, Secure quando HTTPS real via X-Forwarded-Proto, SameSite=Strict, path=/, maxAge=expires_in) e devolve ao browser apenas { user }, sem o token no corpo.
+Demais chamadas: o proxy le o cookie itcenter_session e monta o header Authorization: Bearer <token> antes de repassar ao backend. O client nunca mais monta esse header.
+Logout (POST /api/v1/auth/logout): o proxy sempre expira o cookie (maxAge=0), mesmo se a chamada ao backend falhar.
+```
 
-Motivo da prioridade:
+O contrato do backend (ADR-022) nao muda: `POST /api/v1/auth/login` continua devolvendo `access_token`/`token_type`/`expires_in`/`user` no JSON. A migracao para cookie e inteiramente uma decisao de armazenamento no Next.js — o backend continua emitindo Bearer token HMAC SHA-256 e nao sabe nem precisa saber que o Next.js guarda esse token em cookie.
 
-* E o unico dado de sessao do usuario humano; se qualquer vetor de XSS surgir no futuro (hoje nao ha nenhum identificado no codigo atual), o token pode ser lido e exfiltrado por JavaScript.
-* Cookie `httpOnly` eliminaria esse vetor especifico, pois o token deixaria de ser acessivel via `document`/`window` para script no navegador.
+Motivo original (risco corrigido):
 
-Mitigacao atual:
+* Token em `localStorage` e acessivel a qualquer script executando na pagina; se um vetor de XSS surgisse no futuro, o token poderia ser lido e exfiltrado por JavaScript. Cookie `httpOnly` elimina esse vetor especifico.
+* O frontend nao usa `dangerouslySetInnerHTML`, `eval` ou HTML nao sanitizado em nenhum componente (confirmado por revisao completa em 2026-07-29), o que ja reduzia a chance de um XSS aparecer — mas o cookie `httpOnly` remove a dependencia dessa garantia.
 
-* O frontend nao usa `dangerouslySetInnerHTML`, `eval` ou HTML nao sanitizado em nenhum componente (confirmado por revisao completa em 2026-07-29), reduzindo a chance de um XSS aparecer.
-
-Evolucao planejada:
-
-* Migrar para cookie `httpOnly` + `Secure` + `SameSite=Strict`, setado pelo backend/BFF no login, com o proxy `/api/backend` lendo o cookie em vez de exigir `Authorization` manual do client. Isso exige revisar o contrato de `ADR-022` antes de implementar.
+Gate complementar: `frontend/dashboard/middleware.ts` bloqueia o acesso as paginas protegidas quando o cookie `itcenter_session` esta ausente, redirecionando para `/login` no edge (checagem de presenca, nao de validade — a validade continua sendo checada em `/api/v1/auth/me` pelo componente `Shell`).
 
 ## Auditoria
 
