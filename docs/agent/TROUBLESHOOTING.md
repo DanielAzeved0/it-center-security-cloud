@@ -104,6 +104,13 @@ Valores aceitos:
 * `server_url` pode apontar para a raiz do dominio publicado.
 * `server_url` local pode usar `http://127.0.0.1:8000/api/v1`.
 * Configs legadas com `api_key` e `interval_minutes` continuam aceitas.
+* `log_max_size_kb` (padrao 5120), `log_max_backups` (padrao 3) e `cache_retention_days` (padrao 30) sao opcionais; se omitidos, o agente usa esses defaults.
+
+Desde o hardening da EPIC 16, o instalador restringe a ACL de `config.json` a `SYSTEM`/`Administrators`. Se precisar ler o arquivo manualmente e receber "Acesso negado", execute o PowerShell como Administrador:
+
+```powershell
+Get-Acl "C:\Program Files\ITCenterAgent\config.json" | Format-List
+```
 
 ## 4. DNS e porta 443
 
@@ -245,6 +252,15 @@ Acao corretiva:
 3. Execute o agente manualmente para tentar reenviar.
 4. Confirme se os arquivos diminuem apos envio bem-sucedido.
 
+Desde a EPIC 16:
+
+* Um arquivo de cache corrompido (JSON invalido) e movido automaticamente para `cache\quarantine\` e nao bloqueia mais o reenvio dos arquivos mais novos. Investigue o conteudo do arquivo em quarentena antes de descarta-lo.
+* Arquivos com mais de `cache_retention_days` (padrao 30 dias), incluindo os que estao em `cache\quarantine\`, sao removidos automaticamente a cada ciclo.
+
+```powershell
+Get-ChildItem "C:\Program Files\ITCenterAgent\cache\quarantine" -File -ErrorAction SilentlyContinue
+```
+
 ## 10. Logs ausentes ou vazios
 
 Diagnostico:
@@ -266,6 +282,14 @@ Acao corretiva:
 1. Execute manualmente o agente como Administrador.
 2. Confirme `log_path` no `config.json`.
 3. Reinstale o agente se a estrutura estiver incompleta.
+
+Desde a EPIC 16, o log e rotacionado por tamanho: ao atingir `log_max_size_kb` (padrao 5120 KB), `itcenter-agent.log` vira `itcenter-agent.log.1` e os backups anteriores deslocam até `log_max_backups` (padrao 3) antes de serem descartados. Se `itcenter-agent.log` estiver vazio mas pequeno, verifique os arquivos `.1`, `.2`, etc. no mesmo diretorio.
+
+Uma falha de configuracao/inicializacao (ex.: `config.json` invalido) agora e registrada com `[ERROR]` no log antes do agente encerrar com erro:
+
+```powershell
+Select-String -Path "C:\Program Files\ITCenterAgent\logs\itcenter-agent.log*" -Pattern "\[ERROR\]"
+```
 
 ## 11. Validacao final no dashboard
 

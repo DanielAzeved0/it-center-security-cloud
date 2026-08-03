@@ -277,6 +277,32 @@ Assert-True -Condition ($validatedLegacyConfig.retry_max_attempts -eq 3) -Messag
 Assert-True -Condition ($validatedRetryConfig.retry_max_attempts -eq 4) -Message "Retry config must preserve max attempts."
 Assert-True -Condition ($validatedRetryConfig.retry_initial_delay_seconds -eq 1) -Message "Retry config must preserve initial delay."
 Assert-True -Condition ($validatedRetryConfig.retry_max_delay_seconds -eq 8) -Message "Retry config must preserve max delay."
+Assert-True -Condition ($validatedNewConfig.log_max_size_kb -eq 5120) -Message "Default log max size must be 5120 KB."
+Assert-True -Condition ($validatedNewConfig.log_max_backups -eq 3) -Message "Default log max backups must be 3."
+Assert-True -Condition ($validatedNewConfig.cache_retention_days -eq 30) -Message "Default cache retention days must be 30."
+
+$validatedRotationConfig = ConvertTo-AgentValidatedConfig -RawConfig ([pscustomobject]@{
+    server_url = "https://itcenter-daniel.chickenkiller.com"
+    agent_api_key = "rotation-key"
+    log_max_size_kb = 256
+    log_max_backups = 2
+    cache_retention_days = 7
+})
+Assert-True -Condition ($validatedRotationConfig.log_max_size_kb -eq 256) -Message "Custom log max size must be preserved."
+Assert-True -Condition ($validatedRotationConfig.log_max_backups -eq 2) -Message "Custom log max backups must be preserved."
+Assert-True -Condition ($validatedRotationConfig.cache_retention_days -eq 7) -Message "Custom cache retention days must be preserved."
+
+try {
+    ConvertTo-AgentValidatedConfig -RawConfig ([pscustomobject]@{
+        server_url = "https://itcenter-daniel.chickenkiller.com"
+        agent_api_key = "invalid-key"
+        log_max_size_kb = 0
+    }) | Out-Null
+    throw "Expected invalid log_max_size_kb to fail validation."
+}
+catch {
+    Assert-True -Condition ($_.Exception.Message -like "*Log max size*") -Message "Invalid log_max_size_kb must fail validation with a clear message."
+}
 
 Assert-Percent -Value $cpuUsage -Name "CPU usage"
 Assert-Percent -Value $ramUsage -Name "RAM usage"
@@ -310,7 +336,7 @@ $operatingSystem = Get-AgentOperatingSystem -RegistryReader ${function:Invoke-Mo
 Assert-True -Condition ($operatingSystem.operating_system -eq "Windows 11 Pro") -Message "Operating system must come from registry."
 Assert-True -Condition ($operatingSystem.os_version -eq "23H2") -Message "OS version must come from registry."
 
-$programs = @(Get-InstalledPrograms -RegistryReader ${function:Invoke-MockProgramRegistry})
+$programs = @(Get-InstalledPrograms -RegistryReader ${function:Invoke-MockProgramRegistry} -AppxPackageReader { @() })
 Assert-True -Condition ($programs.Count -eq 2) -Message "Installed programs must be de-duplicated."
 Assert-True -Condition ($programs[0].name -eq "AnyDesk" -or $programs[1].name -eq "AnyDesk") -Message "Installed programs must include AnyDesk."
 Assert-True -Condition ($programs[0].name -eq "Google Chrome" -or $programs[1].name -eq "Google Chrome") -Message "Installed programs must include Google Chrome."
@@ -327,10 +353,65 @@ Assert-True -Condition ($localAdmins.Count -eq 2) -Message "Local admins must be
 Assert-True -Condition ($localAdmins -contains "DESKTOP\Administrator") -Message "Local admins must include local Administrator."
 Assert-True -Condition ($localAdmins -contains "DOMAIN\Daniel") -Message "Local admins must include domain admin."
 
-$usbDevices = @(Get-AgentUsbDevices -UsbDeviceReader ${function:Invoke-MockUsbDevices})
+$usbDevices = @(Get-AgentUsbDevices -UsbDeviceReader ${function:Invoke-MockUsbDevices} -PeripheralDeviceReader { @() })
 Assert-True -Condition ($usbDevices.Count -eq 1) -Message "USB devices must be collected."
 Assert-True -Condition ($usbDevices[0].name -eq "Kingston DataTraveler") -Message "USB device model must be collected."
 Assert-True -Condition ($usbDevices[0].serial_number -eq "USB123") -Message "USB device serial number must be collected."
+Assert-True -Condition ($usbDevices[0].type -eq "storage") -Message "USB storage device must be typed as storage."
+
+$mockUsbPeripherals = @(
+    [pscustomobject]@{ Name = "Logitech USB Keyboard"; PNPClass = "HIDClass"; Manufacturer = "Logitech"; DeviceID = 'USB\VID_046D&PID_C31C\6&1234' }
+)
+
+function Invoke-MockUsbPeripherals {
+    $script:mockUsbPeripherals
+}
+
+$usbPeripherals = @(Get-AgentUsbPeripheralDevices -PeripheralDeviceReader ${function:Invoke-MockUsbPeripherals})
+Assert-True -Condition ($usbPeripherals.Count -eq 1) -Message "USB peripheral devices must be collected."
+Assert-True -Condition ($usbPeripherals[0].name -eq "Logitech USB Keyboard") -Message "USB peripheral device name must be collected."
+Assert-True -Condition ($usbPeripherals[0].type -eq "HIDClass") -Message "USB peripheral device type must come from PNPClass."
+
+$combinedUsbDevices = @(Get-AgentUsbDevices -UsbDeviceReader ${function:Invoke-MockUsbDevices} -PeripheralDeviceReader ${function:Invoke-MockUsbPeripherals})
+Assert-True -Condition ($combinedUsbDevices.Count -eq 2) -Message "USB devices must combine storage and peripheral devices."
+
+$mockAppxPackages = @(
+    [pscustomobject]@{ Name = "Microsoft.WindowsCalculator"; Version = "11.2504.0.0"; Publisher = "CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US" }
+)
+
+function Invoke-MockAppxPackages {
+    $script:mockAppxPackages
+}
+
+$appxPrograms = @(Get-InstalledAppxPrograms -AppxPackageReader ${function:Invoke-MockAppxPackages})
+Assert-True -Condition ($appxPrograms.Count -eq 1) -Message "UWP/Store apps must be collected."
+Assert-True -Condition ($appxPrograms[0].name -eq "Microsoft.WindowsCalculator") -Message "UWP app name must be collected."
+Assert-True -Condition ($appxPrograms[0].publisher -eq "Microsoft Corporation") -Message "UWP app publisher must be extracted from the certificate distinguished name."
+
+$programsWithAppx = @(Get-InstalledPrograms -RegistryReader ${function:Invoke-MockProgramRegistry} -AppxPackageReader ${function:Invoke-MockAppxPackages})
+Assert-True -Condition ($programsWithAppx.Count -eq 3) -Message "Installed programs must include registry entries and UWP apps."
+Assert-True -Condition (@($programsWithAppx | Where-Object { $_.name -eq "Microsoft.WindowsCalculator" }).Count -eq 1) -Message "Installed programs must include the UWP app."
+
+function Invoke-MockCpuCounter {
+    42.5
+}
+
+$cpuFromCounter = Get-AgentCpuUsage -CounterReader ${function:Invoke-MockCpuCounter}
+Assert-True -Condition ($cpuFromCounter -eq 42.5) -Message "CPU usage must use the sampled counter value when available."
+
+function Invoke-FailingCpuCounter {
+    throw "Get-Counter unavailable in this environment."
+}
+
+function Invoke-MockCpuFallbackProcessors {
+    @(
+        [pscustomobject]@{ LoadPercentage = 20 },
+        [pscustomobject]@{ LoadPercentage = 40 }
+    )
+}
+
+$cpuFromFallback = Get-AgentCpuUsage -CounterReader ${function:Invoke-FailingCpuCounter} -ProcessorReader ${function:Invoke-MockCpuFallbackProcessors}
+Assert-True -Condition ($cpuFromFallback -eq 30) -Message "CPU usage must fall back to WMI average when the counter is unavailable."
 
 $failedLogins = Get-AgentFailedLoginsLastHour -FailedLoginReader ${function:Invoke-MockFailedLogins}
 Assert-True -Condition ($failedLogins -eq 2) -Message "Failed login count must match mocked events."
@@ -476,6 +557,124 @@ try {
 finally {
     if (Test-Path -LiteralPath $tempCacheDirectory) {
         Remove-Item -LiteralPath $tempCacheDirectory -Recurse -Force
+    }
+}
+
+$logRotationDirectory = Join-Path ([System.IO.Path]::GetTempPath()) "itcenter-agent-log-rotation-$([guid]::NewGuid().ToString('N'))"
+New-Item -ItemType Directory -Path $logRotationDirectory | Out-Null
+$previousRuntimeConfigForRotation = $script:AgentRuntimeConfig
+
+try {
+    $script:AgentRuntimeConfig = [pscustomobject]@{
+        log_path = $logRotationDirectory
+        cache_path = $null
+        log_max_size_kb = 1
+        log_max_backups = 2
+    }
+
+    $rotatingLogFile = Join-Path $logRotationDirectory "itcenter-agent.log"
+    ("x" * 2048) | Set-Content -LiteralPath $rotatingLogFile -Encoding UTF8
+    Write-AgentLog -Message "Triggers rotation"
+
+    Assert-True -Condition (Test-Path -LiteralPath "$rotatingLogFile.1") -Message "Oversized log must be rotated to a .1 backup."
+    Assert-True -Condition (Test-Path -LiteralPath $rotatingLogFile) -Message "A fresh log file must exist after rotation."
+
+    ("y" * 2048) | Set-Content -LiteralPath $rotatingLogFile -Encoding UTF8
+    Write-AgentLog -Message "Triggers second rotation"
+
+    Assert-True -Condition (Test-Path -LiteralPath "$rotatingLogFile.1") -Message "Most recent backup must be .1 after a second rotation."
+    Assert-True -Condition (Test-Path -LiteralPath "$rotatingLogFile.2") -Message "Previous backup must shift to .2 after a second rotation."
+}
+finally {
+    $script:AgentRuntimeConfig = $previousRuntimeConfigForRotation
+    if (Test-Path -LiteralPath $logRotationDirectory) {
+        Remove-Item -LiteralPath $logRotationDirectory -Recurse -Force
+    }
+}
+
+$cacheQuarantineDirectory = Join-Path ([System.IO.Path]::GetTempPath()) "itcenter-agent-quarantine-$([guid]::NewGuid().ToString('N'))"
+New-Item -ItemType Directory -Path $cacheQuarantineDirectory | Out-Null
+$quarantineResendCount = 0
+
+function Invoke-TestQuarantineResendRequest {
+    param($RequestParams)
+
+    $script:quarantineResendCount++
+    [pscustomobject]@{ status = "success"; message = "Check-in received"; machine_id = 99 }
+}
+
+try {
+    $goodCacheFile = Save-AgentOfflinePayload -Payload $payload -CacheDirectory $cacheQuarantineDirectory
+    $corruptedCacheFile = Join-Path $cacheQuarantineDirectory "checkin-corrupted-$([guid]::NewGuid().ToString('N')).json"
+    "{ not valid json" | Set-Content -LiteralPath $corruptedCacheFile -Encoding UTF8
+
+    $quarantineSentCount = Send-PendingAgentCheckins -Config ([pscustomobject]@{
+        server_url = "http://127.0.0.1:8000/api/v1"
+        api_key = "quarantine-key"
+    }) -CacheDirectory $cacheQuarantineDirectory -RequestInvoker ${function:Invoke-TestQuarantineResendRequest}
+
+    Assert-True -Condition ($quarantineSentCount -eq 1) -Message "A corrupted cache file must not block resend of the valid cached check-in."
+    Assert-True -Condition ($quarantineResendCount -eq 1) -Message "Only the valid cached check-in must be resent."
+    Assert-True -Condition (-not (Test-Path -LiteralPath $goodCacheFile)) -Message "Valid cached check-in must be removed after successful resend."
+    Assert-True -Condition (-not (Test-Path -LiteralPath $corruptedCacheFile)) -Message "Corrupted cache file must be moved out of the cache root."
+
+    $quarantinedFiles = @(Get-ChildItem -LiteralPath (Join-Path $cacheQuarantineDirectory "quarantine") -File -ErrorAction SilentlyContinue)
+    Assert-True -Condition ($quarantinedFiles.Count -eq 1) -Message "Corrupted cache file must be moved to the quarantine subdirectory."
+}
+finally {
+    if (Test-Path -LiteralPath $cacheQuarantineDirectory) {
+        Remove-Item -LiteralPath $cacheQuarantineDirectory -Recurse -Force
+    }
+}
+
+$cacheRetentionDirectory = Join-Path ([System.IO.Path]::GetTempPath()) "itcenter-agent-retention-$([guid]::NewGuid().ToString('N'))"
+New-Item -ItemType Directory -Path $cacheRetentionDirectory | Out-Null
+
+try {
+    $expiredCacheFile = Join-Path $cacheRetentionDirectory "checkin-expired-$([guid]::NewGuid().ToString('N')).json"
+    (ConvertTo-AgentCheckinJson -Payload $payload) | Set-Content -LiteralPath $expiredCacheFile -Encoding UTF8
+    (Get-Item -LiteralPath $expiredCacheFile).LastWriteTimeUtc = (Get-Date).ToUniversalTime().AddDays(-40)
+
+    $recentCacheFile = Save-AgentOfflinePayload -Payload $payload -CacheDirectory $cacheRetentionDirectory
+
+    $removedCount = Remove-AgentExpiredCacheFiles -CacheDirectory $cacheRetentionDirectory -RetentionDays 30
+
+    Assert-True -Condition ($removedCount -eq 1) -Message "Only the expired cache file must be pruned."
+    Assert-True -Condition (-not (Test-Path -LiteralPath $expiredCacheFile)) -Message "Expired cache file must be removed."
+    Assert-True -Condition (Test-Path -LiteralPath $recentCacheFile) -Message "Recent cache file must be preserved."
+}
+finally {
+    if (Test-Path -LiteralPath $cacheRetentionDirectory) {
+        Remove-Item -LiteralPath $cacheRetentionDirectory -Recurse -Force
+    }
+}
+
+$startupFailureConfigPath = Join-Path ([System.IO.Path]::GetTempPath()) "itcenter-agent-missing-config-$([guid]::NewGuid().ToString('N')).json"
+$startupLogDirectory = Join-Path ([System.IO.Path]::GetTempPath()) "itcenter-agent-startup-logs-$([guid]::NewGuid().ToString('N'))"
+New-Item -ItemType Directory -Path $startupLogDirectory | Out-Null
+$previousConfigPathForStartup = $ConfigPath
+$previousRuntimeConfigForStartup = $script:AgentRuntimeConfig
+$ConfigPath = $startupFailureConfigPath
+$script:AgentRuntimeConfig = [pscustomobject]@{ log_path = $startupLogDirectory; cache_path = $null }
+
+try {
+    try {
+        Start-ItCenterAgent | Out-Null
+        throw "Expected Start-ItCenterAgent to fail with a missing config file."
+    }
+    catch {
+        Assert-True -Condition ($_.Exception.Message -like "*Config file not found*") -Message "Start-ItCenterAgent must surface the configuration error."
+    }
+
+    $startupLogText = Get-Content -LiteralPath (Join-Path $startupLogDirectory "itcenter-agent.log") -Raw
+    Assert-True -Condition ($startupLogText -like "*ERROR*") -Message "Start-ItCenterAgent must log an ERROR entry on startup failure."
+    Assert-True -Condition ($startupLogText -like "*failed during startup*") -Message "Startup failure log must be explicit about configuration failure."
+}
+finally {
+    $ConfigPath = $previousConfigPathForStartup
+    $script:AgentRuntimeConfig = $previousRuntimeConfigForStartup
+    if (Test-Path -LiteralPath $startupLogDirectory) {
+        Remove-Item -LiteralPath $startupLogDirectory -Recurse -Force
     }
 }
 

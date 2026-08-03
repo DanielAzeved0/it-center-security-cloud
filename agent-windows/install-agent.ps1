@@ -113,6 +113,31 @@ function Test-AgentServerConnectivity {
     }
 }
 
+function Protect-AgentConfigFile {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+
+    $acl = Get-Acl -Path $Path
+    $acl.SetAccessRuleProtection($true, $false)
+
+    foreach ($existingRule in @($acl.Access)) {
+        $acl.RemoveAccessRule($existingRule) | Out-Null
+    }
+
+    foreach ($identity in @("NT AUTHORITY\SYSTEM", "BUILTIN\Administrators")) {
+        $rule = New-Object System.Security.AccessControl.FileSystemAccessRule(
+            $identity,
+            [System.Security.AccessControl.FileSystemRights]::FullControl,
+            [System.Security.AccessControl.AccessControlType]::Allow
+        )
+        $acl.AddAccessRule($rule)
+    }
+
+    Set-Acl -Path $Path -AclObject $acl
+}
+
 $serverUri = Assert-InstallInput
 
 if ($SkipConnectivityCheck) {
@@ -155,12 +180,23 @@ $config = [ordered]@{
     retry_max_delay_seconds = 15
     log_path = $logsPath
     cache_path = $cachePath
+    log_max_size_kb = 5120
+    log_max_backups = 3
+    cache_retention_days = 30
     collect_inventory = $true
     collect_metrics = $true
     collect_security = $true
 }
 
 $config | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $configPath -Encoding UTF8
+
+try {
+    Protect-AgentConfigFile -Path $configPath
+    Write-Output "config.json ACL restricted to SYSTEM and Administrators."
+}
+catch {
+    Write-Output "Warning: failed to restrict config.json ACL: $($_.Exception.Message)"
+}
 
 $action = New-ScheduledTaskAction `
     -Execute "powershell.exe" `

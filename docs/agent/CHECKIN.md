@@ -172,9 +172,14 @@ Observações:
 * Falhas temporarias incluem timeout, erro de rede, HTTP 408, HTTP 429 e respostas 5xx.
 * Falhas permanentes como HTTP 400, 401, 403 e 422 nao recebem retry excessivo.
 * No próximo ciclo, o agente tenta reenviar check-ins pendentes antes de enviar a coleta atual.
+* Um arquivo de cache corrompido (JSON invalido) e movido para `cache/quarantine/` em vez de travar o reenvio dos arquivos mais novos (EPIC 16).
+* Arquivos de cache (incluindo `cache/quarantine/`) com mais de `cache_retention_days` (padrao 30 dias) sao removidos automaticamente antes de cada tentativa de reenvio (EPIC 16).
 * O agente já registra as coletas em `agent-windows/logs/itcenter-agent.log`.
+* O log e rotacionado por tamanho: ao atingir `log_max_size_kb` (padrao 5120 KB), o arquivo atual vira `.1` e os backups anteriores deslocam até `log_max_backups` (padrao 3) antes de descarte (EPIC 16).
 * Em instalacao Windows, logs e cache usam os caminhos configurados em `config.json`.
 * `server_url` pode apontar para a raiz do dominio publicado ou para a base local `/api/v1`.
+* `config.json` tem a ACL restrita a `SYSTEM`/`Administrators` pelo instalador, protegendo o `agent_api_key` em texto puro contra leitura por usuarios comuns (EPIC 16).
+* Falha de configuracao/inicializacao (`Start-ItCenterAgent`) e capturada no nivel mais alto e registrada com `Level = "ERROR"` antes de propagar o erro (EPIC 16).
 
 ## Testes atuais
 
@@ -203,6 +208,13 @@ Server URL raiz expandida para /api/v1/agent/checkin
 Retry em falhas temporarias
 Falha permanente sem retry excessivo
 Logs de retry sem valor de API key
+Rotacao de log por tamanho (log_max_size_kb, log_max_backups)
+Quarentena de arquivo de cache corrompido sem bloquear reenvio dos demais
+Retencao/expiracao de arquivos de cache por idade (cache_retention_days)
+CPU via Get-Counter com fallback para Win32_Processor.LoadPercentage
+Inventario de apps UWP/Store via Get-AppxPackage combinado ao registro
+Deteccao de USB alem de armazenamento via Win32_PnPEntity
+Falha de configuracao/inicializacao logada como ERROR em Start-ItCenterAgent
 ```
 
 ---
@@ -259,6 +271,25 @@ Estado atual:
 * `defender_enabled` e coletado por `Get-MpComputerStatus`.
 * `rdp_enabled` e coletado no registro `HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server`.
 * `local_admins` e coletado pelo grupo local de administradores via SID `S-1-5-32-544`.
-* `usb_devices` coleta metadados tecnicos de discos USB, sem ler conteudo de arquivos.
+* `usb_devices` coleta metadados tecnicos de discos USB (`type: "storage"`) e de outros dispositivos USB via `Win32_PnPEntity` (`type` = classe PnP, ex.: `HIDClass`), sem ler conteudo de arquivos (EPIC 16).
 * `failed_logins_last_hour` conta eventos 4625 no log Security da ultima hora; se o log nao estiver acessivel, retorna 0.
 * Os testes do agente validam as coletas do EPIC 6.
+
+---
+
+# EPIC 16 - Hardening do Agente Windows
+
+Lacunas de robustez corrigidas (ver ADR-025 e `docs/development/TASKS.md`):
+
+```text
+ACL de config.json restrita a SYSTEM/Administrators (instalador)
+Quarentena de cache corrompido em cache/quarantine/
+Retencao por idade em cache/ (cache_retention_days)
+Rotacao de logs/itcenter-agent.log por tamanho (log_max_size_kb, log_max_backups)
+CPU via Get-Counter '\Processor(_Total)\% Processor Time' com fallback WMI
+Inventario incluindo apps UWP/Store (Get-AppxPackage -AllUsers)
+Deteccao de USB alem de armazenamento (Win32_PnPEntity)
+try/catch no nivel mais alto de Start-ItCenterAgent com log ERROR explicito
+```
+
+Pendente (fora do escopo automatizavel por codigo, depende de certificado de code-signing): assinar os scripts do agente e trocar `ExecutionPolicy` de `Bypass` para `AllSigned`/`RemoteSigned`.

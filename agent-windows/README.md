@@ -187,9 +187,10 @@ Regra atual:
 1. Lê as chaves de uninstall em HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall.
 2. Lê também HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall.
 3. Ignora entradas sem DisplayName.
-4. Normaliza nome, versão e publisher.
-5. Remove duplicidades por nome, versão e publisher.
-6. Registra a quantidade de programas no log local.
+4. Coleta também apps UWP/Store via Get-AppxPackage -AllUsers (EPIC 16), extraindo o nome do publisher a partir do certificado.
+5. Normaliza nome, versão e publisher.
+6. Remove duplicidades por nome, versão e publisher.
+7. Registra a quantidade de programas no log local.
 ```
 
 Os programas instalados passam a compor o campo `installed_programs` do check-in.
@@ -201,8 +202,8 @@ O agente coleta o uso atual de CPU em percentual.
 Regra atual:
 
 ```text
-1. Coleta LoadPercentage via Win32_Processor.
-2. Calcula a media quando houver mais de um processador informado.
+1. Amostra o contador '\Processor(_Total)\% Processor Time' via Get-Counter (EPIC 16, substitui Win32_Processor.LoadPercentage por ser impreciso).
+2. Se Get-Counter falhar (contadores de performance indisponiveis), usa como fallback a media de LoadPercentage via Win32_Processor.
 3. Normaliza o valor para ficar entre 0 e 100.
 4. Registra o percentual no log local.
 ```

@@ -633,25 +633,25 @@ Corrigir lacunas concretas de robustez identificadas no agente PowerShell (agent
 
 ### Tarefas
 
-[ ] Restringir ACL de config.json (leitura apenas para SYSTEM/Administrators) para proteger o agent_api_key em texto puro
+[x] Restringir ACL de config.json (leitura apenas para SYSTEM/Administrators) para proteger o agent_api_key em texto puro
 
-[ ] Adicionar quarentena para arquivo de cache corrompido em Send-PendingAgentCheckins, evitando que um arquivo quebrado trave o reenvio dos mais novos
+[x] Adicionar quarentena para arquivo de cache corrompido em Send-PendingAgentCheckins, evitando que um arquivo quebrado trave o reenvio dos mais novos
 
-[ ] Adicionar retencao/limite de idade para arquivos em cache/
+[x] Adicionar retencao/limite de idade para arquivos em cache/
 
-[ ] Adicionar rotacao por tamanho para logs/itcenter-agent.log
+[x] Adicionar rotacao por tamanho para logs/itcenter-agent.log
 
-[ ] Trocar medicao de CPU de Win32_Processor.LoadPercentage para Get-Counter '\Processor(_Total)\% Processor Time' amostrado
+[x] Trocar medicao de CPU de Win32_Processor.LoadPercentage para Get-Counter '\Processor(_Total)\% Processor Time' amostrado
 
-[ ] Incluir apps UWP/Store (Get-AppxPackage) no inventario de programas instalados
+[x] Incluir apps UWP/Store (Get-AppxPackage) no inventario de programas instalados
 
-[ ] Ampliar deteccao de USB para alem de armazenamento (Win32_PnPEntity), mantendo a politica de nao ler conteudo
+[x] Ampliar deteccao de USB para alem de armazenamento (Win32_PnPEntity), mantendo a politica de nao ler conteudo
 
-[ ] Adicionar try/catch no nivel mais alto de Start-ItCenterAgent com log explicito de falha de configuracao
+[x] Adicionar try/catch no nivel mais alto de Start-ItCenterAgent com log explicito de falha de configuracao
 
-[ ] Assinar os scripts do agente com certificado de code-signing e trocar ExecutionPolicy de Bypass para AllSigned ou RemoteSigned
+[ ] Assinar os scripts do agente com certificado de code-signing e trocar ExecutionPolicy de Bypass para AllSigned ou RemoteSigned (bloqueado: depende de adquirir/gerar um certificado de code-signing, decisao do usuario)
 
-[ ] Atualizar docs/agent/TROUBLESHOOTING.md com os novos comportamentos apos o hardening
+[x] Atualizar docs/agent/TROUBLESHOOTING.md com os novos comportamentos apos o hardening
 
 ---
 

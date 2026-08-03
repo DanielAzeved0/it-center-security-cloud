@@ -119,6 +119,39 @@ function ConvertTo-AgentValidatedConfig {
         Get-DefaultAgentCacheDirectory
     }
 
+    $logMaxSizeKb = if ($null -ne $RawConfig.log_max_size_kb) {
+        [int]$RawConfig.log_max_size_kb
+    }
+    else {
+        5120
+    }
+
+    if ($logMaxSizeKb -lt 1) {
+        throw "Log max size KB must be greater than or equal to 1."
+    }
+
+    $logMaxBackups = if ($null -ne $RawConfig.log_max_backups) {
+        [int]$RawConfig.log_max_backups
+    }
+    else {
+        3
+    }
+
+    if ($logMaxBackups -lt 1) {
+        throw "Log max backups must be greater than or equal to 1."
+    }
+
+    $cacheRetentionDays = if ($null -ne $RawConfig.cache_retention_days) {
+        [int]$RawConfig.cache_retention_days
+    }
+    else {
+        30
+    }
+
+    if ($cacheRetentionDays -lt 1) {
+        throw "Cache retention days must be greater than or equal to 1."
+    }
+
     [pscustomobject]@{
         server_url = $serverUrl.TrimEnd("/")
         api_key = $apiKey
@@ -130,6 +163,9 @@ function ConvertTo-AgentValidatedConfig {
         retry_max_delay_seconds = $retryMaxDelaySeconds
         log_path = $logPath
         cache_path = $cachePath
+        log_max_size_kb = $logMaxSizeKb
+        log_max_backups = $logMaxBackups
+        cache_retention_days = $cacheRetentionDays
         collect_inventory = if ($null -eq $RawConfig.collect_inventory) { $true } else { [bool]$RawConfig.collect_inventory }
         collect_metrics = if ($null -eq $RawConfig.collect_metrics) { $true } else { [bool]$RawConfig.collect_metrics }
         collect_security = if ($null -eq $RawConfig.collect_security) { $true } else { [bool]$RawConfig.collect_security }
@@ -157,6 +193,56 @@ function Get-AgentLogDirectory {
     Get-DefaultAgentLogDirectory
 }
 
+function Get-AgentLogMaxSizeBytes {
+    $maxSizeKb = if ($null -ne $script:AgentRuntimeConfig -and $null -ne $script:AgentRuntimeConfig.log_max_size_kb) {
+        [int]$script:AgentRuntimeConfig.log_max_size_kb
+    }
+    else {
+        5120
+    }
+
+    $maxSizeKb * 1KB
+}
+
+function Get-AgentLogMaxBackups {
+    if ($null -ne $script:AgentRuntimeConfig -and $null -ne $script:AgentRuntimeConfig.log_max_backups) {
+        return [int]$script:AgentRuntimeConfig.log_max_backups
+    }
+
+    3
+}
+
+function Invoke-AgentLogRotation {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$LogFile
+    )
+
+    if (-not (Test-Path -LiteralPath $LogFile)) {
+        return
+    }
+
+    $currentSize = (Get-Item -LiteralPath $LogFile).Length
+    if ($currentSize -lt (Get-AgentLogMaxSizeBytes)) {
+        return
+    }
+
+    $maxBackups = Get-AgentLogMaxBackups
+    $oldestBackup = "$LogFile.$maxBackups"
+    if (Test-Path -LiteralPath $oldestBackup) {
+        Remove-Item -LiteralPath $oldestBackup -Force
+    }
+
+    for ($index = $maxBackups - 1; $index -ge 1; $index--) {
+        $source = "$LogFile.$index"
+        if (Test-Path -LiteralPath $source) {
+            Move-Item -LiteralPath $source -Destination "$LogFile.$($index + 1)" -Force
+        }
+    }
+
+    Move-Item -LiteralPath $LogFile -Destination "$LogFile.1" -Force
+}
+
 function Write-AgentLog {
     param(
         [string]$Message,
@@ -169,6 +255,14 @@ function Write-AgentLog {
     }
 
     $logFile = Join-Path $logsPath "itcenter-agent.log"
+
+    try {
+        Invoke-AgentLogRotation -LogFile $logFile
+    }
+    catch {
+        # Rotation failures must never block the agent from logging the current event.
+    }
+
     $timestamp = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
     Add-Content -LiteralPath $logFile -Value "[$timestamp] [$Level] $Message"
 }
@@ -279,8 +373,14 @@ function Get-AgentIpAddress {
     $ipAddress.Trim()
 }
 
-function Get-AgentCpuUsage {
-    $processors = Get-CimInstance -ClassName Win32_Processor -ErrorAction SilentlyContinue
+function Get-AgentCpuUsageFallback {
+    param(
+        [scriptblock]$ProcessorReader = {
+            Get-CimInstance -ClassName Win32_Processor -ErrorAction SilentlyContinue
+        }
+    )
+
+    $processors = & $ProcessorReader
     $cpuSamples = @($processors | Where-Object { $null -ne $_.LoadPercentage } | ForEach-Object { [double]$_.LoadPercentage })
 
     if ($cpuSamples.Count -eq 0) {
@@ -289,6 +389,31 @@ function Get-AgentCpuUsage {
 
     $averageCpu = ($cpuSamples | Measure-Object -Average).Average
     ConvertTo-AgentPercent -Value $averageCpu
+}
+
+function Get-AgentCpuUsage {
+    param(
+        [scriptblock]$CounterReader = {
+            (Get-Counter -Counter '\Processor(_Total)\% Processor Time' -SampleInterval 1 -MaxSamples 2 -ErrorAction Stop).CounterSamples |
+                Select-Object -Last 1 -ExpandProperty CookedValue
+        },
+        [scriptblock]$ProcessorReader = {
+            Get-CimInstance -ClassName Win32_Processor -ErrorAction SilentlyContinue
+        }
+    )
+
+    try {
+        $counterValue = & $CounterReader
+
+        if ($null -ne $counterValue) {
+            return ConvertTo-AgentPercent -Value ([double]$counterValue)
+        }
+    }
+    catch {
+        # Get-Counter can be unavailable (perf counters disabled/corrupt); fall back to WMI below.
+    }
+
+    Get-AgentCpuUsageFallback -ProcessorReader $ProcessorReader
 }
 
 function Get-AgentRamUsage {
@@ -386,11 +511,63 @@ function Get-AgentOperatingSystem {
     }
 }
 
+function ConvertTo-AgentFriendlyPublisher {
+    param(
+        [string]$Publisher
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Publisher)) {
+        return $null
+    }
+
+    if ($Publisher -match "CN=([^,]+)") {
+        return $Matches[1].Trim()
+    }
+
+    $Publisher.Trim()
+}
+
+function Get-InstalledAppxPrograms {
+    param(
+        [scriptblock]$AppxPackageReader = {
+            if (Get-Command -Name Get-AppxPackage -ErrorAction SilentlyContinue) {
+                Get-AppxPackage -AllUsers -ErrorAction SilentlyContinue
+            }
+        }
+    )
+
+    $packages = try {
+        @(& $AppxPackageReader | Where-Object { $null -ne $_ })
+    }
+    catch {
+        @()
+    }
+
+    $packages |
+        ForEach-Object {
+            $name = [string]$_.Name
+            if ([string]::IsNullOrWhiteSpace($name)) {
+                return
+            }
+
+            [pscustomobject]@{
+                name = $name.Trim()
+                version = if ([string]::IsNullOrWhiteSpace($_.Version)) { $null } else { [string]$_.Version.Trim() }
+                publisher = ConvertTo-AgentFriendlyPublisher -Publisher ([string]$_.Publisher)
+            }
+        }
+}
+
 function Get-InstalledPrograms {
     param(
         [scriptblock]$RegistryReader = {
             param($Path)
             Get-ItemProperty -Path $Path -ErrorAction SilentlyContinue
+        },
+        [scriptblock]$AppxPackageReader = {
+            if (Get-Command -Name Get-AppxPackage -ErrorAction SilentlyContinue) {
+                Get-AppxPackage -AllUsers -ErrorAction SilentlyContinue
+            }
         }
     )
 
@@ -399,7 +576,7 @@ function Get-InstalledPrograms {
         "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*"
     )
 
-    $programs = foreach ($path in $registryPaths) {
+    $registryPrograms = foreach ($path in $registryPaths) {
         $items = @(& $RegistryReader $path)
 
         foreach ($item in $items) {
@@ -419,6 +596,9 @@ function Get-InstalledPrograms {
             }
         }
     }
+
+    $appxPrograms = @(Get-InstalledAppxPrograms -AppxPackageReader $AppxPackageReader)
+    $programs = @($registryPrograms) + $appxPrograms
 
     $programs |
         Sort-Object name, version, publisher -Unique |
@@ -521,7 +701,7 @@ function Get-AgentLocalAdmins {
         Sort-Object -Unique
 }
 
-function Get-AgentUsbDevices {
+function Get-AgentUsbStorageDevices {
     param(
         [scriptblock]$UsbDeviceReader = {
             Get-CimInstance -ClassName Win32_DiskDrive -ErrorAction SilentlyContinue |
@@ -535,10 +715,56 @@ function Get-AgentUsbDevices {
         ForEach-Object {
             [ordered]@{
                 name = if ([string]::IsNullOrWhiteSpace($_.Model)) { "USB storage device" } else { [string]$_.Model.Trim() }
+                type = "storage"
                 manufacturer = if ([string]::IsNullOrWhiteSpace($_.Manufacturer)) { $null } else { [string]$_.Manufacturer.Trim() }
                 serial_number = if ([string]::IsNullOrWhiteSpace($_.SerialNumber)) { $null } else { [string]$_.SerialNumber.Trim() }
             }
         }
+}
+
+function Get-AgentUsbPeripheralDevices {
+    param(
+        [scriptblock]$PeripheralDeviceReader = {
+            Get-CimInstance -ClassName Win32_PnPEntity -ErrorAction SilentlyContinue |
+                Where-Object {
+                    $_.DeviceID -like "USB\*" -and
+                    $_.PNPClass -notin @("USB", "DiskDrive", "CDROM")
+                }
+        }
+    )
+
+    $devices = @(& $PeripheralDeviceReader | Where-Object { $null -ne $_ })
+
+    $devices |
+        ForEach-Object {
+            [ordered]@{
+                name = if ([string]::IsNullOrWhiteSpace($_.Name)) { "USB device" } else { [string]$_.Name.Trim() }
+                type = if ([string]::IsNullOrWhiteSpace($_.PNPClass)) { "other" } else { [string]$_.PNPClass.Trim() }
+                manufacturer = if ([string]::IsNullOrWhiteSpace($_.Manufacturer)) { $null } else { [string]$_.Manufacturer.Trim() }
+                serial_number = $null
+            }
+        }
+}
+
+function Get-AgentUsbDevices {
+    param(
+        [scriptblock]$UsbDeviceReader = {
+            Get-CimInstance -ClassName Win32_DiskDrive -ErrorAction SilentlyContinue |
+                Where-Object { $_.InterfaceType -eq "USB" }
+        },
+        [scriptblock]$PeripheralDeviceReader = {
+            Get-CimInstance -ClassName Win32_PnPEntity -ErrorAction SilentlyContinue |
+                Where-Object {
+                    $_.DeviceID -like "USB\*" -and
+                    $_.PNPClass -notin @("USB", "DiskDrive", "CDROM")
+                }
+        }
+    )
+
+    $storageDevices = @(Get-AgentUsbStorageDevices -UsbDeviceReader $UsbDeviceReader)
+    $peripheralDevices = @(Get-AgentUsbPeripheralDevices -PeripheralDeviceReader $PeripheralDeviceReader)
+
+    @($storageDevices) + @($peripheralDevices)
 }
 
 function Get-AgentFailedLoginsLastHour {
@@ -798,6 +1024,66 @@ function Send-AgentCheckin {
     }
 }
 
+function Get-AgentCacheQuarantineDirectory {
+    param(
+        [string]$CacheDirectory = (Get-AgentCacheDirectory)
+    )
+
+    Join-Path $CacheDirectory "quarantine"
+}
+
+function Move-AgentCacheFileToQuarantine {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$FilePath,
+        [string]$CacheDirectory = (Get-AgentCacheDirectory)
+    )
+
+    $quarantineDirectory = Get-AgentCacheQuarantineDirectory -CacheDirectory $CacheDirectory
+    if (-not (Test-Path -LiteralPath $quarantineDirectory)) {
+        New-Item -ItemType Directory -Path $quarantineDirectory | Out-Null
+    }
+
+    $fileName = Split-Path -Path $FilePath -Leaf
+    $destination = Join-Path $quarantineDirectory $fileName
+
+    if (Test-Path -LiteralPath $destination) {
+        $destination = Join-Path $quarantineDirectory "$([guid]::NewGuid().ToString('N'))-$fileName"
+    }
+
+    Move-Item -LiteralPath $FilePath -Destination $destination -Force
+    $destination
+}
+
+function Get-AgentCacheRetentionDays {
+    if ($null -ne $script:AgentRuntimeConfig -and $null -ne $script:AgentRuntimeConfig.cache_retention_days) {
+        return [int]$script:AgentRuntimeConfig.cache_retention_days
+    }
+
+    30
+}
+
+function Remove-AgentExpiredCacheFiles {
+    param(
+        [string]$CacheDirectory = (Get-AgentCacheDirectory),
+        [int]$RetentionDays = (Get-AgentCacheRetentionDays)
+    )
+
+    if (-not (Test-Path -LiteralPath $CacheDirectory)) {
+        return 0
+    }
+
+    $cutoffUtc = (Get-Date).ToUniversalTime().AddDays(-$RetentionDays)
+    $expiredFiles = @(Get-ChildItem -LiteralPath $CacheDirectory -Filter "*.json" -File -Recurse -ErrorAction SilentlyContinue |
+        Where-Object { $_.LastWriteTimeUtc -lt $cutoffUtc })
+
+    foreach ($expiredFile in $expiredFiles) {
+        Remove-Item -LiteralPath $expiredFile.FullName -Force
+    }
+
+    $expiredFiles.Count
+}
+
 function Send-PendingAgentCheckins {
     param(
         [Parameter(Mandatory = $true)]
@@ -819,12 +1105,29 @@ function Send-PendingAgentCheckins {
         return 0
     }
 
+    try {
+        Remove-AgentExpiredCacheFiles -CacheDirectory $CacheDirectory | Out-Null
+    }
+    catch {
+        Write-AgentLog -Message "Failed to prune expired cached check-ins: $($_.Exception.Message)" -Level "WARN"
+    }
+
     $sentCount = 0
     $pendingFiles = @(Get-ChildItem -LiteralPath $CacheDirectory -Filter "checkin-*.json" -File | Sort-Object LastWriteTimeUtc, Name)
 
     foreach ($pendingFile in $pendingFiles) {
+        $pendingPayload = $null
+
         try {
             $pendingPayload = Get-Content -LiteralPath $pendingFile.FullName -Raw | ConvertFrom-Json
+        }
+        catch {
+            Write-AgentLog -Message "Cached check-in $($pendingFile.Name) is corrupted and was quarantined: $($_.Exception.Message)" -Level "WARN"
+            Move-AgentCacheFileToQuarantine -FilePath $pendingFile.FullName -CacheDirectory $CacheDirectory | Out-Null
+            continue
+        }
+
+        try {
             Send-AgentCheckin -Config $Config -Payload $pendingPayload -RequestInvoker $RequestInvoker -RetryDelayInvoker $RetryDelayInvoker | Out-Null
             Remove-Item -LiteralPath $pendingFile.FullName
             $sentCount++
@@ -839,10 +1142,16 @@ function Send-PendingAgentCheckins {
 }
 
 function Start-ItCenterAgent {
-    $config = Get-AgentConfig -Path $ConfigPath
-    $script:AgentRuntimeConfig = $config
-    Initialize-AgentWorkspace -Config $config
-    $payload = New-AgentCheckinPayload
+    try {
+        $config = Get-AgentConfig -Path $ConfigPath
+        $script:AgentRuntimeConfig = $config
+        Initialize-AgentWorkspace -Config $config
+        $payload = New-AgentCheckinPayload
+    }
+    catch {
+        Write-AgentLog -Message "Agent failed during startup/configuration: $($_.Exception.Message)" -Level "ERROR"
+        throw
+    }
 
     Write-AgentLog -Message "Agent started. Server URL: $($config.server_url)"
     Write-AgentLog -Message "Hostname collected: $($payload.hostname)"

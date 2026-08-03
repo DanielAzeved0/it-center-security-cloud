@@ -7,6 +7,9 @@
   "retry_max_delay_seconds": 15,
   "log_path": null,
   "cache_path": null,
+  "log_max_size_kb": 5120,
+  "log_max_backups": 3,
+  "cache_retention_days": 30,
   "collect_inventory": true,
   "collect_metrics": true,
   "collect_security": true
