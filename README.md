@@ -2,7 +2,7 @@
 
 > Plataforma full stack para monitoramento, inventário, observabilidade e segurança de máquinas Windows, com agente PowerShell, API FastAPI, PostgreSQL, dashboard web e práticas iniciais de SOC/Blue Team.
 
-Status: Fases 0 a 9 concluídas (governança/autenticação e operação/segurança de produção validadas em produção real) | Fase 12 (Terraform/IaC) em andamento (import ainda não executado) | Fase 13 (hardening do agente Windows) concluída, exceto assinatura de código, pendente de certificado | Fase 14 (hardening do dashboard) e Fase 15 (orquestração de agentes de IA, ADR-026) concluídas | Fases 16 a 18 (RustDesk/Snipe-IT, relatórios/dashboard executivo, observabilidade de infraestrutura) com planejamento e ADRs concluídos, implementação pendente — ver Roadmap | Ambiente local Docker operacional | Produção publicada na Oracle Cloud | Agente Windows integrado ao check-in.
+Status: Fases 0 a 9 concluídas (governança/autenticação e operação/segurança de produção validadas em produção real) | Fase 12 (Terraform/IaC) concluída, exceto backend de state remoto — import contra produção executado em 2026-08-04, `terraform plan` em "No changes." | Fase 13 (hardening do agente Windows) concluída, exceto assinatura de código, pendente de certificado | Fase 14 (hardening do dashboard) e Fase 15 (orquestração de agentes de IA, ADR-026) concluídas | Fases 16 a 18 (RustDesk/Snipe-IT, relatórios/dashboard executivo, observabilidade de infraestrutura) com planejamento e ADRs concluídos, implementação pendente — ver Roadmap | Ambiente local Docker operacional | Produção publicada na Oracle Cloud | Agente Windows integrado ao check-in.
 
 ---
 
@@ -565,12 +565,12 @@ docker compose -f infra/docker-compose.yml down -v
 * Multiusuário
 * SaaS
 
-### Fase 12 - Infraestrutura como Código — em andamento
+### Fase 12 - Infraestrutura como Código — concluída, exceto backend de state remoto
 
 * Módulos Terraform (network e compute)
-* Import dos recursos Oracle Cloud já existentes, sem destroy/recreate
-* `terraform plan` zero-diff validado
-* Backend de state remoto em OCI Object Storage
+* Import dos recursos Oracle Cloud já existentes, sem destroy/recreate — executado em 2026-08-04
+* `terraform plan` zero-diff validado (`No changes.`)
+* Backend de state remoto em OCI Object Storage — pendente, state segue local por enquanto
 
 ### Fase 13 - Hardening do Agente Windows — concluída, exceto assinatura de código
 

@@ -11,8 +11,8 @@ resource "oci_core_instance" "edge_node" {
   compartment_id      = var.compartment_id
   availability_domain = var.availability_domain
   display_name        = var.display_name
-  shape                = var.shape
-  freeform_tags        = var.freeform_tags
+  shape               = var.shape
+  freeform_tags       = var.freeform_tags
 
   dynamic "shape_config" {
     for_each = var.shape_config == null ? [] : [var.shape_config]
@@ -29,7 +29,7 @@ resource "oci_core_instance" "edge_node" {
 
   source_details {
     source_type = "image"
-    image_id    = var.image_id
+    source_id   = var.image_id
   }
 
   metadata = merge(

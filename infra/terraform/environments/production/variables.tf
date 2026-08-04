@@ -70,10 +70,20 @@ variable "ingress_security_rules" {
   type = list(object({
     protocol    = string
     source      = string
-    description = string
+    description = optional(string)
     tcp_port    = number
   }))
   default = []
+}
+
+variable "private_route_table_id" {
+  description = "OCID da route table real usada pela subnet privada (NAT Gateway + Service Gateway), descoberta via 'oci network route-table list'."
+  type        = string
+}
+
+variable "private_security_list_ids" {
+  description = "OCIDs das security lists reais usadas pela subnet privada, descobertas via 'oci network subnet list'."
+  type        = list(string)
 }
 
 # Instancia (modulo compute)
@@ -113,7 +123,7 @@ variable "instance_ssh_authorized_keys" {
 }
 
 variable "freeform_tags" {
-  type    = map(string)
+  type = map(string)
   default = {
     project     = "it-center-security-cloud"
     managed_by  = "terraform"

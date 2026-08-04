@@ -11,6 +11,10 @@ region            = "sa-saopaulo-1"
 compartment_id      = "ocid1.compartment.oc1..aaaaaaaa_EXEMPLO"
 public_subnet_cidr  = "10.0.0.0/24"
 private_subnet_cidr = "10.0.1.0/24"
+# DNS labels sao imutaveis no OCI: usar o valor ja existente na subnet real
+# (ver 'oci network subnet list'), nunca um nome so "bonito" novo.
+public_subnet_dns_label  = "sub00000000000_EXEMPLO"
+private_subnet_dns_label = "sub00000000001_EXEMPLO"
 
 ingress_security_rules = [
   {
@@ -33,11 +37,18 @@ ingress_security_rules = [
   },
 ]
 
+# Route table e security lists ja existentes usadas pela subnet privada
+# (NAT Gateway + Service Gateway do VCN Wizard), descobertas via
+# 'oci network route-table list' / 'oci network subnet list'. Fora do
+# escopo do Terraform - so referenciadas, nunca gerenciadas.
+private_route_table_id    = "ocid1.routetable.oc1..aaaaaaaa_EXEMPLO"
+private_security_list_ids = ["ocid1.securitylist.oc1..aaaaaaaa_EXEMPLO"]
+
 availability_domain = "abCD:SA-SAOPAULO-1-AD-1"
-instance_shape      = "VM.Standard.A1.Flex"
-instance_shape_config = {
-  ocpus         = 2
-  memory_in_gbs = 12
-}
+# Shapes fixos (ex.: VM.Standard.E2.1.Micro do Always Free) nao aceitam
+# shape_config - deixar instance_shape_config = null nesse caso. So
+# preencher shape_config para shapes flexiveis (ex.: VM.Standard.A1.Flex).
+instance_shape        = "VM.Standard.E2.1.Micro"
+instance_shape_config = null
 instance_image_id            = "ocid1.image.oc1.sa-saopaulo-1.aaaaaaaa_EXEMPLO"
 instance_ssh_authorized_keys = "ssh-rsa AAAA... exemplo@local"

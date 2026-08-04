@@ -2,6 +2,23 @@
 
 Este documento registra o processo real de implantacao do IT Center Security Cloud na Oracle Cloud.
 
+## 2026-08-04 - Adocao de Terraform via import (fechamento da EPIC 15)
+
+Contexto: EPIC 15 tinha os modulos e o ADR-024 prontos, mas nenhum recurso real havia sido importado. Executado de ponta a ponta nesta sessao, com acesso real a conta Oracle Cloud.
+
+1. Usuario IAM `terraform-provisioner` criado no Console OCI (grupo `TerraformProvisioners`), com policy de escopo minimo aplicada `in tenancy` (o Edge Node vive no root compartment, sem compartment dedicado - `in compartment <nome>` nao e valido para o root).
+2. Descoberta via `oci` CLI revelou que a VCN foi criada pelo "VCN Wizard" da Oracle: alem dos recursos ja documentados, existem um NAT Gateway e um Service Gateway, e a subnet privada usa uma route table e uma security list dedicadas (nao as default da VCN, que na verdade pertencem a subnet publica). Documentado em `docs/architecture/IAC.md` e `docs/architecture/NETWORK.md`.
+3. IP publico de producao (`147.15.78.220`) confirmado `EPHEMERAL` (nao `RESERVED`). Decisao: manter efemero por ora, sem reservar (reservar trocaria o endereco, exigindo janela de manutencao e atualizacao de DNS).
+4. Modulos `network`/`compute` ajustados: variaveis novas para a route table/security list da subnet privada, regras ICMP padrao adicionadas, `versions.tf` proprio criado em cada modulo (faltava - sem ele o provider resolvia para o namespace legado `hashicorp/oci` dentro dos modulos), e corrigido um bug de schema (`source_details` usa `source_id`, nao `image_id`, no provider `oracle/oci` >= 5.x).
+5. Import executado na ordem VCN -> Internet Gateway -> Route Table -> Security List -> Subnet publica -> Subnet privada -> Instancia, validando `terraform plan` sem diff funcional apos cada um. A instancia importou com diff zero de primeira.
+6. Unico diff remanescente era cosmetico (tag `VCN` que o Wizard deixa em cada recurso de rede). Resolvido com um `terraform apply` minimo e deliberado (0 add, 6 change, 0 destroy - so update in-place de tags), apos salvar e revisar o plano com `-out`.
+7. `terraform plan` final confirmado como `No changes. Your infrastructure matches the configuration.`. Producao validada no ar apos o apply (`curl -I` respondendo 401 do Basic Auth normal do Nginx).
+
+Resultado:
+
+* EPIC 15 concluida em `docs/development/TASKS.md`, exceto migracao do state para backend remoto (fora do escopo minimo, state segue local).
+* Nenhum recurso foi destruido ou recriado - todos os itens ja existentes em producao, apenas trazidos para dentro do Terraform.
+
 ## 2026-07-28 - Recuperacao de acesso, criacao do primeiro admin e correcao do loop de login
 
 Contexto: perda da chave SSH pessoal de acesso a `itcenter-edge-01`, ausencia de qualquer usuario administrativo na tabela `users` de producao, e um loop de login causado por conflito entre Basic Auth e Bearer token. Detalhes completos de cada causa raiz em `docs/deployment/POSTMORTEMS.md` (INCIDENTE 018, 019 e 020).

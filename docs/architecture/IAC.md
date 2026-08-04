@@ -42,6 +42,7 @@ Docker Compose (infra/docker-compose.production.yml)
 Scripts de deploy, backup, restore, rollback (infra/scripts/)
 Certificados TLS (Certbot)
 Migrations e dados do PostgreSQL
+NAT Gateway e Service Gateway (existem, ver secao "Descoberta real" abaixo)
 ```
 
 ## Mapeamento com as camadas da arquitetura
@@ -68,6 +69,20 @@ infra/terraform/
 ```
 
 Dois modulos pequenos, nao um por recurso individual: o ciclo de vida de rede e o ciclo de vida da instancia sao diferentes (trocar shape ou imagem da VM nunca deve arriscar tocar a VCN).
+
+## Descoberta real (import executado em 2026-08-04)
+
+A descoberta via `oci` CLI revelou uma topologia mais rica do que a descrita acima: a VCN foi originalmente criada pelo "VCN Wizard" da Oracle, que provisiona automaticamente um NAT Gateway e um Service Gateway junto com a subnet privada, alem de dar a cada subnet sua propria route table e security list dedicadas (a subnet publica usa a route table/security list *default* da VCN; a subnet privada usa uma route table/security list separadas, com rota para o NAT Gateway). Isso significa que:
+
+```text
+Subnet privada -> nao esta "sem uso": ja tem saida de internet via NAT Gateway
+Route table    -> existem 2 (default, da subnet publica; dedicada, da subnet privada)
+Security list  -> existem 2 (default, da subnet publica; dedicada, da subnet privada)
+```
+
+Decisao tomada: NAT Gateway e Service Gateway permanecem fora do escopo do Terraform (nao ha necessidade de geri-los - nada os toca, `block_traffic = false` desde a criacao). A route table e a security list da subnet privada tambem nao sao modeladas como recursos Terraform proprios - a subnet privada as referencia por OCID via variavel (`private_route_table_id`, `private_security_list_ids`), sem tentar gerir o NAT Gateway/Service Gateway que elas apontam. Route table e security list da subnet *publica* continuam totalmente geridas pelo Terraform (`oci_core_route_table.public`, `oci_core_security_list.public`), pois governam o trafego de entrada real do Edge Node.
+
+O IP publico `147.15.78.220` foi confirmado como `EPHEMERAL` (nao `RESERVED`). Decisao: manter efemero por enquanto (nenhum `apply` de recriacao roda durante a introducao do Terraform, entao o risco abaixo nao se materializa hoje). Reservar no futuro exige criar um IP novo (a OCI nao converte um efemero em reservado no mesmo endereco) e migrar o DNS numa janela planejada.
 
 ## Introducao via import, nunca destroy/recreate
 
@@ -116,7 +131,7 @@ Chave de API: fora da arvore do repositorio (nunca em infra/terraform/, mesmo gi
 ```text
 Recurso esquecido no import          -> Terraform tenta recriar/duplicar
 State local corrompido por sync      -> pasta do projeto esta sob OneDrive
-IP publico efemero (nao reservado)   -> replace acidental da instancia troca o IP e quebra o DNS
+IP publico efemero (nao reservado)   -> confirmado EPHEMERAL em producao (2026-08-04); replace acidental da instancia trocaria o IP e quebraria o DNS - mitigado por nunca rodar apply de recriacao
 Shape Always Free indisponivel       -> risco ao recriar a instancia numa recuperacao futura
 Drift de versao do provider oci      -> comitar .terraform.lock.hcl
 ```

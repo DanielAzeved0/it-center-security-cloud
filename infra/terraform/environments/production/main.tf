@@ -13,16 +13,18 @@ provider "oci" {
 module "network" {
   source = "../../modules/network"
 
-  compartment_id           = var.compartment_id
-  vcn_display_name         = var.vcn_display_name
-  vcn_cidr_block           = var.vcn_cidr_block
-  vcn_dns_label            = var.vcn_dns_label
-  public_subnet_cidr       = var.public_subnet_cidr
-  public_subnet_dns_label  = var.public_subnet_dns_label
-  private_subnet_cidr      = var.private_subnet_cidr
-  private_subnet_dns_label = var.private_subnet_dns_label
-  ingress_security_rules   = var.ingress_security_rules
-  freeform_tags            = var.freeform_tags
+  compartment_id            = var.compartment_id
+  vcn_display_name          = var.vcn_display_name
+  vcn_cidr_block            = var.vcn_cidr_block
+  vcn_dns_label             = var.vcn_dns_label
+  public_subnet_cidr        = var.public_subnet_cidr
+  public_subnet_dns_label   = var.public_subnet_dns_label
+  private_subnet_cidr       = var.private_subnet_cidr
+  private_subnet_dns_label  = var.private_subnet_dns_label
+  ingress_security_rules    = var.ingress_security_rules
+  private_route_table_id    = var.private_route_table_id
+  private_security_list_ids = var.private_security_list_ids
+  freeform_tags             = var.freeform_tags
 }
 
 module "compute" {

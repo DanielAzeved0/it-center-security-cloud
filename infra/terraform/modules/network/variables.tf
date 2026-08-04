@@ -48,10 +48,20 @@ variable "ingress_security_rules" {
   type = list(object({
     protocol    = string
     source      = string
-    description = string
+    description = optional(string)
     tcp_port    = number
   }))
   default = []
+}
+
+variable "private_route_table_id" {
+  description = "OCID da route table ja existente usada pela subnet privada (NAT Gateway + Service Gateway, criados pelo VCN Wizard da Oracle). Fora do escopo do Terraform (ADR-024) - apenas referenciada, nunca gerenciada."
+  type        = string
+}
+
+variable "private_security_list_ids" {
+  description = "OCIDs das security lists ja existentes usadas pela subnet privada. Fora do escopo do Terraform (ADR-024) - apenas referenciadas, nunca gerenciadas."
+  type        = list(string)
 }
 
 variable "freeform_tags" {

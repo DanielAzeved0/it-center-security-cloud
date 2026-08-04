@@ -120,6 +120,40 @@ terraform apply
 terraform output
 ```
 
+## Execucao real (2026-08-04)
+
+O import descrito acima foi executado com sucesso contra producao. Notas para quem for repetir um processo parecido (nova VM, disaster recovery, ou outro ambiente):
+
+```text
+Provider oracle/oci ~> 5.0 resolveu para 5.47.0. Os modulos (network/compute)
+precisam de um versions.tf proprio declarando source = "oracle/oci" - sem
+isso o Terraform resolve "oci" para o namespace legado hashicorp/oci dentro
+dos modulos (ver "terraform providers" para diagnosticar isso).
+
+No provider 5.x, oci_core_instance.source_details usa o argumento
+source_id, nao image_id (o nome usado originalmente no modulo estava
+desatualizado/errado e so foi descoberto no primeiro terraform plan real).
+
+A VCN foi criada pelo "VCN Wizard" da Oracle: isso significa NAT Gateway,
+Service Gateway, e route tables/security lists dedicadas por subnet, nao so
+os recursos "basicos" descritos na secao Escopo. Ver docs/architecture/IAC.md
+("Descoberta real") e docs/architecture/NETWORK.md para o que foi encontrado
+e como o modulo network foi ajustado (variaveis private_route_table_id e
+private_security_list_ids).
+
+A regra "SSH" da security list default nao tinha description preenchida
+(so HTTP/HTTPS tinham) - o tipo da variavel ingress_security_rules precisou
+virar description = optional(string).
+
+O IP publico de producao (147.15.78.220) e EPHEMERAL, nao RESERVED -
+confirmado, decisao foi nao reservar agora (ver IAC.md).
+
+Ao final do import, sobrou so um diff de freeform_tags (tag "VCN" que o
+Wizard deixa em cada recurso de rede). Resolvido com um terraform apply
+minimo (0 add, 6 change, 0 destroy) normalizando para freeform_tags = {} -
+plan final confirmado como "No changes.".
+```
+
 ## O que nunca comitar
 
 ```text

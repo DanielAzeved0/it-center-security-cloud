@@ -542,78 +542,127 @@ Provisionar e versionar a camada de infraestrutura Oracle Cloud (VCN, subnets, s
 
 [x] Atualizar .gitignore com artefatos de Terraform
 
-[ ] Criar usuario IAM dedicado terraform-provisioner com API key propria
+[x] Criar usuario IAM dedicado terraform-provisioner com API key propria
 
-    Policy de escopo minimo redigida em infra/terraform/README.md
-    ("Usuario IAM e policy de escopo minimo"); criacao do usuario/grupo
-    no Console OCI e a geracao da API key continuam manuais, pendentes.
+    Criado manualmente no Console OCI (grupo TerraformProvisioners,
+    usuario terraform-provisioner, API key gerada e salva fora do
+    repositorio). Concluido em 2026-08-04.
 
 [x] Definir policy de escopo minimo (compartment especifico)
 
     Redigida em infra/terraform/README.md: inspect all-resources,
     manage virtual-network-family, manage instance-family e use
-    volume-family, restritos ao compartment do Edge Node.
+    volume-family. Aplicada `in tenancy` (nao `in compartment <nome>`)
+    porque o Edge Node vive no root compartment do tenancy
+    (danielazevedo081205), que nao existe como compartment nomeado
+    separado - sintaxe de policy da OCI exige `in tenancy` nesse caso.
 
-[ ] Descobrir e registrar shape, availability domain, regiao e compartment atuais
+[x] Descobrir e registrar shape, availability domain, regiao e compartment atuais
 
-    Runbook de comandos oci CLI somente-leitura documentado em
-    infra/terraform/README.md ("Descoberta dos parametros reais");
-    execucao real pendente (requer terraform-provisioner configurado).
+    Executado via oci CLI em 2026-08-04. Compartment = root do tenancy.
+    Regiao sa-saopaulo-1. AD gIEb:SA-SAOPAULO-1-AD-1. Shape real da
+    instancia e VM.Standard.E2.1.Micro (fixo, sem shape_config) - o
+    exemplo antigo em terraform.tfvars.example citava VM.Standard.A1.Flex,
+    corrigido.
 
-[ ] Verificar se o IP publico 147.15.78.220 e reservado ou efemero
+[x] Verificar se o IP publico 147.15.78.220 e reservado ou efemero
 
-    Comando `oci network public-ip list` e o criterio de decisao
-    (lifetime RESERVED vs EPHEMERAL) documentados no mesmo runbook;
-    execucao real pendente.
+    Confirmado via `oci network public-ip get`: lifetime EPHEMERAL,
+    scope AVAILABILITY_DOMAIN. Decisao registrada: manter efemero por
+    ora (nenhum terraform apply de recriacao roda nesta introducao, entao
+    o risco documentado em IAC.md nao se materializa agora). Nota
+    importante: OCI nao permite converter um IP efemero em reservado no
+    mesmo endereco - so criando um novo IP reservado (endereco diferente)
+    e migrando o DNS. Se o IP for reservado no futuro, isso exige janela
+    de manutencao planejada com atualizacao do registro DNS de
+    itcenter-daniel.chickenkiller.com.
 
-[ ] Levantar todos os OCIDs existentes (VCN, subnets, IGW, route table, security list, instancia)
+[x] Levantar todos os OCIDs existentes (VCN, subnets, IGW, route table, security list, instancia)
+
+    Levantados via oci CLI em 2026-08-04. Descoberta importante nao
+    prevista em IAC.md/NETWORK.md: a VCN foi criada pelo "VCN Wizard" da
+    Oracle, que tambem provisionou um NAT Gateway e um Service Gateway
+    (fora do escopo do Terraform - so referenciados por OCID). A subnet
+    privada usa uma route table e uma security list dedicadas (nao a
+    default da VCN, que na verdade pertence a subnet publica) com rota
+    real para o NAT Gateway - ou seja, a subnet privada ja tem saida de
+    internet configurada, nao esta "sem uso" como a documentacao antiga
+    sugeria. Ver docs/architecture/IAC.md e NETWORK.md atualizados.
 
 [x] Criar infra/terraform/modules/network
 
-    main.tf, variables.tf e outputs.tf criados (VCN, subnets, IGW,
-    route table e security list), parametrizados por variavel, sem
-    OCID hardcoded, com prevent_destroy na VCN. Ainda nao importado
-    contra producao.
+    Ajustado em 2026-08-04 apos a descoberta acima: adicionadas as
+    variaveis private_route_table_id/private_security_list_ids (a
+    subnet privada nao usa mais oci_core_vcn.this.default_route_table_id/
+    default_security_list_id), adicionadas as 2 regras ICMP padrao do
+    VCN Wizard na security list publica, display_names ajustados para
+    bater com os nomes reais ja existentes, e criado versions.tf
+    proprio do modulo (faltava - sem ele o Terraform resolvia o
+    provider como hashicorp/oci em vez de oracle/oci). Importado com
+    sucesso contra producao, plan limpo.
 
 [x] Criar infra/terraform/modules/compute
 
-    main.tf, variables.tf e outputs.tf criados (instancia
-    itcenter-edge-01), com prevent_destroy, ignore_changes em
-    source_details e variavel enable_bootstrap_user_data desligada
-    por padrao. Ainda nao importado contra producao.
+    Corrigido bug de schema em 2026-08-04: source_details usava
+    `image_id`, mas o provider oracle/oci >= 5.x espera `source_id`.
+    Criado versions.tf proprio do modulo (mesmo motivo do network).
+    Importado com sucesso contra producao com diff zero.
 
 [x] Criar infra/terraform/environments/production
 
-    main.tf (provider oci + modulos), variables.tf e
-    terraform.tfvars.example criados. terraform.tfvars real com os
-    valores de producao ainda nao existe (depende da descoberta acima).
+    main.tf, variables.tf e terraform.tfvars.example atualizados em
+    2026-08-04 com as novas variaveis private_route_table_id/
+    private_security_list_ids e correcao do exemplo de shape.
+    terraform.tfvars real preenchido com os valores de producao
+    (gitignored, nao versionado).
 
 [x] Fixar versions.tf (provider oci e terraform)
 
-    infra/terraform/environments/production/versions.tf criado:
-    terraform >= 1.6, provider oracle/oci ~> 5.0.
+    infra/terraform/environments/production/versions.tf ja existia:
+    terraform >= 1.6, provider oracle/oci ~> 5.0 (resolveu para 5.47.0).
+    Adicionado versions.tf tambem em modules/network e modules/compute
+    em 2026-08-04 (ver acima) - sem eles os modulos nao herdavam o
+    source oracle/oci corretamente.
 
-[ ] terraform init com backend local
+[x] terraform init com backend local
 
-[ ] Importar VCN e validar plan sem diff
+    Executado em 2026-08-04 (backend local, terraform.tfstate
+    gitignored).
 
-[ ] Importar Internet Gateway e validar plan sem diff
+[x] Importar VCN e validar plan sem diff
 
-[ ] Importar Route Table e validar plan sem diff
+[x] Importar Internet Gateway e validar plan sem diff
 
-[ ] Importar Security List e validar plan sem diff
+[x] Importar Route Table e validar plan sem diff
 
-[ ] Importar subnet publica e validar plan sem diff
+[x] Importar Security List e validar plan sem diff
 
-[ ] Importar subnet privada e validar plan sem diff
+[x] Importar subnet publica e validar plan sem diff
 
-[ ] Importar instancia de computacao e validar plan sem diff
+[x] Importar subnet privada e validar plan sem diff
 
-[ ] Importar IP publico reservado, se aplicavel
+[x] Importar instancia de computacao e validar plan sem diff
 
-[ ] Confirmar terraform plan completo em "No changes."
+    Diff zero de primeira (shape, imagem, subnet e chave SSH bateram
+    exatamente) - so depois de corrigir o bug image_id -> source_id.
 
-[ ] Adicionar lifecycle prevent_destroy na instancia e na VCN
+[x] Importar IP publico reservado, se aplicavel
+
+    Nao aplicavel: IP e efemero (ver item acima), decisao foi nao
+    reservar agora. Nenhum recurso oci_core_public_ip foi criado.
+
+[x] Confirmar terraform plan completo em "No changes."
+
+    Alcancado em 2026-08-04 apos um pequeno apply so de tags (0 add,
+    6 change, 0 destroy - remocao da tag "VCN" que o VCN Wizard deixa
+    em todo recurso de rede, normalizada para freeform_tags = {}).
+    `terraform plan` final retornou "No changes. Your infrastructure
+    matches the configuration."
+
+[x] Adicionar lifecycle prevent_destroy na instancia e na VCN
+
+    Ja estava no codigo dos modulos desde a criacao inicial; validado
+    que sobreviveu ao import sem problema.
 
 [ ] Criar bucket OCI Object Storage para state remoto
 

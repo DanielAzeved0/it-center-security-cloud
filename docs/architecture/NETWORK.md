@@ -25,8 +25,21 @@ sequenceDiagram
 
 ```text
 Dominio: itcenter-daniel.chickenkiller.com
-IP: 147.15.78.220
+IP: 147.15.78.220 (efemero - ver nota abaixo)
 ```
+
+O IP publico e efemero (`lifetime: EPHEMERAL`, escopo `AVAILABILITY_DOMAIN`), confirmado via `oci network public-ip get` durante o import do Terraform (EPIC 15, 2026-08-04). A OCI nao permite converter um IP efemero em reservado no mesmo endereco - so criando um novo IP reservado (endereco diferente). Decisao atual: manter efemero, risco documentado em `docs/architecture/IAC.md`. Reservar exigiria uma janela de manutencao planejada com atualizacao do registro DNS.
+
+## VCN e subnets
+
+A VCN `itcenter-vcn` (`10.0.0.0/16`) foi criada via "VCN Wizard" da Oracle, que provisiona automaticamente mais recursos do que a subnet publica/privada citadas na documentacao original:
+
+```text
+Subnet publica  (10.0.0.0/24) -> route table default -> Internet Gateway
+Subnet privada  (10.0.1.0/24) -> route table dedicada -> NAT Gateway + Service Gateway
+```
+
+A subnet privada nao esta "sem uso": ja tem saida de internet configurada via NAT Gateway (para atualizacoes de pacotes, por exemplo) e acesso ao Oracle Services Network via Service Gateway, mesmo sem nenhum recurso rodando nela hoje. NAT Gateway e Service Gateway ficam fora do escopo do Terraform (ADR-024) - sao apenas referenciados pelo OCID ja existente em `infra/terraform/modules/network`, nunca criados/destruidos por ele. Detalhes do import em `docs/architecture/IAC.md`.
 
 ## Rede Docker
 

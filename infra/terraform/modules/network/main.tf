@@ -22,15 +22,17 @@ resource "oci_core_vcn" "this" {
 resource "oci_core_internet_gateway" "this" {
   compartment_id = var.compartment_id
   vcn_id         = oci_core_vcn.this.id
-  display_name   = "itcenter-igw"
+  display_name   = "Internet gateway-itcenter-vcn"
   enabled        = true
   freeform_tags  = var.freeform_tags
 }
 
+# Route table default da VCN (criada pelo VCN Wizard da Oracle), usada pela
+# subnet publica. Importada aqui, nao criada do zero.
 resource "oci_core_route_table" "public" {
   compartment_id = var.compartment_id
   vcn_id         = oci_core_vcn.this.id
-  display_name   = "itcenter-public-rt"
+  display_name   = "default route table for itcenter-vcn"
   freeform_tags  = var.freeform_tags
 
   route_rules {
@@ -40,15 +42,38 @@ resource "oci_core_route_table" "public" {
   }
 }
 
+# Security list default da VCN (criada pelo VCN Wizard), usada pela subnet
+# publica. As duas regras ICMP sao o bloco padrao que a Oracle sempre
+# adiciona (Path MTU Discovery e Destination Unreachable) - nao vem do
+# var.ingress_security_rules porque nao sao configuraveis pelo operador.
 resource "oci_core_security_list" "public" {
   compartment_id = var.compartment_id
   vcn_id         = oci_core_vcn.this.id
-  display_name   = "itcenter-public-sl"
+  display_name   = "Default Security List for itcenter-vcn"
   freeform_tags  = var.freeform_tags
 
   egress_security_rules {
     protocol    = "all"
     destination = "0.0.0.0/0"
+  }
+
+  ingress_security_rules {
+    protocol = "1"
+    source   = "0.0.0.0/0"
+
+    icmp_options {
+      type = 3
+      code = 4
+    }
+  }
+
+  ingress_security_rules {
+    protocol = "1"
+    source   = var.vcn_cidr_block
+
+    icmp_options {
+      type = 3
+    }
   }
 
   dynamic "ingress_security_rules" {
@@ -69,7 +94,7 @@ resource "oci_core_security_list" "public" {
 resource "oci_core_subnet" "public" {
   compartment_id             = var.compartment_id
   vcn_id                     = oci_core_vcn.this.id
-  display_name               = "itcenter-public-subnet"
+  display_name               = "public subnet-itcenter-vcn"
   cidr_block                 = var.public_subnet_cidr
   dns_label                  = var.public_subnet_dns_label
   route_table_id             = oci_core_route_table.public.id
@@ -78,14 +103,20 @@ resource "oci_core_subnet" "public" {
   freeform_tags              = var.freeform_tags
 }
 
+# A subnet privada usa uma route table e security lists dedicadas (NAT
+# Gateway + Service Gateway, criadas pelo VCN Wizard) - nao a route
+# table/security list default da VCN, que na verdade pertence a subnet
+# publica (ver docs/architecture/IAC.md). NAT Gateway e Service Gateway
+# ficam fora do escopo do Terraform (ADR-024): sao apenas referenciados
+# pelo OCID ja existente, nunca criados/geridos por aqui.
 resource "oci_core_subnet" "private" {
   compartment_id             = var.compartment_id
   vcn_id                     = oci_core_vcn.this.id
-  display_name               = "itcenter-private-subnet"
+  display_name               = "private subnet-itcenter-vcn"
   cidr_block                 = var.private_subnet_cidr
   dns_label                  = var.private_subnet_dns_label
-  route_table_id             = oci_core_vcn.this.default_route_table_id
-  security_list_ids          = [oci_core_vcn.this.default_security_list_id]
+  route_table_id             = var.private_route_table_id
+  security_list_ids          = var.private_security_list_ids
   prohibit_public_ip_on_vnic = true
   freeform_tags              = var.freeform_tags
 }
