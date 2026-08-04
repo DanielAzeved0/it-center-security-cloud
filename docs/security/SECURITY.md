@@ -61,6 +61,19 @@ Futuro:
 
 ---
 
+## Integração Externa: Snipe-IT (EPIC 19, ADR-028)
+
+Primeira dependência externa de dados do projeto (fora de Terraform/Oracle Cloud, que é infraestrutura). Controles aplicados:
+
+* `SNIPEIT_BASE_URL` e `SNIPEIT_API_TOKEN` são secrets opcionais, lidos apenas via variável de ambiente (`.env.production`, nunca versionados) — mesma política de `AGENT_API_KEY`/`AUTH_TOKEN_SECRET`.
+* Sem `SNIPEIT_BASE_URL`/`SNIPEIT_API_TOKEN` configurados, `app/services/snipeit.py` não faz nenhuma chamada HTTP (integração desativada por padrão).
+* O IT Center só armazena `machines.snipeit_asset_id` (referência numérica). Nenhum dado de patrimônio, garantia, licença ou histórico de movimentação do Snipe-IT é replicado no banco do IT Center.
+* Qualquer falha de comunicação com o Snipe-IT (rede, timeout, resposta inesperada, erro HTTP) é capturada e apenas logada — nunca propaga erro nem bloqueia o check-in do agente, para que a indisponibilidade do Snipe-IT não vire indisponibilidade do IT Center.
+* A criação de ativo novo no Snipe-IT só ocorre quando `SNIPEIT_DEFAULT_MODEL_ID`/`SNIPEIT_DEFAULT_STATUS_ID` estiverem configurados; sem eles, a criação é pulada (evita erro 422 da API do Snipe-IT por falta de campos obrigatórios).
+* Monitoramento de disponibilidade do Snipe-IT em si fica fora do escopo do IT Center (ver ADR-028).
+
+---
+
 ## Proteção do Banco
 
 * Acesso apenas interno

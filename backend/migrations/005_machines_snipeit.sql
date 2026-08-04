@@ -1,0 +1,5 @@
+BEGIN;
+
+ALTER TABLE machines ADD COLUMN IF NOT EXISTS snipeit_asset_id INTEGER;
+
+COMMIT;

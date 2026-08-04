@@ -10,11 +10,14 @@ class MachineSummary(BaseModel):
     ip_address: str | None = Field(default=None, max_length=45)
     status: str
     last_seen: datetime | None
+    rustdesk_id: str | None = Field(default=None, max_length=50)
 
 
 class MachineDetail(MachineSummary):
     operating_system: str | None = Field(default=None, max_length=255)
     os_version: str | None = Field(default=None, max_length=100)
+    snipeit_asset_id: int | None = None
+    snipeit_asset_url: str | None = None
 
 
 class MachineMetric(BaseModel):
@@ -35,3 +38,12 @@ class MachineLocalAdmin(BaseModel):
     admin_name: str = Field(..., min_length=1, max_length=255)
     first_seen_at: datetime
     last_seen_at: datetime
+
+
+class MachineRustdeskUpdate(BaseModel):
+    rustdesk_id: str | None = Field(default=None, max_length=50)
+
+
+class MachineRustdeskUpdateResponse(BaseModel):
+    status: str
+    message: str

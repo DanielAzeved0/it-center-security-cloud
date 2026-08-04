@@ -6,6 +6,8 @@ Migrations SQL do PostgreSQL, aplicadas em ordem:
 001_initial_schema.sql   tabelas iniciais (machines, metrics, installed_programs, machine_local_admins, security_events, alerts, agent_configs)
 002_users.sql             tabela users (login administrativo, RBAC — EPIC 12)
 003_audit_logs.sql        tabela audit_logs (auditoria — EPIC 12)
+004_machines_rustdesk.sql tabela machines ganha rustdesk_id (integração RustDesk — EPIC 19, ADR-027)
+005_machines_snipeit.sql  tabela machines ganha snipeit_asset_id (integração Snipe-IT — EPIC 19, ADR-028)
 ```
 
 Em execução normal (Docker Compose ou `python apply_migrations.py`), todas as migrations são aplicadas automaticamente antes da API iniciar.

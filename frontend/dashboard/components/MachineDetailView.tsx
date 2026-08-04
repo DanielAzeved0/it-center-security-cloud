@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Shell } from "@/components/Shell";
 import { EmptyState, ErrorState, LoadingBlock, SeverityBadge, StatusBadge, ToolbarButton } from "@/components/Ui";
 import { formatDateTime, formatRelativeMinutes, formatUptime, requestBackend } from "@/lib/api";
-import type { AlertSummary, MachineDetail, MachineLocalAdmin, MachineMetric, MachineProgram, SecurityEvent } from "@/lib/types";
+import type { AlertSummary, AuthUser, MachineDetail, MachineLocalAdmin, MachineMetric, MachineProgram, SecurityEvent } from "@/lib/types";
 
 type SectionState<T> = {
   data: T;
@@ -55,6 +55,10 @@ export function MachineDetailView({ machineId }: { machineId: string }) {
   const [admins, setAdmins] = useState<SectionState<MachineLocalAdmin[]>>(emptyAdminsState);
   const [events, setEvents] = useState<SectionState<SecurityEvent[]>>(emptyEventsState);
   const [alerts, setAlerts] = useState<SectionState<AlertSummary[]>>(emptyAlertsState);
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
+  const [rustdeskInput, setRustdeskInput] = useState("");
+  const [rustdeskSaving, setRustdeskSaving] = useState(false);
+  const [rustdeskError, setRustdeskError] = useState<string | null>(null);
 
   const loadDetail = useCallback(async () => {
     if (!validMachineId) {
@@ -68,8 +72,12 @@ export function MachineDetailView({ machineId }: { machineId: string }) {
     setDetailError(null);
 
     try {
-      const machineDetail = await requestBackend<MachineDetail>(`/api/v1/machines/${parsedMachineId}`);
+      const [machineDetail, userPayload] = await Promise.all([
+        requestBackend<MachineDetail>(`/api/v1/machines/${parsedMachineId}`),
+        requestBackend<{ user: AuthUser }>("/api/v1/auth/me"),
+      ]);
       setDetail(machineDetail);
+      setCurrentUser(userPayload.user);
     } catch (err) {
       setDetail(null);
       setDetailError(err instanceof Error ? err.message : "Erro inesperado");
@@ -179,6 +187,33 @@ export function MachineDetailView({ machineId }: { machineId: string }) {
     loadAll();
   }, [loadAll]);
 
+  useEffect(() => {
+    setRustdeskInput(detail?.rustdesk_id ?? "");
+  }, [detail?.rustdesk_id]);
+
+  const saveRustdesk = async () => {
+    if (!validMachineId) {
+      return;
+    }
+
+    setRustdeskSaving(true);
+    setRustdeskError(null);
+
+    try {
+      const trimmed = rustdeskInput.trim();
+      await requestBackend<{ status: string; message: string }>(`/api/v1/machines/${parsedMachineId}/rustdesk`, {
+        method: "PATCH",
+        body: JSON.stringify({ rustdesk_id: trimmed.length > 0 ? trimmed : null }),
+      });
+      await loadDetail();
+    } catch (err) {
+      setRustdeskError(err instanceof Error ? err.message : "Erro inesperado");
+    } finally {
+      setRustdeskSaving(false);
+    }
+  };
+
+  const canManageRustdesk = currentUser?.role === "admin" || currentUser?.role === "analyst";
   const latestMetric = metrics.data[0];
   const lastSeenLabel = detail ? formatRelativeMinutes(detail.last_seen) : "sem check-in";
   const programsPreview = useMemo(() => programs.data.slice(0, 80), [programs.data]);
@@ -226,6 +261,79 @@ export function MachineDetailView({ machineId }: { machineId: string }) {
               <DetailItem label="Ultimo check-in" value={formatDateTime(detail.last_seen)} helper={lastSeenLabel} />
               <DetailItem label="ID interno" value={String(detail.id)} />
             </dl>
+          </section>
+
+          <section className="panel">
+            <div className="panel-header">
+              <h2>Integracoes</h2>
+              <span>RustDesk e Snipe-IT</span>
+            </div>
+            <div className="integrations-grid">
+              <div className="integration-block">
+                <span className="eyebrow">RustDesk</span>
+                {detail.rustdesk_id && canManageRustdesk ? (
+                  <a
+                    className="secondary-button compact-button"
+                    href={`rustdesk://connect?id=${detail.rustdesk_id}`}
+                  >
+                    Conectar
+                  </a>
+                ) : detail.rustdesk_id ? (
+                  <span
+                    className="secondary-button compact-button"
+                    aria-disabled="true"
+                    title="Seu perfil nao pode conectar via RustDesk"
+                  >
+                    Conectar
+                  </span>
+                ) : (
+                  <p className="panel-note">Nenhum ID RustDesk cadastrado para esta maquina.</p>
+                )}
+                <form
+                  className="inline-form"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    void saveRustdesk();
+                  }}
+                >
+                  <label>
+                    ID do RustDesk
+                    <input
+                      type="text"
+                      value={rustdeskInput}
+                      onChange={(event) => setRustdeskInput(event.target.value)}
+                      placeholder="Ex: 123456789"
+                      disabled={!canManageRustdesk || rustdeskSaving}
+                    />
+                  </label>
+                  <button
+                    className="primary-button"
+                    type="submit"
+                    disabled={!canManageRustdesk || rustdeskSaving}
+                    title={!canManageRustdesk ? "Seu perfil nao pode editar o RustDesk desta maquina" : undefined}
+                  >
+                    {rustdeskSaving ? "Salvando" : "Salvar"}
+                  </button>
+                </form>
+                {rustdeskError ? <div className="form-error" role="alert">{rustdeskError}</div> : null}
+              </div>
+
+              <div className="integration-block">
+                <span className="eyebrow">Snipe-IT</span>
+                {detail.snipeit_asset_url ? (
+                  <a
+                    className="secondary-button compact-button"
+                    href={detail.snipeit_asset_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Ver no Snipe-IT
+                  </a>
+                ) : (
+                  <p className="panel-note">Ativo ainda nao sincronizado com o Snipe-IT.</p>
+                )}
+              </div>
+            </div>
           </section>
 
           <section className="panel">

@@ -48,6 +48,12 @@ button:disabled {
   opacity: 0.6;
 }
 
+a[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.6;
+  pointer-events: none;
+}
+
 a {
   color: inherit;
   text-decoration: none;
@@ -736,6 +742,56 @@ tr:last-child td {
   font-size: 13px;
 }
 
+.integrations-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.integration-block {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  padding: 14px;
+  background: var(--surface-strong);
+  border-radius: 8px;
+}
+
+.integration-block .panel-note {
+  margin: 0;
+}
+
+.inline-form {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.inline-form label {
+  display: grid;
+  flex: 1 1 200px;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.inline-form input {
+  min-height: 38px;
+  padding: 0 10px;
+  color: var(--text);
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.inline-form input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .detail-metrics {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
@@ -910,7 +966,8 @@ progress::-moz-progress-bar {
   .detail-grid,
   .detail-grid-wide,
   .metric-summary-grid,
-  .metric-grid {
+  .metric-grid,
+  .integrations-grid {
     grid-template-columns: 1fr;
   }
 

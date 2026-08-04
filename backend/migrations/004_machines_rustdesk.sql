@@ -1,0 +1,5 @@
+BEGIN;
+
+ALTER TABLE machines ADD COLUMN IF NOT EXISTS rustdesk_id VARCHAR(50);
+
+COMMIT;

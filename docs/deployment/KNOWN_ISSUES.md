@@ -125,6 +125,24 @@ Evolucao esperada:
 
 * Adicionar `.env*` ao `.dockerignore` do frontend como prevencao. Rastreado na EPIC 17 de `docs/development/TASKS.md`.
 
+## `npm run lint` quebrado no frontend
+
+Descoberto em 2026-08-04 durante a implementacao da EPIC 19: `npm run lint` (`next lint`) falha em `frontend/dashboard/`.
+
+Causa:
+
+```text
+Next.js 16 removeu o comando integrado `next lint` (substituido por ESLint standalone) e o projeto nunca teve `eslint` como devDependency — nao e uma regressao da EPIC 19, o mesmo erro ja ocorria antes dessa mudanca (reproduzido isoladamente com `npx next lint .`).
+```
+
+Risco:
+
+* O passo de lint documentado em `CLAUDE.md` ("Frontend: `npm run lint` e `npm run build`") nao funciona hoje; `npm run build` (TypeScript + Next) continua sendo a unica verificacao automatizada real do frontend fora do CI.
+
+Evolucao esperada:
+
+* Adicionar `eslint`/`eslint-config-next` como devDependency e migrar para o CLI standalone do ESLint, em tarefa propria (fora do escopo da EPIC 19).
+
 ## PostgreSQL no mesmo Edge Node
 
 No MVP, PostgreSQL roda no mesmo host por custo zero.

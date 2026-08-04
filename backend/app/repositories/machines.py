@@ -115,7 +115,8 @@ def list_machines() -> list[MachineSummary]:
                 username,
                 host(ip_address) AS ip_address,
                 status,
-                last_seen
+                last_seen,
+                rustdesk_id
             FROM machines
             ORDER BY id
             """
@@ -138,7 +139,9 @@ def get_machine(machine_id: int) -> MachineDetail | None:
                 operating_system,
                 os_version,
                 status,
-                last_seen
+                last_seen,
+                rustdesk_id,
+                snipeit_asset_id
             FROM machines
             WHERE id = %s
             """,
@@ -149,6 +152,33 @@ def get_machine(machine_id: int) -> MachineDetail | None:
         return None
 
     return MachineDetail(**row)
+
+
+def update_machine_rustdesk_id(machine_id: int, rustdesk_id: str | None) -> bool:
+    with get_connection() as connection:
+        row = connection.execute(
+            """
+            UPDATE machines
+            SET rustdesk_id = %s
+            WHERE id = %s
+            RETURNING id
+            """,
+            (rustdesk_id, machine_id),
+        ).fetchone()
+
+    return row is not None
+
+
+def update_machine_snipeit_asset_id(machine_id: int, snipeit_asset_id: int) -> None:
+    with get_connection() as connection:
+        connection.execute(
+            """
+            UPDATE machines
+            SET snipeit_asset_id = %s
+            WHERE id = %s
+            """,
+            (snipeit_asset_id, machine_id),
+        )
 
 
 def list_machine_metrics(machine_id: int) -> list[MachineMetric] | None:

@@ -1,7 +1,7 @@
 from hmac import compare_digest
 from typing import Annotated
 
-from fastapi import APIRouter, Header, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Header, HTTPException, status
 
 from app.core.config import get_settings
 from app.schemas.agent import AgentCheckinRequest, AgentCheckinResponse
@@ -13,6 +13,7 @@ router = APIRouter(prefix="/api/v1/agent", tags=["agent"])
 @router.post("/checkin", response_model=AgentCheckinResponse)
 def checkin(
     payload: AgentCheckinRequest,
+    background_tasks: BackgroundTasks,
     x_agent_api_key: Annotated[str | None, Header(alias="X-Agent-Api-Key")] = None,
 ) -> AgentCheckinResponse:
     settings = get_settings()
@@ -29,4 +30,4 @@ def checkin(
             detail="Invalid or missing agent API key",
         )
 
-    return process_agent_checkin(payload)
+    return process_agent_checkin(payload, background_tasks)

@@ -719,33 +719,33 @@ Configurar o Claude Code para atuar como especialistas de dominio (backend, fron
 
 Objetivo:
 
-Implementar as duas primeiras integracoes do Hub (Fase H de `docs/architecture/FUTURE_ARCHITECTURE.md`), priorizadas em 2026-08-03 por serem as de menor esforco e maior valor imediato de produto. Somente planejamento/documentacao nesta rodada; implementacao em ciclo proprio (ver ADR-027 e ADR-028).
+Implementar as duas primeiras integracoes do Hub (Fase H de `docs/architecture/FUTURE_ARCHITECTURE.md`), priorizadas em 2026-08-03 por serem as de menor esforco e maior valor imediato de produto (ver ADR-027 e ADR-028). Backend e frontend implementados em 2026-08-04, com revisao de seguranca aplicada (RBAC do botao "Conectar" corrigido no cliente; sincronizacao Snipe-IT movida para `BackgroundTasks` para nao atrasar o check-in sob lentidao do Snipe-IT). Execucao real dos testes novos (`pytest`) ainda pendente de ambiente com Docker/Postgres.
 
 ### Tarefas - RustDesk (ADR-027)
 
-[ ] Adicionar coluna `machines.rustdesk_id` (nullable) via migration
+[x] Adicionar coluna `machines.rustdesk_id` (nullable) via migration
 
-[ ] Endpoint `PATCH /api/v1/machines/{id}/rustdesk` para admin/analyst cadastrarem o ID (viewer sem acesso de escrita)
+[x] Endpoint `PATCH /api/v1/machines/{id}/rustdesk` para admin/analyst cadastrarem o ID (viewer sem acesso de escrita)
 
-[ ] Botao "Conectar" em `MachineDetailView` (abre `rustdesk://connect?id=...` via URI customizado do RustDesk)
+[x] Botao "Conectar" em `MachineDetailView` (abre `rustdesk://connect?id=...` via URI customizado do RustDesk)
 
-[ ] Indicar no `MachinesView`/`MachineDetailView` se a maquina tem RustDesk cadastrado
+[x] Indicar no `MachinesView`/`MachineDetailView` se a maquina tem RustDesk cadastrado
 
-[ ] Atualizar `docs/backend/DATABASE.md`, `docs/backend/API.md` e `docs/security/AUTH.md` no momento da implementacao (nao antes, para nao descrever schema/endpoint que ainda nao existe)
+[x] Atualizar `docs/backend/DATABASE.md`, `docs/backend/API.md` e `docs/security/AUTH.md` no momento da implementacao (nao antes, para nao descrever schema/endpoint que ainda nao existe)
 
 ### Tarefas - Snipe-IT (ADR-028)
 
-[ ] Criar servico de integracao (`app/services/snipeit.py`) consumindo a API REST do Snipe-IT
+[x] Criar servico de integracao (`app/services/snipeit.py`) consumindo a API REST do Snipe-IT
 
-[ ] Adicionar `SNIPEIT_BASE_URL` e `SNIPEIT_API_TOKEN` como secrets, nunca versionados (`.env.production.example`, `docs/security/SECURITY.md`)
+[x] Adicionar `SNIPEIT_BASE_URL` e `SNIPEIT_API_TOKEN` como secrets, nunca versionados (`.env.production.example`, `docs/security/SECURITY.md`)
 
-[ ] Adicionar coluna `machines.snipeit_asset_id` (nullable) via migration
+[x] Adicionar coluna `machines.snipeit_asset_id` (nullable) via migration
 
-[ ] Sincronizacao automatica no check-in: existe no Snipe-IT -> atualiza; nao existe -> cria (falha do Snipe-IT nao bloqueia o check-in)
+[x] Sincronizacao automatica no check-in: existe no Snipe-IT -> atualiza; nao existe -> cria (falha do Snipe-IT nao bloqueia o check-in)
 
-[ ] Link "Ver no Snipe-IT" no `MachineDetailView` (aponta para a URL do ativo, sem espelhar todos os campos do Snipe-IT no banco do IT Center)
+[x] Link "Ver no Snipe-IT" no `MachineDetailView` (aponta para a URL do ativo, sem espelhar todos os campos do Snipe-IT no banco do IT Center)
 
-[ ] Atualizar `docs/backend/DATABASE.md`, `docs/backend/API.md` e `docs/security/SECURITY.md` no momento da implementacao
+[x] Atualizar `docs/backend/DATABASE.md`, `docs/backend/API.md` e `docs/security/SECURITY.md` no momento da implementacao
 
 ---
 

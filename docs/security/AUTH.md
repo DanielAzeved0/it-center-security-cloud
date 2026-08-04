@@ -162,6 +162,9 @@ Permissoes:
 | Visualizar eventos de seguranca | sim | sim | sim |
 | Visualizar alertas | sim | sim | sim |
 | Resolver alertas | sim | sim | nao |
+| Cadastrar/editar RustDesk ID da maquina (EPIC 19) | sim | sim | nao |
+| Conectar via RustDesk (botao no dashboard, EPIC 19) | sim | sim | nao |
+| Ver link do ativo no Snipe-IT (EPIC 19) | sim | sim | sim |
 | Gerenciar usuarios | sim | nao | nao |
 | Alterar configuracoes administrativas | sim | nao | nao |
 | Alterar politica SOC | sim | nao | nao |
@@ -264,10 +267,13 @@ GET /api/v1/machines/{id}
 GET /api/v1/machines/{id}/metrics
 GET /api/v1/machines/{id}/programs
 GET /api/v1/machines/{id}/admins
+PATCH /api/v1/machines/{id}/rustdesk
 GET /api/v1/alerts
 PATCH /api/v1/alerts/{id}/resolve
 GET /api/v1/security-events
 ```
+
+`PATCH /api/v1/machines/{id}/rustdesk` (EPIC 19, ADR-027) segue o mesmo padrão de `PATCH /api/v1/alerts/{id}/resolve`: exige `admin` ou `analyst` (`viewer` recebe `403`) e registra `audit_logs` com `action = "machine.rustdesk_update"`. O dashboard (`MachineDetailView.tsx`) reflete o mesmo RBAC no cliente: o formulário de cadastro e o botão "Conectar" ficam desabilitados para `viewer` (o botão "Conectar" só é renderizado como link ativo quando o papel permite; para `viewer`, aparece desabilitado com `title` explicativo) — a aplicação da regra em si continua sendo do backend, o frontend só evita expor a ação de forma confusa.
 
 Excecoes previstas:
 

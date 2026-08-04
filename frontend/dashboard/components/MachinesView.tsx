@@ -104,7 +104,10 @@ export function MachinesView() {
                     <small>{machine.username ?? "usuario nao informado"}</small>
                   </span>
                   <span>
-                    <StatusBadge value={machine.status} />
+                    <span className="item-meta">
+                      <StatusBadge value={machine.status} />
+                      {machine.rustdesk_id ? <span className="badge">RustDesk</span> : null}
+                    </span>
                     <small>{formatRelativeMinutes(machine.last_seen)}</small>
                   </span>
                 </button>

@@ -1,8 +1,11 @@
+from fastapi import BackgroundTasks
+
 from app.schemas.agent import AgentCheckinRequest, AgentCheckinResponse
 from app.repositories.alerts import create_open_alert_once
 from app.repositories.local_admins import sync_machine_local_admins
 from app.repositories.machines import save_machine_checkin
 from app.repositories.security_events import create_security_event
+from app.services.snipeit import sync_machine_asset
 
 # Espelhos temporarios de ASSET_POLICY.md ate existir politica em banco/dashboard.
 KNOWN_ASSET_HOSTNAMES = {"NOTE-DANIEL", "PC-TI-01", "PC-TI-02", "PC-FINANCEIRO-01"}
@@ -367,9 +370,10 @@ def process_security_posture(payload: AgentCheckinRequest, machine_id: int) -> N
     process_installed_program_rules(payload, machine_id)
 
 
-def process_agent_checkin(payload: AgentCheckinRequest) -> AgentCheckinResponse:
+def process_agent_checkin(payload: AgentCheckinRequest, background_tasks: BackgroundTasks) -> AgentCheckinResponse:
     machine = save_machine_checkin(payload)
     process_security_posture(payload, machine.id)
+    background_tasks.add_task(sync_machine_asset, machine.id, _hostname(payload))
 
     return AgentCheckinResponse(
         status="success",

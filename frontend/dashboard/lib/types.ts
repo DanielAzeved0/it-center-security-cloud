@@ -5,11 +5,14 @@ export type MachineSummary = {
   ip_address: string | null;
   status: "online" | "offline" | string;
   last_seen: string | null;
+  rustdesk_id: string | null;
 };
 
 export type MachineDetail = MachineSummary & {
   operating_system: string | null;
   os_version: string | null;
+  snipeit_asset_id: number | null;
+  snipeit_asset_url: string | null;
 };
 
 export type MachineMetric = {
