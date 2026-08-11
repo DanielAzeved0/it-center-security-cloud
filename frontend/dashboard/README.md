@@ -69,10 +69,13 @@ http://127.0.0.1:3000
 ```text
 /login     Login administrativo (Bearer token, RBAC)
 /          Dashboard operacional
+/executive Dashboard executivo (resumo agregado + exportar PDF)
 /machines  Inventario, metricas e programas
 /alerts    Alertas e acao de resolver
 /security  Eventos de seguranca
 ```
+
+Em `/executive` e no detalhe de maquina (`/machines/[id]`), o botao "Exportar PDF" baixa um relatorio gerado pelo backend (`reportlab`) via `GET /api/v1/reports/executive.pdf` e `GET /api/v1/machines/{id}/report.pdf`.
 
 ## Seguranca de dependencias
 

@@ -36,6 +36,41 @@ export async function requestBackend<T>(path: string, init?: RequestInit): Promi
   return response.json() as Promise<T>;
 }
 
+export async function downloadBackendFile(path: string, fallbackFilename: string): Promise<void> {
+  const response = await fetch(`/api/backend${path}`, { cache: "no-store" });
+
+  if (!response.ok) {
+    let message = `Falha ao gerar arquivo (${response.status})`;
+
+    try {
+      const payload = (await response.json()) as { detail?: string };
+      if (payload.detail) {
+        message = payload.detail;
+      }
+    } catch {
+      // Mantem a mensagem padrao quando a resposta nao for JSON.
+    }
+
+    throw new ApiError(message, response.status);
+  }
+
+  const disposition = response.headers.get("Content-Disposition") ?? "";
+  const filenameMatch = disposition.match(/filename="([^"]+)"/);
+  const filename = filenameMatch ? filenameMatch[1] : fallbackFilename;
+
+  const blob = await response.blob();
+  const downloadUrl = URL.createObjectURL(blob);
+
+  const link = document.createElement("a");
+  link.href = downloadUrl;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+
+  URL.revokeObjectURL(downloadUrl);
+}
+
 export function formatDateTime(value: string | null | undefined): string {
   if (!value) {
     return "-";

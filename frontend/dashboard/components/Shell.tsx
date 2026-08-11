@@ -9,6 +9,7 @@ import type { AuthUser } from "@/lib/types";
 
 const navItems = [
   { href: "/", label: "Dashboard" },
+  { href: "/executive", label: "Executivo" },
   { href: "/machines", label: "Maquinas" },
   { href: "/alerts", label: "Alertas" },
   { href: "/security", label: "Seguranca" },

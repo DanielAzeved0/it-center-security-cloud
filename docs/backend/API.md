@@ -517,6 +517,80 @@ Resposta:
 
 ---
 
+# Dashboard Executivo
+
+## Resumo do Dashboard
+
+Retorna um resumo agregado (máquinas online/offline, alertas abertos por severidade, eventos recentes), evitando que a tela executiva precise de múltiplas chamadas.
+
+```http
+GET /api/v1/dashboard/summary
+```
+
+Requer papel `admin`, `analyst` ou `viewer`.
+
+Resposta:
+
+```json
+{
+  "machines_total": 12,
+  "machines_online": 9,
+  "machines_offline": 3,
+  "alerts_open_total": 4,
+  "alerts_open_by_severity": {
+    "low": 1,
+    "medium": 2,
+    "high": 1,
+    "critical": 0
+  },
+  "recent_events": [
+    {
+      "id": 42,
+      "machine_id": 3,
+      "event_type": "usb_device_connected",
+      "severity": "medium",
+      "source": "agent",
+      "description": "Dispositivo USB conectado",
+      "created_at": "2026-08-11T12:00:00"
+    }
+  ]
+}
+```
+
+`alerts_open_by_severity` conta alertas com status `open` ou `investigating`. `recent_events` traz os 10 eventos mais recentes (mesma origem de `GET /api/v1/security-events`).
+
+Origem dos dados:
+
+```text
+Agregação de machines, alerts e security_events no PostgreSQL.
+```
+
+---
+
+# Exportação de Relatórios PDF
+
+Gerados com `reportlab` (Python puro, compatível com a imagem Alpine do backend — ver ADR-029). Ambos exigem papel `admin`, `analyst` ou `viewer`, respondem `Content-Type: application/pdf` e `Content-Disposition: attachment`.
+
+## Relatório Executivo
+
+```http
+GET /api/v1/reports/executive.pdf
+```
+
+PDF com os mesmos indicadores de `GET /api/v1/dashboard/summary` (máquinas online/offline, alertas por severidade, eventos recentes).
+
+## Relatório de Máquina
+
+```http
+GET /api/v1/machines/{machine_id}/report.pdf
+```
+
+PDF com o detalhe da máquina, últimas métricas, alertas, eventos de segurança, programas instalados e administradores locais — mesmos dados já expostos em `GET /api/v1/machines/{machine_id}` e endpoints relacionados.
+
+Quando a máquina não existir, a API retorna `404 Machine not found`.
+
+---
+
 # Regras Iniciais da API
 
 ## Segurança

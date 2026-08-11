@@ -12,6 +12,8 @@ const ALLOWED_PATH_PREFIXES = [
   "api/v1/machines",
   "api/v1/alerts",
   "api/v1/security-events",
+  "api/v1/dashboard",
+  "api/v1/reports",
 ];
 
 function isAllowedPath(joinedPath: string): boolean {
@@ -73,12 +75,19 @@ function fetchUpstream(
 }
 
 async function relay(response: Response): Promise<NextResponse> {
-  const responseBody = await response.text();
+  const responseBody = await response.arrayBuffer();
+  const headers: Record<string, string> = {
+    "Content-Type": response.headers.get("Content-Type") ?? "application/json",
+  };
+
+  const contentDisposition = response.headers.get("Content-Disposition");
+  if (contentDisposition) {
+    headers["Content-Disposition"] = contentDisposition;
+  }
+
   return new NextResponse(responseBody, {
     status: response.status,
-    headers: {
-      "Content-Type": response.headers.get("Content-Type") ?? "application/json",
-    },
+    headers,
   });
 }
 

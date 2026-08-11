@@ -361,6 +361,9 @@ A fonte de verdade sobre rotas, contratos de request/response e regras de segura
 /api/v1/machines/{id}/admins             administradores locais
 /api/v1/security-events                  eventos de segurança (SOC Light)
 /api/v1/alerts, /alerts/{id}/resolve     alertas e resolução
+/api/v1/dashboard/summary                resumo agregado para o dashboard executivo (ADR-029)
+/api/v1/reports/executive.pdf            relatório executivo em PDF (ADR-029)
+/api/v1/machines/{id}/report.pdf         relatório em PDF de uma máquina (ADR-029)
 ```
 
 ---

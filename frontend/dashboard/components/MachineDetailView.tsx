@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Shell } from "@/components/Shell";
 import { EmptyState, ErrorState, LoadingBlock, SeverityBadge, StatusBadge, ToolbarButton } from "@/components/Ui";
-import { formatDateTime, formatRelativeMinutes, formatUptime, requestBackend } from "@/lib/api";
+import { downloadBackendFile, formatDateTime, formatRelativeMinutes, formatUptime, requestBackend } from "@/lib/api";
 import type { AlertSummary, AuthUser, MachineDetail, MachineLocalAdmin, MachineMetric, MachineProgram, SecurityEvent } from "@/lib/types";
 
 type SectionState<T> = {
@@ -59,6 +59,8 @@ export function MachineDetailView({ machineId }: { machineId: string }) {
   const [rustdeskInput, setRustdeskInput] = useState("");
   const [rustdeskSaving, setRustdeskSaving] = useState(false);
   const [rustdeskError, setRustdeskError] = useState<string | null>(null);
+  const [exportingReport, setExportingReport] = useState(false);
+  const [reportError, setReportError] = useState<string | null>(null);
 
   const loadDetail = useCallback(async () => {
     if (!validMachineId) {
@@ -213,6 +215,26 @@ export function MachineDetailView({ machineId }: { machineId: string }) {
     }
   };
 
+  const exportReport = async () => {
+    if (!validMachineId) {
+      return;
+    }
+
+    setExportingReport(true);
+    setReportError(null);
+
+    try {
+      await downloadBackendFile(
+        `/api/v1/machines/${parsedMachineId}/report.pdf`,
+        `relatorio-maquina-${parsedMachineId}.pdf`,
+      );
+    } catch (err) {
+      setReportError(err instanceof Error ? err.message : "Erro inesperado ao gerar o PDF");
+    } finally {
+      setExportingReport(false);
+    }
+  };
+
   const canManageRustdesk = currentUser?.role === "admin" || currentUser?.role === "analyst";
   const latestMetric = metrics.data[0];
   const lastSeenLabel = detail ? formatRelativeMinutes(detail.last_seen) : "sem check-in";
@@ -232,11 +254,15 @@ export function MachineDetailView({ machineId }: { machineId: string }) {
             Voltar
           </Link>
           <ToolbarButton onClick={loadAll}>Atualizar</ToolbarButton>
+          <button className="primary-button" type="button" disabled={exportingReport || !detail} onClick={exportReport}>
+            {exportingReport ? "Gerando PDF" : "Exportar PDF"}
+          </button>
         </>
       }
     >
       {detailLoading ? <LoadingBlock label="Carregando maquina" /> : null}
       {detailError ? <ErrorState message={detailError} onRetry={loadDetail} /> : null}
+      {reportError ? <div className="form-error" role="alert">{reportError}</div> : null}
 
       {detail && !detailLoading ? (
         <section className="machine-detail-layout">

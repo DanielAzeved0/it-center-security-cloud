@@ -66,3 +66,19 @@ export type SecurityEvent = {
   description: string;
   created_at: string;
 };
+
+export type AlertSeverityCounts = {
+  low: number;
+  medium: number;
+  high: number;
+  critical: number;
+};
+
+export type DashboardSummary = {
+  machines_total: number;
+  machines_online: number;
+  machines_offline: number;
+  alerts_open_total: number;
+  alerts_open_by_severity: AlertSeverityCounts;
+  recent_events: SecurityEvent[];
+};

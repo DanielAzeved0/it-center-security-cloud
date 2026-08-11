@@ -833,21 +833,62 @@ Implementar as duas primeiras integracoes do Hub (Fase H de `docs/architecture/F
 
 Objetivo:
 
-Entregar exportacao de relatorios em PDF e uma visao executiva resumida do dashboard (ADR-029). Somente planejamento/documentacao nesta rodada.
+Entregar exportacao de relatorios em PDF e uma visao executiva resumida do dashboard (ADR-029).
 
 ### Tarefas
 
-[ ] Escolher e adicionar ao backend a biblioteca de geracao de PDF (ver alternativas avaliadas na ADR-029)
+[x] Escolher e adicionar ao backend a biblioteca de geracao de PDF (ver alternativas avaliadas na ADR-029)
 
-[ ] Endpoint agregado `GET /api/v1/dashboard/summary` (maquinas online/offline, alertas por severidade, eventos recentes) para alimentar a tela executiva sem N chamadas do frontend
+    reportlab==5.0.0 adicionado a backend/requirements.txt. Validado em
+    2026-08-11 com build real da imagem Docker Alpine do backend
+    (docker build) e geracao de PDF dentro do container: instala sem
+    dependencias de sistema extras, confirmando a premissa da ADR-029
+    de manter a base Alpine intacta (ao contrario do WeasyPrint).
 
-[ ] Tela "Dashboard Executivo" no frontend (nova rota; leitura liberada para `admin`/`analyst`/`viewer`, mesmo padrao de RBAC das telas atuais)
+[x] Endpoint agregado `GET /api/v1/dashboard/summary` (maquinas online/offline, alertas por severidade, eventos recentes) para alimentar a tela executiva sem N chamadas do frontend
 
-[ ] Endpoint(s) de exportacao PDF (ex.: `GET /api/v1/machines/{id}/report.pdf`, `GET /api/v1/reports/executive.pdf`)
+    Implementado em app/routes/dashboard.py + app/services/dashboard.py +
+    app/repositories/dashboard.py, RBAC admin/analyst/viewer. Alertas
+    contados como abertos quando status IN ('open', 'investigating').
 
-[ ] Botao de exportar PDF na tela executiva e/ou no detalhe da maquina
+[x] Tela "Dashboard Executivo" no frontend (nova rota; leitura liberada para `admin`/`analyst`/`viewer`, mesmo padrao de RBAC das telas atuais)
 
-[ ] Atualizar `docs/backend/API.md` e `frontend/dashboard/README.md` no momento da implementacao
+    components/ExecutiveDashboardView.tsx + app/executive/page.tsx, item
+    de navegacao "Executivo" adicionado em Shell.tsx.
+
+[x] Endpoint(s) de exportacao PDF (ex.: `GET /api/v1/machines/{id}/report.pdf`, `GET /api/v1/reports/executive.pdf`)
+
+    app/routes/reports.py + app/services/reports.py (reportlab, sem
+    markup HTML nas celulas de tabela para evitar que texto de
+    hostname/descricao quebre o parser de Paragraph). RBAC
+    admin/analyst/viewer, mesmo padrao de leitura das telas atuais.
+
+[x] Botao de exportar PDF na tela executiva e/ou no detalhe da maquina
+
+    Botao "Exportar PDF" em ExecutiveDashboardView.tsx e
+    MachineDetailView.tsx, via novo helper downloadBackendFile em
+    lib/api.ts (fetch direto ao proxy + blob, sem passar por
+    requestBackend que assume JSON).
+
+    Durante a implementacao foi corrigido um bug real no proxy
+    app/api/backend/[...path]/route.ts: a funcao relay() lia toda
+    resposta com response.text(), o que corrompe bytes binarios (PDF).
+    Trocado para response.arrayBuffer() e Content-Disposition passou a
+    ser repassado. Validado em 2026-08-11 comparando byte a byte o PDF
+    obtido direto do backend com o obtido via proxy (identicos, exceto
+    timestamp de geracao). ALLOWED_PATH_PREFIXES ampliado com
+    api/v1/dashboard e api/v1/reports.
+
+[x] Atualizar `docs/backend/API.md` e `frontend/dashboard/README.md` no momento da implementacao
+
+Validacao em 2026-08-11: suite completa do backend (96 passed, incluindo
+os novos testes de test_dashboard_summary.py e test_reports_pdf.py) e
+build de producao do frontend (`npm run build`, TypeScript OK) com
+Postgres local via Docker Compose. `next lint` esta quebrado neste
+projeto independente desta EPIC - Next.js 16 removeu o comando `next
+lint` embutido e o projeto nunca teve eslint/eslint-config-next
+instalado; fora de escopo aqui, registrado como divida tecnica.
+EPIC 20 encerrada.
 
 ---
 
