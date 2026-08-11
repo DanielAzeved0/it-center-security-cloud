@@ -13,6 +13,8 @@ param(
 
     [switch]$SkipConnectivityCheck,
 
+    [switch]$SkipSignatureCheck,
+
     [switch]$Force
 )
 
@@ -113,6 +115,51 @@ function Test-AgentServerConnectivity {
     }
 }
 
+function Get-AgentScheduledTaskExecutionPolicy {
+    param(
+        [switch]$SkipSignatureCheck
+    )
+
+    if ($SkipSignatureCheck) {
+        return "Bypass"
+    }
+
+    return "AllSigned"
+}
+
+function Assert-AgentScriptSignature {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+
+    $signature = Get-AuthenticodeSignature -FilePath $Path
+    if ($signature.Status -ne "Valid") {
+        throw "Agent script is not signed with a valid certificate: $Path (status: $($signature.Status)). Run scripts\Sign-AgentScripts.ps1 before installing, or pass -SkipSignatureCheck for a local/dev install without code-signing enforcement (ADR-031)."
+    }
+}
+
+function Install-AgentSigningCertificate {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$CerPath
+    )
+
+    if (-not (Test-Path -LiteralPath $CerPath)) {
+        throw "Signing certificate not found: $CerPath. Run scripts\New-AgentSigningCertificate.ps1 and scripts\Sign-AgentScripts.ps1 first, or pass -SkipSignatureCheck for a local/dev install without code-signing enforcement (ADR-031)."
+    }
+
+    # certutil.exe is used instead of the X509Store .NET API because X509Store.Add() on the
+    # Root store can hang waiting on a Windows security prompt even when called programmatically -
+    # unacceptable for a silent, unattended install on a monitored machine.
+    foreach ($storeName in @("Root", "TrustedPublisher")) {
+        & certutil.exe -addstore -f $storeName $CerPath | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            throw "certutil -addstore $storeName failed with exit code $LASTEXITCODE"
+        }
+    }
+}
+
 function Protect-AgentConfigFile {
     param(
         [Parameter(Mandatory = $true)]
@@ -154,6 +201,7 @@ if (-not (Test-Path -LiteralPath $agentSource)) {
 
 $installerSource = Join-Path $PSScriptRoot "install-agent.ps1"
 $uninstallerSource = Join-Path $PSScriptRoot "uninstall-agent.ps1"
+$signingCertPath = Join-Path $PSScriptRoot "itcenter-agent-signing.cer"
 $logsPath = Join-Path $InstallPath "logs"
 $cachePath = Join-Path $InstallPath "cache"
 $configPath = Join-Path $InstallPath "config.json"
@@ -161,6 +209,21 @@ $agentTarget = Join-Path $InstallPath "itcenter-agent.ps1"
 
 if ((Test-Path -LiteralPath $InstallPath) -and -not $Force) {
     throw "InstallPath already exists. Re-run with -Force to update files: $InstallPath"
+}
+
+if ($SkipSignatureCheck) {
+    Write-Output "Code-signing enforcement skipped (-SkipSignatureCheck). Scheduled task will use ExecutionPolicy Bypass (ADR-031)."
+}
+else {
+    # Import the certificate before validating signatures: on a first-time install, the
+    # certificate chain is not yet trusted on this machine, so Get-AuthenticodeSignature
+    # would report NotTrusted even for a legitimately signed script.
+    Install-AgentSigningCertificate -CerPath $signingCertPath
+    Write-Output "Signing certificate imported into LocalMachine Root and TrustedPublisher."
+
+    Assert-AgentScriptSignature -Path $agentSource
+    Assert-AgentScriptSignature -Path $installerSource
+    Assert-AgentScriptSignature -Path $uninstallerSource
 }
 
 New-Item -ItemType Directory -Path $InstallPath -Force | Out-Null
@@ -198,9 +261,11 @@ catch {
     Write-Output "Warning: failed to restrict config.json ACL: $($_.Exception.Message)"
 }
 
+$executionPolicy = Get-AgentScheduledTaskExecutionPolicy -SkipSignatureCheck:$SkipSignatureCheck
+
 $action = New-ScheduledTaskAction `
     -Execute "powershell.exe" `
-    -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$agentTarget`" -ConfigPath `"$configPath`""
+    -Argument "-NoProfile -ExecutionPolicy $executionPolicy -File `"$agentTarget`" -ConfigPath `"$configPath`""
 
 $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) `
     -RepetitionInterval (New-TimeSpan -Minutes $CheckinIntervalMinutes) `
@@ -220,3 +285,4 @@ Write-Output "IT Center Agent installed."
 Write-Output "InstallPath: $InstallPath"
 Write-Output "ConfigPath: $configPath"
 Write-Output "TaskName: $TaskName"
+Write-Output "ExecutionPolicy: $executionPolicy"

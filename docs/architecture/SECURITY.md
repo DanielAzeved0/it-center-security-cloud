@@ -75,14 +75,13 @@ PostgreSQL:
 
 * Nginx ainda mantem Basic Auth como camada extra redundante ao login administrativo (ver ADR-023).
 * Banco roda no mesmo host por custo zero.
-* Windows Agent ainda nao tem scripts assinados (code-signing pendente na EPIC 16; as demais lacunas de robustez ja foram corrigidas).
+* EPIC 16 (hardening do agente Windows) concluida: scripts assinados com certificado Authenticode self-signed e Tarefa Agendada com `ExecutionPolicy AllSigned` (ADR-031), alem das demais lacunas de robustez ja corrigidas.
 * EPIC 17 (hardening do frontend) concluida: cookie `httpOnly` de sessao, `middleware.ts`, CSP e demais itens corrigidos — detalhes em `docs/security/SECURITY.md`, nao duplicados aqui.
 
 ## Evolucao recomendada
 
 * Rate limit basico na API.
 * Rotacao de secrets (incluindo API Key por agente).
-* Assinatura de codigo do agente Windows (EPIC 16, bloqueado por certificado).
 * Wazuh.
 * Prometheus, Loki e Grafana.
 * Reavaliar a necessidade do Basic Auth do Nginx agora que o login administrativo esta em producao (ADR-023).

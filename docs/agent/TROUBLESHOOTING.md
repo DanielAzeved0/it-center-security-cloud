@@ -310,7 +310,33 @@ Se o log mostra sucesso, mas o dashboard segue vazio:
 3. Verifique se o backend lista a maquina.
 4. Escale para dashboard/backend se API e banco estiverem corretos.
 
-## 12. Quando escalar
+## 12. Tarefa Agendada falha por assinatura invalida (ADR-031)
+
+Desde a resolucao do ultimo item pendente da EPIC 16, a Tarefa Agendada roda com `ExecutionPolicy AllSigned`: qualquer script sem assinatura Authenticode valida falha ao executar, sem gerar check-in nem log de erro do proprio agente (o PowerShell bloqueia antes do script rodar).
+
+Diagnostico:
+
+```powershell
+Get-ScheduledTaskInfo -TaskName "ITCenterAgent"
+Get-AuthenticodeSignature "C:\Program Files\ITCenterAgent\itcenter-agent.ps1"
+Get-ChildItem Cert:\LocalMachine\Root, Cert:\LocalMachine\TrustedPublisher |
+  Where-Object { $_.Subject -eq "CN=IT Center Security Cloud Agent" }
+```
+
+Interpretacao:
+
+* `LastTaskResult` diferente de `0` combinado com `Get-AuthenticodeSignature` retornando `Status` diferente de `Valid`: o script instalado nao esta assinado ou a assinatura foi invalidada.
+* Nenhum certificado retornado pela consulta em `Cert:\LocalMachine\Root`/`TrustedPublisher`: o certificado de assinatura nao foi importado (reinstale sem `-SkipSignatureCheck`, ou confirme que `agent-windows\itcenter-agent-signing.cer` existe no pacote usado na instalacao).
+* Certificado presente, mas com `NotAfter` no passado: o certificado expirou (validade padrao de 10 anos definida em `New-AgentSigningCertificate.ps1`) — gere um novo certificado, reassine os scripts com `Sign-AgentScripts.ps1` e reinstale.
+* Script editado manualmente apos a assinatura (mesmo uma unica linha) invalida a assinatura — sempre rode `Sign-AgentScripts.ps1` como ultimo passo antes de empacotar um release.
+
+Acao corretiva:
+
+1. Confirme a causa raiz com os comandos de diagnostico acima.
+2. Gere/obtenha os scripts corretamente assinados (`agent-windows\scripts\Sign-AgentScripts.ps1`) e reinstale com `install-agent.ps1` (sem `-SkipSignatureCheck`) para reimportar o certificado, se necessario.
+3. Para instalacao local/dev sem certificado configurado, use `-SkipSignatureCheck` explicitamente — isso volta a Tarefa Agendada para `ExecutionPolicy Bypass` e nunca deve ser usado em producao.
+
+## 13. Quando escalar
 
 Escalar para backend/infra quando:
 

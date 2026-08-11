@@ -9,7 +9,11 @@ agent-windows/
   itcenter-agent.ps1
   install-agent.ps1
   uninstall-agent.ps1
+  itcenter-agent-signing.cer
   config.json
+  scripts/
+    New-AgentSigningCertificate.ps1
+    Sign-AgentScripts.ps1
   cache/
   logs/
 ```
@@ -54,7 +58,30 @@ Arquivo de cache corrompido e movido para cache/quarantine/ em vez de travar o r
 Arquivos de cache (incluindo quarentena) com mais de cache_retention_days (padrao 30) sao removidos automaticamente.
 logs/itcenter-agent.log e rotacionado por tamanho ao atingir log_max_size_kb (padrao 5120 KB), mantendo log_max_backups (padrao 3) backups.
 Falha de configuracao/inicializacao e capturada no nivel mais alto e registrada com [ERROR] antes de propagar o erro.
+Scripts assinados com certificado Authenticode self-signed; Tarefa Agendada roda com ExecutionPolicy AllSigned (EPIC 16, ADR-031, detalhes em docs/agent/INSTALLATION.md).
 ```
+
+## Code-signing (ADR-031)
+
+Antes de empacotar um release do agente, os 3 scripts (`itcenter-agent.ps1`, `install-agent.ps1`, `uninstall-agent.ps1`) precisam estar assinados:
+
+```powershell
+cd agent-windows
+$pfxPassword = Read-Host -AsSecureString "Senha do .pfx"
+.\scripts\Sign-AgentScripts.ps1 -PfxPath "C:\caminho\seguro\itcenter-agent.pfx" -PfxPassword $pfxPassword
+```
+
+Gerar um certificado novo (uma unica vez, numa maquina de confianca, nunca numa maquina monitorada):
+
+```powershell
+$pfxPassword = Read-Host -AsSecureString "Senha do .pfx"
+.\scripts\New-AgentSigningCertificate.ps1 `
+  -PfxPath "C:\caminho\seguro\itcenter-agent.pfx" `
+  -CerPath ".\itcenter-agent-signing.cer" `
+  -PfxPassword $pfxPassword
+```
+
+O `.pfx` (chave privada) nunca deve ser versionado nem usado em CI. Só `itcenter-agent-signing.cer` (chave publica) e commitado — e' o que `install-agent.ps1` importa em `Cert:\LocalMachine\Root`/`TrustedPublisher` durante a instalacao. Detalhes completos em `docs/agent/INSTALLATION.md`.
 
 `server_url` pode ser informado como raiz do ambiente publicado:
 

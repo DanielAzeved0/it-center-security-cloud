@@ -1128,6 +1128,98 @@ Impactos:
 
 ---
 
+# ADR-031
+
+## Data
+
+2026-08-10
+
+## Decisão
+
+Resolver a lacuna de code-signing do agente Windows (identificada na EPIC 16) com um certificado Authenticode **self-signed**, gerado via `New-SelfSignedCertificate -Type CodeSigningCert` (sem custo de CA pública, validade de 10 anos definida na geração), em vez de comprar um certificado de uma CA pública de terceiro. A `ExecutionPolicy` da tarefa agendada do agente passa de `Bypass` para **`AllSigned`** (não `RemoteSigned`).
+
+## Motivo
+
+A tarefa agendada do agente roda `powershell.exe -ExecutionPolicy Bypass` (`agent-windows/install-agent.ps1`), registrada com `New-ScheduledTaskPrincipal -UserId "SYSTEM" -RunLevel Highest` — ou seja, com privilégio SYSTEM em cada máquina monitorada, a cada ciclo de check-in. Em `Bypass`, qualquer sobrescrita local de `itcenter-agent.ps1` no disco é executada como SYSTEM na próxima execução sem nenhuma verificação de assinatura. A suposição inicial da EPIC 16 era que corrigir isso exigia comprar um certificado de code-signing de CA pública, o que ficou registrado como bloqueio dependente de custo/decisão do usuário. Um certificado self-signed elimina esse custo porque o projeto controla todas as máquinas onde o agente roda — não é software distribuído a terceiros desconhecidos, cenário em que self-signed seria inaceitável.
+
+`RemoteSigned` foi descartado porque só exige assinatura em arquivos marcados com Zone.Identifier de "Internet" (baixados da web); um script sobrescrito localmente no disco não carrega essa marca de zona e passaria sem verificação — não mitigaria o vetor de ataque real, que é a sobrescrita local do arquivo que a tarefa SYSTEM executa. `AllSigned` exige assinatura válida em qualquer script, local ou remoto.
+
+## Alternativas Avaliadas
+
+* Certificado de CA pública (DigiCert, Sectigo etc.) — descartado: custo recorrente desnecessário, já que o usuário controla todas as máquinas onde o agente roda.
+* Manter `Bypass` e aceitar o risco residual — descartado: deixa sem mitigação a lacuna real (SYSTEM executando conteúdo arbitrário sobrescrito localmente).
+* `RemoteSigned` — descartado: não verifica scripts sobrescritos localmente (sem Zone.Identifier de Internet), não mitigando o vetor de ataque real.
+* Certificado Authenticode self-signed + `AllSigned` — escolhida.
+
+## Resultado
+
+* Certificado gerado uma única vez, numa máquina de confiança do usuário (nunca numa máquina monitorada), via `New-SelfSignedCertificate -Type CodeSigningCert`, com validade de 10 anos.
+* Chave privada exportada como `.pfx` protegida por senha; nunca versionada no repositório nem usada em CI/GitHub Actions. A assinatura passa a ser um passo manual, feito na máquina de confiança do usuário, como último passo antes de empacotar cada release do agente (qualquer edição posterior invalida a assinatura).
+* Os três scripts do agente (`itcenter-agent.ps1`, `install-agent.ps1`, `uninstall-agent.ps1`) passam a ser assinados com `Set-AuthenticodeSignature`.
+* Só a chave pública (`.cer`) é distribuída, embutida no próprio pacote de instalação (`agent-windows/`).
+* `install-agent.ps1` (que já roda elevado durante a instalação) passa a importar o `.cer` em dois certificate stores: `Cert:\LocalMachine\Root` (Trusted Root) e `Cert:\LocalMachine\TrustedPublisher` — os dois são necessários porque, sendo self-signed, o próprio certificado é sua raiz; sem estar em Root, o Windows nunca confia nele mesmo estando em TrustedPublisher. Como o ambiente não tem AD/GPO centralizado, essa importação pelo próprio instalador (por máquina) é o mecanismo de distribuição.
+* O argumento da `New-ScheduledTaskAction` em `install-agent.ps1` passa de `-ExecutionPolicy Bypass` para `-ExecutionPolicy AllSigned`.
+* O item correspondente na EPIC 16 (`docs/development/TASKS.md`) permanece não concluído (`[ ]`) até a implementação de fato — esta ADR formaliza apenas a abordagem decidida, removendo o bloqueio por custo/aquisição de certificado.
+
+Impactos:
+
+* A chave privada `.pfx` passa a ser o ativo crítico do processo de release do agente; se comprometida, a mitigação é gerar um novo certificado e redistribuir o `.cer` (viável na escala do projeto — poucas máquinas de uma operação, não uma frota de milhares).
+* Sem CRL/OCSP de terceiro (self-signed não tem revogação centralizada externa).
+* O processo de release do agente muda: assinatura manual é o último passo, sempre antes de empacotar; nenhuma automação de assinatura entra no CI.
+* Falha silenciosa possível se o certificado expirar ou o `.cer` não for importado corretamente numa máquina nova — `AllSigned` bloqueia a execução do agente sem alerta automático, porque é o próprio agente que reportaria esse alerta.
+* `docs/architecture/SECURITY.md` e `docs/development/TASKS.md` (EPIC 16) atualizados para refletir que a abordagem já foi decidida, sem bloqueio de custo; a implementação em código (`agent-windows/*.ps1`) permanece pendente.
+
+---
+
+# ADR-032
+
+## Data
+
+2026-08-10
+
+## Decisão
+
+Implementar atualização automática do agente Windows através de um **updater dedicado**, separado do script de coleta (`itcenter-agent.ps1`), mas 100% PowerShell puro — sem Serviço Windows nativo via Service Control Manager (SCM) e sem NSSM/WinSW ou qualquer wrapper compilado de terceiro. O updater (`agent-windows/itcenter-agent-updater.ps1`) roda numa **segunda Tarefa Agendada dedicada** (`ITCenterAgentUpdater`), registrada por `install-agent.ps1`, com frequência menor que a do check-in de coleta (ex.: 1x/dia, configurável) — não a cada ciclo de 5 minutos.
+
+## Motivo
+
+O agente hoje não tem nenhum mecanismo de atualização: qualquer correção ou evolução exige reinstalar manualmente `agent-windows/install-agent.ps1` em cada máquina, o que não escala conforme a frota de máquinas monitoradas cresce.
+
+PowerShell puro não implementa o protocolo `START_PENDING`/`STOP_PENDING` exigido pelo Service Control Manager do Windows. Conseguir um Serviço Windows nativo de verdade exigiria NSSM/WinSW (dependência de terceiro nova) ou reescrever o agente numa linguagem compilada — ambos contrariam o ADR-005 (agente PowerShell puro, sem dependências externas) e o ADR-025 (manter PowerShell; Go permanece candidata condicional apenas se o hardening incremental se mostrar insuficiente). Uma segunda Tarefa Agendada dedicada resolve o problema concreto (atualização sem intervenção manual) sem essa dependência, reaproveitando o mesmo mecanismo de agendamento já usado pela Tarefa Agendada de coleta (EPIC 8) e a mesma infraestrutura de certificado/validação de assinatura Authenticode já implementada no ADR-031.
+
+Isso resolve, especificamente para atualização automática, o item "Criar serviço Windows" da Fase B de `docs/architecture/FUTURE_ARCHITECTURE.md` — mas somente para esse caso, via Tarefa Agendada, não via SCM. O caso genérico (transformar a coleta em si num serviço Windows real) continua sem decisão e permanece pendente na Fase B.
+
+## Alternativas Avaliadas
+
+* Self-update dentro do próprio `itcenter-agent.ps1`/mesma Tarefa Agendada de coleta — descartada: acopla a lógica de auto-modificação à coleta de dados sensíveis no mesmo processo/execução, aumentando a superfície de risco, e pagaria o custo de checar atualização a cada ciclo de coleta (5 min por padrão), gerando tráfego desnecessário contra o backend conforme a frota cresce.
+* Serviço Windows nativo via SCM, usando NSSM/WinSW ou um wrapper compilado — descartada: introduz dependência de terceiro nova, contrariando o ADR-005/ADR-025 (agente 100% PowerShell puro, sem dependências externas); PowerShell puro não implementa `START_PENDING`/`STOP_PENDING`.
+* Não implementar atualização automática, manter atualização manual (reinstalar por máquina) — descartada: é exatamente o problema que motivou esta decisão; não escala e exige acesso manual a cada máquina.
+* Updater dedicado em PowerShell puro, com Tarefa Agendada própria de frequência menor, validação obrigatória de assinatura Authenticode + hash SHA-256, rollout controlado por versão-alvo por máquina e auto-rollback — escolhida.
+
+## Resultado
+
+* Novo script `agent-windows/itcenter-agent-updater.ps1`, com Tarefa Agendada dedicada `ITCenterAgentUpdater` registrada por `install-agent.ps1`, frequência configurável (sugestão: 1x/dia), independente do `checkin_interval_minutes` (padrão 5 min) da coleta.
+* Backend passa a servir um manifest de versão (`GET /api/v1/agent/manifest`, retornando `{version, sha256}`) e o download do script mais recente (`GET /api/v1/agent/download` ou similar), sempre assinado com o mesmo certificado do ADR-031.
+* `itcenter-agent.ps1` ganha uma variável de versão no topo do script (`$script:AgentVersion`), comparada pelo updater contra o manifest.
+* O updater baixa o script novo para um arquivo temporário e exige, sem exceção e sem qualquer fallback tipo `-SkipSignatureCheck`: (1) assinatura Authenticode válida (`Get-AuthenticodeSignature` com `Status -eq 'Valid'`, usando o certificado do ADR-031) e (2) hash SHA-256 conferindo com o manifest. Diferente do instalador (que tem um fallback consciente de `-SkipSignatureCheck` só para uso local/dev sem certificado configurado), o updater nunca aceita esse fallback, por operar contra rede/backend, não apenas instalação local.
+* Antes de substituir, faz backup do script atual (`itcenter-agent.ps1.previous`); a substituição é atômica via `Move-Item -Force`.
+* Auto-rollback: se após a atualização o agente de coleta falhar N check-ins consecutivos (número exato a definir na implementação), o updater restaura `itcenter-agent.ps1.previous` automaticamente na execução seguinte e registra a falha no log.
+* Rollout controlado (não big-bang): nova coluna `machines.target_agent_version` (nullable) — se nula, a máquina segue sempre a versão mais recente do manifest; se preenchida, o updater só atualiza para essa versão específica, permitindo canário/staged rollout administrado pelo operador.
+* Visibilidade: nova coluna `machines.agent_version`, persistida a cada check-in (o agente passa a informar a própria versão no payload), exibida no dashboard nas telas de máquina.
+* Backlog detalhado na EPIC 22 (`docs/development/TASKS.md`); Fase B de `docs/architecture/FUTURE_ARCHITECTURE.md` atualizada para referenciar este ADR/EPIC.
+* `docs/backend/API.md`, `docs/backend/DATABASE.md`, `docs/agent/CHECKIN.md` e `docs/agent/INSTALLATION.md` serão atualizados no momento da implementação, não antes — mesmo padrão já usado nas EPICs 19/20/21.
+* Identidade individual por agente (API key por máquina, em vez da `AGENT_API_KEY` global atual) e revogação de agentes comprometidos permanecem **pendentes**, fora do escopo deste ADR/EPIC — são pré-requisitos relacionados de outra pendência da Fase B, mencionados aqui apenas como contexto relacionado, não como parte do escopo desta decisão.
+
+Impactos:
+
+* Dois novos endpoints entram na API (`GET /api/v1/agent/manifest`, `GET /api/v1/agent/download`), autenticados pelo mesmo mecanismo do check-in (`X-Agent-Api-Key`).
+* Duas novas colunas em `machines` (`agent_version`, `target_agent_version`).
+* Uma segunda Tarefa Agendada por máquina monitorada (além da já existente de coleta) — mais um processo periódico rodando com privilégio SYSTEM, mitigado pela mesma validação de assinatura Authenticode obrigatória do ADR-031, sem fallback de bypass.
+* Nenhuma tecnologia nova entra na stack: continua 100% PowerShell + FastAPI + PostgreSQL, sem Serviço Windows via SCM e sem dependências de terceiros.
+* O caso genérico de "Serviço Windows" (para a coleta, não só para o updater) continua pendente e sem decisão na Fase B.
+
+---
+
 # ADR-XXX
 
 ## Data

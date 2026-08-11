@@ -42,6 +42,20 @@ if ($RemoveFiles) {
     }
 
     Write-Output "Agent executable files removed from: $InstallPath"
+
+    # certutil.exe -delstore is used instead of X509Store.Remove() because X509Store.Add() on
+    # the Root store is known to hang waiting on a Windows security prompt even when called
+    # programmatically (see install-agent.ps1); -delstore does not have that issue, but the
+    # thumbprint lookup itself (read-only) still uses the .NET certificate store APIs.
+    $signingCertSubject = "CN=IT Center Security Cloud Agent"
+    foreach ($storeName in @("Root", "TrustedPublisher")) {
+        $matchingCerts = @(Get-ChildItem "Cert:\LocalMachine\$storeName" | Where-Object { $_.Subject -eq $signingCertSubject })
+        foreach ($cert in $matchingCerts) {
+            & certutil.exe -delstore $storeName $cert.Thumbprint | Out-Null
+        }
+    }
+
+    Write-Output "Agent signing certificate removed from LocalMachine Root and TrustedPublisher (if present)."
 }
 
 if ($RemoveData) {

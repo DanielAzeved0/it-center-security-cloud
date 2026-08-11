@@ -237,7 +237,7 @@ O contrato basico do agente e considerado atendido quando:
 * Enviar para API
 * Operar offline temporariamente
 
-Esses pontos ja estao implementados e cobertos pelos testes do agente. Melhorias como assinatura de payloads, atualizacao automatica e empacotamento independente ficam como evolucao futura.
+Esses pontos ja estao implementados e cobertos pelos testes do agente. Melhorias como assinatura de payloads e empacotamento independente ficam como evolucao futura sem plano formal ainda; atualizacao automatica ja tem plano formal registrado em ADR-032/EPIC 22 (`docs/development/DECISIONS.md`, `docs/development/TASKS.md`), implementacao ainda pendente.
 
 ---
 
@@ -290,6 +290,7 @@ CPU via Get-Counter '\Processor(_Total)\% Processor Time' com fallback WMI
 Inventario incluindo apps UWP/Store (Get-AppxPackage -AllUsers)
 Deteccao de USB alem de armazenamento (Win32_PnPEntity)
 try/catch no nivel mais alto de Start-ItCenterAgent com log ERROR explicito
+Scripts assinados com certificado Authenticode self-signed; Tarefa Agendada com ExecutionPolicy AllSigned (ADR-031, `docs/development/DECISIONS.md`)
 ```
 
-Pendente (fora do escopo automatizavel por codigo, depende de certificado de code-signing): assinar os scripts do agente e trocar `ExecutionPolicy` de `Bypass` para `AllSigned`/`RemoteSigned`.
+EPIC 16 concluida.

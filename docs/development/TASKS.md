@@ -698,7 +698,30 @@ Corrigir lacunas concretas de robustez identificadas no agente PowerShell (agent
 
 [x] Adicionar try/catch no nivel mais alto de Start-ItCenterAgent com log explicito de falha de configuracao
 
-[ ] Assinar os scripts do agente com certificado de code-signing e trocar ExecutionPolicy de Bypass para AllSigned ou RemoteSigned (bloqueado: depende de adquirir/gerar um certificado de code-signing, decisao do usuario)
+[x] Assinar os scripts do agente com certificado de code-signing e trocar ExecutionPolicy de Bypass para AllSigned ou RemoteSigned
+
+    Decisao registrada em ADR-031 (2026-08-10): certificado Authenticode
+    self-signed (New-SelfSignedCertificate -Type CodeSigningCert, validade
+    de 10 anos, sem custo de CA publica) + ExecutionPolicy AllSigned (nao
+    RemoteSigned, que nao verifica scripts sobrescritos localmente sem
+    Zone.Identifier de Internet). Implementado em 2026-08-10:
+    agent-windows/scripts/New-AgentSigningCertificate.ps1 e
+    Sign-AgentScripts.ps1 criados; install-agent.ps1 importa
+    itcenter-agent-signing.cer em Cert:\LocalMachine\Root e
+    Cert:\LocalMachine\TrustedPublisher antes de validar a assinatura dos
+    scripts de origem (ordem necessaria: numa maquina nova a cadeia de
+    confianca so existe apos o import), copia os arquivos e registra a
+    Tarefa Agendada com ExecutionPolicy AllSigned (fallback
+    -SkipSignatureCheck para instalacao local/dev, volta a Bypass);
+    uninstall-agent.ps1 remove o certificado com -RemoveFiles. Import/
+    remocao usam certutil.exe em vez da API .NET X509Store: descoberto
+    durante a validacao que X509Store.Add() na store Root pode travar
+    esperando um prompt de seguranca do Windows mesmo chamado via script,
+    o que quebraria uma instalacao silenciosa em massa; certutil.exe nao
+    tem esse problema. Chave privada (.pfx) nunca versionada nem usada em
+    CI; geracao do certificado real de producao e assinatura dos scripts
+    de producao ficam a cargo do mantenedor, fora desta implementacao.
+    docs/agent/INSTALLATION.md e TROUBLESHOOTING.md atualizados.
 
 [x] Atualizar docs/agent/TROUBLESHOOTING.md com os novos comportamentos apos o hardening
 
@@ -841,3 +864,37 @@ Monitorar o Edge Node e os containers — nao as maquinas Windows monitoradas pe
 [ ] Validar impacto de recursos (RAM/disco) no free tier antes de ativar em producao (ver `infra/scripts/ops-check.sh`)
 
 [ ] Atualizar `docs/architecture/ARCHITECTURE.md`, `docs/architecture/CONTAINERS.md`, `docs/architecture/NETWORK.md` e `docs/security/SECURITY.md` no momento da implementacao
+
+---
+
+# EPIC 22 - Auto-atualizacao do Agente Windows (Updater Dedicado)
+
+Objetivo:
+
+Implementar atualizacao automatica do agente Windows via um updater dedicado, 100% PowerShell puro, com Tarefa Agendada propria e frequencia menor que o check-in de coleta (ADR-032). Sem Servico Windows nativo via SCM, sem NSSM/WinSW. Resolve, apenas para este caso, o item "Criar servico Windows" da Fase B de `docs/architecture/FUTURE_ARCHITECTURE.md`; o caso geral (servico Windows para a coleta em si) continua pendente. Somente planejamento/documentacao nesta rodada.
+
+### Tarefas
+
+[ ] Endpoint `GET /api/v1/agent/manifest` retornando `{version, sha256}` da versao publicada do agente
+
+[ ] Endpoint `GET /api/v1/agent/download` (ou similar) para baixar o script mais recente, assinado com o certificado do ADR-031
+
+[ ] Adicionar coluna `machines.agent_version` (nullable) via migration
+
+[ ] Adicionar coluna `machines.target_agent_version` (nullable) via migration
+
+[ ] Persistir `agent_version` a cada check-in (agente passa a informar a propria versao no payload)
+
+[ ] Adicionar `$script:AgentVersion` no topo de `itcenter-agent.ps1`
+
+[ ] Criar `agent-windows/itcenter-agent-updater.ps1` (download do manifest/script, backup do script atual, substituicao atomica via `Move-Item -Force`)
+
+[ ] Validacao obrigatoria de assinatura Authenticode (`Get-AuthenticodeSignature` Status `Valid`) e hash SHA-256 no updater, sem fallback `-SkipSignatureCheck`
+
+[ ] Auto-rollback: restaurar `itcenter-agent.ps1.previous` apos N check-ins consecutivos com falha pos-atualizacao, com log da falha
+
+[ ] Registrar Tarefa Agendada dedicada `ITCenterAgentUpdater` em `install-agent.ps1` (frequencia configuravel, menor que o check-in de coleta)
+
+[ ] Exibir `agent_version` no dashboard (telas de maquina)
+
+[ ] Atualizar `docs/backend/API.md`, `docs/backend/DATABASE.md`, `docs/agent/CHECKIN.md` e `docs/agent/INSTALLATION.md` no momento da implementacao

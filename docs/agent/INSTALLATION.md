@@ -75,14 +75,18 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install-agent.ps1 `
 4. Resolver DNS do host configurado
 5. Validar conexao TCP na porta do endpoint
 6. Validar health check do endpoint
-7. Criar C:\Program Files\ITCenterAgent
-8. Criar logs\
-9. Criar cache\
-10. Copiar scripts do agente
-11. Gerar config.json
-12. Restringir ACL de config.json a SYSTEM/Administrators (EPIC 16)
-13. Registrar Tarefa Agendada ITCenterAgent
+7. Importar certificado de assinatura em LocalMachine\Root e LocalMachine\TrustedPublisher (ADR-031)
+8. Validar assinatura Authenticode dos scripts de origem, agora que a cadeia e confiavel (ADR-031)
+9. Criar C:\Program Files\ITCenterAgent
+10. Criar logs\
+11. Criar cache\
+12. Copiar scripts do agente
+13. Gerar config.json
+14. Restringir ACL de config.json a SYSTEM/Administrators (EPIC 16)
+15. Registrar Tarefa Agendada ITCenterAgent com ExecutionPolicy AllSigned
 ```
+
+O certificado precisa ser importado antes da validacao de assinatura: numa maquina nova, a cadeia de confianca ainda nao existe, e `Get-AuthenticodeSignature` reportaria `NotTrusted` mesmo para um script legitimamente assinado se o certificado so fosse importado depois.
 
 ## Preflight de rede do instalador
 
@@ -125,6 +129,37 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install-agent.ps1 `
 ```
 
 Nao use `hosts` como solucao padrao para distribuir agentes. Se o IP publico mudar, cada maquina ficara presa ao IP antigo.
+
+## Code-signing do agente (ADR-031)
+
+Desde a resolucao do ultimo item pendente da EPIC 16, a Tarefa Agendada roda com `ExecutionPolicy AllSigned` em vez de `Bypass`: qualquer script (`itcenter-agent.ps1`, `install-agent.ps1`, `uninstall-agent.ps1`) precisa ter uma assinatura Authenticode valida para ser executado. Isso fecha o vetor em que um script sobrescrito localmente no disco seria executado como `SYSTEM` sem nenhuma verificacao.
+
+Certificado usado: Authenticode **self-signed** (gratuito, sem CA publica), gerado uma unica vez com `agent-windows\scripts\New-AgentSigningCertificate.ps1` numa maquina de confianca do mantenedor (nunca numa maquina monitorada), com validade de 10 anos. A chave privada (`.pfx`) nunca e versionada nem usada em CI. So a chave publica (`itcenter-agent-signing.cer`) e distribuida, embutida no pacote de instalacao.
+
+Fluxo de release do agente (obrigatorio antes de distribuir qualquer atualizacao dos scripts):
+
+```text
+1. Editar os scripts do agente normalmente.
+2. Rodar agent-windows\scripts\Sign-AgentScripts.ps1 com o .pfx do mantenedor -
+   isso deve ser o ultimo passo antes de empacotar, pois qualquer edicao
+   posterior invalida a assinatura.
+3. Confirmar que agent-windows\itcenter-agent-signing.cer corresponde ao
+   certificado usado (so precisa trocar se o certificado for regenerado).
+4. Distribuir/instalar a partir dos scripts ja assinados.
+```
+
+O instalador valida a assinatura dos 3 scripts de origem (`Get-AuthenticodeSignature` com `Status -eq 'Valid'`) antes de copiar qualquer arquivo, e falha cedo com mensagem clara se algum nao estiver assinado.
+
+Bypass consciente, apenas para instalacao local/dev sem certificado configurado (a Tarefa Agendada volta a usar `Bypass` nesse caso — nunca use isso em producao):
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install-agent.ps1 `
+  -ServerUrl "http://127.0.0.1:8000/api/v1" `
+  -AgentApiKey "change-me" `
+  -CheckinIntervalMinutes 5 `
+  -SkipSignatureCheck `
+  -Force
+```
 
 ## Configuracoes esperadas
 
@@ -197,12 +232,12 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\Program Files\ITCent
 * ACL de `config.json` restrita a SYSTEM/Administrators (EPIC 16).
 * Quarentena de cache corrompido e retencao por idade em `cache\` (EPIC 16).
 * Rotacao de `logs\itcenter-agent.log` por tamanho (EPIC 16).
+* Instalador/scripts assinados (code-signing) com certificado Authenticode self-signed e Tarefa Agendada com `ExecutionPolicy AllSigned` (EPIC 16, ADR-031).
 
 ## Requisitos pendentes
 
-* Instalador/scripts assinados (code-signing) — bloqueado por depender de certificado.
-* Atualizacao automatica.
-* Servico Windows nativo.
+* Atualizacao automatica — plano formal registrado em ADR-032/EPIC 22 (`docs/development/DECISIONS.md`, `docs/development/TASKS.md`); implementacao ainda pendente.
+* Servico Windows nativo — resolvido parcialmente para atualizacao automatica via Tarefa Agendada dedicada (ADR-032/EPIC 22); o caso geral (servico Windows via SCM para a coleta em si) continua pendente.
 * Criptografia e assinatura de payloads.
 
 ## Estrutura esperada no Windows
@@ -241,6 +276,19 @@ Confirmar Tarefa Agendada:
 
 ```powershell
 Get-ScheduledTask -TaskName "ITCenterAgent"
+```
+
+Confirmar ExecutionPolicy `AllSigned` na acao da Tarefa Agendada (ADR-031):
+
+```powershell
+(Get-ScheduledTask -TaskName "ITCenterAgent").Actions.Arguments
+```
+
+Confirmar certificado de assinatura importado:
+
+```powershell
+Get-ChildItem Cert:\LocalMachine\Root, Cert:\LocalMachine\TrustedPublisher |
+  Where-Object { $_.Subject -eq "CN=IT Center Security Cloud Agent" }
 ```
 
 Executar check-in manual:
