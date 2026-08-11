@@ -1,5 +1,7 @@
 # Relatorio tecnico de production readiness
 
+> Snapshot de 2026-06-25/26 (ADR-015, criação dos scripts de deploy). Não é atualizado continuamente — para o estado/roadmap atual, ver `docs/development/TASKS.md` e `docs/development/ROADMAP.md`.
+
 ## Escopo
 
 Esta refatoracao prepara a infraestrutura de producao do IT Center Security Cloud para operar com mais seguranca, reprodutibilidade e manutencao, sem alterar funcionalidades da aplicacao, endpoints da API, contratos do frontend ou comportamento do agente Windows.
@@ -134,11 +136,11 @@ curl --fail --user admin:SENHA_FORTE_AQUI https://SEU_DOMINIO/
 ## Evolucoes futuras
 
 * Separar `requirements.txt` em runtime e dev/test para reduzir a imagem do backend.
-* Adicionar CI/CD com build, testes, Docker Scout e publish controlado.
-* Adicionar Prometheus para metricas.
+* Adicionar CI/CD com build, testes, Docker Scout e publish controlado. **Já implementado** desde então (`.github/workflows/ci.yml` e `deploy-production.yml`).
+* Adicionar Prometheus para metricas. **Já tem planejamento formal**: EPIC 21 / ADR-030 (`docs/development/DECISIONS.md`).
 * Adicionar Loki/Promtail para logs.
-* Adicionar Grafana para dashboards operacionais.
-* Adicionar Wazuh para telemetria defensiva avancada.
+* Adicionar Grafana para dashboards operacionais. **Já tem planejamento formal**: EPIC 21 / ADR-030, junto com Prometheus.
+* Adicionar Wazuh para telemetria defensiva avancada. Continua como EPIC 14, fora do escopo do MVP, sem ADR ainda.
 * Adicionar alertas de disco, memoria, containers unhealthy e expiracao de certificado.
 * Avaliar PostgreSQL gerenciado ou instancia privada dedicada quando o MVP crescer.
-* Avaliar Kubernetes apenas quando houver necessidade real de escala, alta disponibilidade ou multiplos ambientes.
+* Avaliar Kubernetes apenas quando houver necessidade real de escala, alta disponibilidade ou multiplos ambientes. **Atualizado**: hoje existe regra dura do projeto proibindo Kubernetes (e RabbitMQ/Kafka/Redis/microsservicos/Elasticsearch) no MVP a menos que exista decisao formal em ADR (`docs/development/CONTRIBUTING.md`) — nao e mais uma avaliacao em aberto.

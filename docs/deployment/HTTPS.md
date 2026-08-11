@@ -93,9 +93,19 @@ Basic Auth solicitado no dashboard
 
 A renovacao deve manter `/etc/letsencrypt` persistente no host.
 
-Fluxo recomendado:
+Imagem usada pelo servico `certbot` (profile `maintenance`):
+
+```text
+certbot/certbot:v5.7.0
+```
+
+Lição aprendida (INCIDENTE 021 em `docs/deployment/POSTMORTEMS.md`): o Compose de produção já referenciou uma tag inexistente (`certbot/certbot:v4.21.0`), descoberta apenas quando a renovação real foi tentada, porque o serviço `certbot` só roda sob o profile `maintenance` e não aparece em smoke test nem deploy de rotina. Antes de fixar uma tag de imagem usada esporadicamente, confirme que ela existe (API do Docker Hub ou GitHub Releases do projeto).
+
+Fluxo validado em produção (`infra/scripts/renew-tls.sh`, executado com sucesso em 2026-07-28 conforme `docs/deployment/DEPLOYMENT_HISTORY.md`):
 
 ```bash
-docker compose --env-file .env.production -f infra/docker-compose.production.yml --profile maintenance run --rm certbot renew --webroot -w /var/www/certbot
-docker compose --env-file .env.production -f infra/docker-compose.production.yml exec nginx nginx -s reload
+TLS_RENEW_DRY_RUN=1 sh infra/scripts/renew-tls.sh
+sh infra/scripts/renew-tls.sh
 ```
+
+O script chama `docker compose ... --profile maintenance run --rm certbot renew --webroot -w /var/www/certbot` (adicionando `--dry-run` quando `TLS_RENEW_DRY_RUN=1`) e recarrega o Nginx (`nginx -s reload`) automaticamente ao final.

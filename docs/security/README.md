@@ -16,6 +16,7 @@ Esta pasta documenta os controles de seguranca do projeto.
 * Nao versionar secrets.
 * Exigir HTTPS em producao.
 * Manter banco, backend e frontend sem exposicao direta.
-* Autenticar o dashboard com Basic Auth no MVP.
+* Autenticar usuarios humanos do dashboard com login administrativo (Bearer token HMAC SHA-256, papeis `admin`/`analyst`/`viewer` — ver `AUTH.md`); esse e o mecanismo principal, nao o Basic Auth.
+* Manter o Basic Auth do Nginx apenas como camada extra de borda no MVP, redundante ao login administrativo (ver ADR-023 em `docs/development/DECISIONS.md`).
 * Autenticar o agente com `X-Agent-Api-Key`.
 * Registrar evolucoes de seguranca em `docs/development/DECISIONS.md`.

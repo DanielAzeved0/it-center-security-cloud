@@ -213,6 +213,10 @@ remote_access_tool_detected
 unauthorized_remote_access_tool
 unauthorized_vpn_tool
 torrent_software_detected
+unknown_asset
+machine_offline
+malware_or_ransomware_indicator
+suspicious_tool_detected
 ```
 
 ## Exemplos de severity
@@ -621,37 +625,9 @@ docs/security/AUTH.md
 
 # Migrations
 
-As migrations ficam em:
+As migrations ficam em `backend/migrations/` e são aplicadas em ordem por `python apply_migrations.py` antes de `uvicorn app.main:app` iniciar (tanto no Docker Compose quanto em execução manual), garantindo que o PostgreSQL tenha o schema esperado antes da API receber requisições.
 
-```text
-backend/migrations/
-```
-
-Migrations aplicadas:
-
-```text
-backend/migrations/001_initial_schema.sql
-backend/migrations/002_users.sql
-backend/migrations/003_audit_logs.sql
-backend/migrations/004_machines_rustdesk.sql
-backend/migrations/005_machines_snipeit.sql
-```
-
-## Execucao via Docker
-
-Quando o backend roda pelo Docker Compose, o container executa:
-
-```text
-python apply_migrations.py
-```
-
-antes de iniciar:
-
-```text
-uvicorn app.main:app
-```
-
-Isso garante que o PostgreSQL tenha o schema esperado antes da API receber requisicoes.
+A lista completa das migrations, com descrição de cada uma e os comandos para aplicar manualmente, é mantida como fonte única em `backend/migrations/README.md` — não duplicar essa lista aqui.
 
 ## Regras das migrations
 

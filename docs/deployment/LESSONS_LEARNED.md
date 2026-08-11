@@ -67,3 +67,36 @@ Licao:
 * Corrigir DNS no roteador/DHCP.
 * Usar DNS confiavel, como Cloudflare ou Google.
 * Considerar dominio proprio gerenciado por Cloudflare para o endpoint dos agentes.
+
+## 11. Acesso administrativo nao pode depender de uma unica chave SSH sem backup
+
+Perder a unica chave SSH pessoal bloqueia todo o acesso administrativo a VM, incluindo backup, restore, rollback e renovacao de TLS.
+
+Licao:
+
+* Guardar copia de recuperacao da chave SSH em um cofre de senhas.
+* Documentar um plano B de acesso (ex.: OCI Console/Serial Console) que nao dependa de um unico canal, como o GitHub Actions.
+
+## 12. "Deploy concluido" nao significa "dados iniciais semeados"
+
+Scripts de setup unico (como a criacao do primeiro usuario admin) ficam fora da imagem Docker e fora do `deploy.sh` sao facilmente esquecidos, porque so precisam rodar uma vez.
+
+Licao:
+
+* Incluir o seed de dados iniciais (ex.: primeiro admin) como etapa explicita do checklist de deploy, nao como algo implicito.
+
+## 13. Basic Auth generico conflita com autenticacao propria da aplicacao
+
+O HTTP permite apenas um cabecalho `Authorization` por requisicao. Basic Auth aplicado sem excecao sobre toda a aplicacao quebra qualquer rota que a propria aplicacao proteja com `Authorization: Bearer <token>`.
+
+Licao:
+
+* Isentar de Basic Auth as rotas que ja tem seu proprio esquema de autenticacao (RBAC/token), em vez de aplicar Basic Auth de forma indiscriminada.
+
+## 14. Tag de imagem Docker externa deve ser confirmada antes de fixar no Compose
+
+Uma tag inexistente em um servico que so roda sob profile opcional pode passar despercebida por muito tempo, porque nao aparece em smoke tests nem em deploys de rotina.
+
+Licao:
+
+* Confirmar a existencia da tag via API do registry ou release oficial antes de fixar a versao no Compose, nao apenas assumir.

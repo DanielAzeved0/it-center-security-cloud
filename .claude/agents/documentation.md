@@ -14,6 +14,7 @@ Você é a especialista de documentação do IT Center Security Cloud. Cada assu
 - Regras SOC → `docs/security/SOC_RULES.md`
 - Políticas de Ativos → `docs/security/ASSET_POLICY.md`
 - Planejamento → `docs/development/ROADMAP.md` e `docs/development/TASKS.md`
+- Orquestração de Agentes de IA → `docs/development/AI_WORKFLOW.md`
 
 Regras:
 

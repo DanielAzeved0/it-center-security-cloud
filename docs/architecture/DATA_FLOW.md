@@ -30,6 +30,7 @@ Next.js Dashboard
 5. O backend valida o payload.
 6. O backend persiste dados no PostgreSQL.
 7. Eventos e alertas podem ser gerados.
+8. Agenda sincronizacao com Snipe-IT via BackgroundTasks, sem bloquear a resposta (ADR-028).
 
 Endpoint:
 
@@ -47,6 +48,13 @@ POST /api/v1/agent/checkin
 6. O backend valida o token/RBAC e consulta o PostgreSQL.
 7. O dashboard renderiza maquinas, metricas, eventos e alertas.
 
+## Dashboard executivo e relatorios (EPIC 20)
+
+1. O usuario autenticado (`admin`/`analyst`/`viewer`) acessa a tela executiva no dashboard.
+2. O Next.js chama `GET /api/v1/dashboard/summary` pelo proxy interno, repassando o Bearer token.
+3. O backend agrega maquinas online/offline, alertas por severidade e eventos recentes (`app/services/dashboard.py` + `app/repositories/dashboard.py`) em uma unica resposta, evitando N chamadas do frontend.
+4. Ao exportar PDF, o Next.js chama `GET /api/v1/reports/executive.pdf` ou `GET /api/v1/machines/{id}/report.pdf`, que o backend gera com `reportlab` (`app/services/reports.py`) e devolve como binario (o proxy repassa via `arrayBuffer`, nao `text()`, para nao corromper o PDF).
+
 ## Fluxo interno Docker
 
 ```text
@@ -58,15 +66,4 @@ backend -> postgres:5432
 
 ## Regras de exposicao
 
-```text
-Publico:
-80/tcp
-443/tcp
-
-Interno:
-3000/tcp
-8000/tcp
-5432/tcp
-```
-
-PostgreSQL, backend e frontend nao devem ser expostos diretamente na internet.
+A tabela completa de portas publicas/internas e mantida em `docs/architecture/NETWORK.md` ("Publicacao de portas"), sem duplicacao aqui. Resumo: apenas o Nginx (80/443) e exposto; PostgreSQL, backend e frontend nao devem ser expostos diretamente na internet.

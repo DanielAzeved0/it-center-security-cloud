@@ -10,9 +10,26 @@ assets/
 `-- images/
 ```
 
-## Uso
+Sempre que possivel, prefira diagramas em texto nos documentos Markdown em vez de arquivos binarios aqui.
 
-* `diagrams/`: diagramas exportados ou fontes de diagramas.
-* `images/`: imagens de apoio para README e documentacao.
+## Diagramas
 
-Evite adicionar arquivos pesados sem necessidade.
+Pasta: `diagrams/`.
+
+Use esta pasta para armazenar:
+
+* diagramas exportados;
+* fontes de diagramas;
+* imagens de arquitetura.
+
+## Imagens
+
+Pasta: `images/`.
+
+Use esta pasta para imagens de apoio a README e documentacao.
+
+Evite armazenar:
+
+* screenshots sensiveis;
+* imagens com secrets;
+* arquivos pesados/grandes sem necessidade.

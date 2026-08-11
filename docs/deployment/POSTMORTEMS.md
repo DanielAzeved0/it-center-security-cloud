@@ -1745,6 +1745,10 @@ docker compose --env-file .env.production -f infra/docker-compose.production.yml
 * DNS com propagacao parcial.
 * Healthchecks desalinhados do runtime real.
 * Recursos limitados da VM.
+* Gestao de credenciais e chaves de acesso administrativo sem plano de backup (INCIDENTE 018).
+* Seed de dados pos-deploy (usuario admin, configuracao inicial) tratado como implicito em vez de etapa explicita (INCIDENTE 019).
+* Esquemas de autenticacao concorrentes disputando o mesmo cabecalho `Authorization` (INCIDENTE 020).
+* Tags de imagens externas fixadas no Compose sem confirmar a existencia real no registry (INCIDENTE 021).
 
 ## Causas mais recorrentes
 
@@ -1752,6 +1756,8 @@ docker compose --env-file .env.production -f infra/docker-compose.production.yml
 * Ordem de deploy dependente de DNS, TLS e secrets.
 * Validacoes manuais insuficientes antes do preflight.
 * Diferenca entre conectividade interna Docker e conectividade externa.
+* Etapas pos-deploy (seed de admin, rotacao/backup de chaves de acesso) sem checklist explicito.
+* Servicos ou configuracoes que só rodam sob profile opcional ou cenario raro (ex.: certbot em `maintenance`) escapam da validacao de rotina.
 
 ## Erros que poderiam ter sido evitados
 
@@ -1784,6 +1790,8 @@ docker compose --env-file .env.production -f infra/docker-compose.production.yml
 * Validacao de memoria e disco.
 * Validacao de healthchecks.
 * Smoke tests internos.
+* Existencia de ao menos um usuario `admin` ativo apos o deploy (INCIDENTE 019).
+* Existencia real das tags de imagens externas no registry, inclusive as usadas somente por profiles opcionais como `maintenance` (INCIDENTE 021).
 
 ## Decisoes que evitaram problemas maiores
 
@@ -1794,6 +1802,7 @@ docker compose --env-file .env.production -f infra/docker-compose.production.yml
 * Secrets fora do Git.
 * Healthchecks no Compose.
 * Preflight antes do deploy.
+* Isentar de Basic Auth as rotas que a aplicacao ja protege com Bearer token/RBAC (ADR-023), evitando conflito entre os dois esquemas de autenticacao (INCIDENTE 020).
 
 ## Mudancas para futuras implantacoes quase automaticas
 
@@ -1805,6 +1814,9 @@ docker compose --env-file .env.production -f infra/docker-compose.production.yml
 * Adicionar CI com `docker compose config`.
 * Adicionar smoke tests completos.
 * Adicionar monitoramento e alertas.
+* Automatizar o seed idempotente do primeiro admin a partir do `deploy.sh` (INCIDENTE 019).
+* Guardar copia de recuperacao de chaves SSH administrativas fora do unico ponto de falha atual (INCIDENTE 018).
+* Incluir `docker compose --profile maintenance pull`/`config` no preflight ou em checagem periodica (INCIDENTE 021).
 
 ---
 

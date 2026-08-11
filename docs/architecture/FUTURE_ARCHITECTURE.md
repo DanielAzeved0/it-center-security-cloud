@@ -219,7 +219,7 @@ Resultado esperado:
 
 Escala com justificativa tecnica, sem overengineering antecipado.
 
-### Fase H - Hub de integracao com ferramentas open source — RustDesk e Snipe-IT em planejamento real (EPIC 19)
+### Fase H - Hub de integracao com ferramentas open source — RustDesk e Snipe-IT implementados (EPIC 19, concluida em 2026-08-04)
 
 Meta:
 
@@ -227,8 +227,8 @@ O IT Center nao deve substituir ferramentas maduras e consolidadas do mercado. E
 
 Ferramentas avaliadas:
 
-* **Snipe-IT** (ITAM — gestao de ativos) — em planejamento real (ADR-028, EPIC 19): fonte oficial de inventario administrativo (computadores, notebooks, impressoras, monitores, licencas, garantias, historico de movimentacao, usuario responsavel, localizacao). O IT Center consome a API REST do Snipe-IT, sincroniza automaticamente computadores novos detectados pelo agente (existe -> atualiza; nao existe -> cria) e exibe/abre o ativo sem sair do dashboard.
-* **RustDesk** — em planejamento real (ADR-027, EPIC 19): acesso remoto seguro entre tecnico e equipamento (open source, com opcao de auto-hospedagem, ja reconhecido em `docs/security/ASSET_POLICY.md`). O IT Center armazena o ID do RustDesk de cada equipamento e permite iniciar uma sessao remota com um clique associado ao ativo correspondente.
+* **Snipe-IT** (ITAM — gestao de ativos) — implementado (ADR-028, EPIC 19, concluida em 2026-08-04): fonte oficial de inventario administrativo (computadores, notebooks, impressoras, monitores, licencas, garantias, historico de movimentacao, usuario responsavel, localizacao). O IT Center consome a API REST do Snipe-IT, sincroniza automaticamente computadores novos detectados pelo agente (existe -> atualiza; nao existe -> cria) e exibe/abre o ativo sem sair do dashboard.
+* **RustDesk** — implementado (ADR-027, EPIC 19, concluida em 2026-08-04): acesso remoto seguro entre tecnico e equipamento (open source, com opcao de auto-hospedagem, ja reconhecido em `docs/security/ASSET_POLICY.md`). O IT Center armazena o ID do RustDesk de cada equipamento e permite iniciar uma sessao remota com um clique associado ao ativo correspondente.
 * **NetBox** — ainda aspiracional (sem ADR/EPIC): source of truth da infraestrutura (data centers, racks, switches, roteadores, firewalls, VLANs, redes, prefixos, IPAM, conexoes fisicas, topologia). O IT Center consultaria dispositivos cadastrados, exibiria IPs/VLANs e relacionaria equipamentos aos ativos, sem duplicar o papel de source of truth do NetBox. Valor real depende do projeto operar em ambientes com infraestrutura de rede propria a gerenciar (racks, switches) — nao e o caso do MVP atual (uma unica VM).
 
 Observabilidade (Prometheus + Grafana) saiu desta lista: o escopo correto para essas duas ferramentas e a **infraestrutura** do proprio IT Center (Edge Node/containers), nao um dominio por-ativo como os tres acima — ver Fase F (Observabilidade), ADR-030 e EPIC 21.
@@ -257,12 +257,12 @@ Experiencia unificada para o operador — Snipe-IT como fonte de inventario/ITAM
 ```text
 1. Estabilizar MVP (concluido)
 2. Adicionar autenticacao e auditoria (concluido, EPIC 12)
-3. Profissionalizar agente Windows (EPIC 16, exceto assinatura de codigo)
+3. Profissionalizar agente Windows (concluido, EPIC 16, incluindo assinatura de codigo via ADR-031)
 4. Transformar regras SOC em politicas configuraveis
 5. Criar estrategia de retencao e agregacao de dados
 6. Adicionar observabilidade de infraestrutura (Prometheus + Grafana, ADR-030, EPIC 21)
 7. Separar servicos somente quando a carga justificar
-8. Hub de integracao: RustDesk e Snipe-IT (ADR-027/028, EPIC 19), depois relatorios/dashboard executivo (ADR-029, EPIC 20); NetBox somente se o projeto operar em ambiente que justifique
+8. Hub de integracao: RustDesk e Snipe-IT (concluido, ADR-027/028, EPIC 19) e relatorios/dashboard executivo (concluido, ADR-029, EPIC 20); NetBox somente se o projeto operar em ambiente que justifique
 ```
 
 ## Principios de decisao

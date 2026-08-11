@@ -31,14 +31,14 @@ Application Layer
 Data Layer
 ```
 
-Camadas oficiais:
+Camadas oficiais (detalhamento completo de cada camada em `docs/architecture/INFRASTRUCTURE.md` — não duplicado aqui):
 
 * Edge Node: VM Ubuntu `itcenter-edge-01`, ponto operacional do MVP na Oracle Cloud.
-* Infrastructure Layer: Ubuntu Server 24.04, Docker Engine, Docker Compose v2, rede Docker `itcenter-network`, volume `postgres_data` e estrutura operacional `/opt/itcenter`.
-* Platform Layer: Nginx, TLS com Let's Encrypt, reverse proxy, scripts de deploy, backup, restore e rollback.
+* Infrastructure Layer: Docker Engine/Compose e rede/volumes do host.
+* Platform Layer: Nginx, TLS e scripts operacionais de deploy/backup/restore/rollback.
 * Application Layer: Next.js, FastAPI e agente Windows.
-* Data Layer: PostgreSQL, volume `postgres_data`, migrations e dumps em `/opt/itcenter/backups`.
-* Security Layer: camada transversal com firewall, Security Lists, HTTPS, login administrativo Bearer/RBAC, Basic Auth (camada extra de borda), `X-Agent-Api-Key`, segredos fora do Git, hardening do Nginx e isolamento por rede Docker.
+* Data Layer: PostgreSQL e backups.
+* Security Layer: camada transversal de autenticação, rede e segredos.
 
 Fluxo funcional:
 
@@ -60,26 +60,7 @@ Dashboard Next.js
 
 # Topologia de Produção do MVP
 
-O MVP é publicado em um único nó de borda, mantendo a aplicação monolítica e os serviços internos isolados da internet.
-
-```text
-Internet
-    ↓
-IPv4 público
-    ↓
-Oracle Cloud VCN (10.0.0.0/16)
-    ├── Subnet pública (10.0.0.0/24)
-    │       ↓
-    │   itcenter-edge-01 (Ubuntu Server 24.04)
-    │       ├── Infrastructure: Docker Engine, Compose, itcenter-network, volumes
-    │       ├── Platform: Nginx, TLS, reverse proxy
-    │       ├── Application: Next.js, FastAPI
-    │       ├── Data: PostgreSQL em postgres_data
-    │       └── Security: firewall, HTTPS, Basic Auth, API Key, secrets
-    │
-    └── Subnet privada (10.0.1.0/24)
-            └── Reservada para futura separação dos serviços
-```
+O MVP é publicado em um único nó de borda (`itcenter-edge-01`), mantendo a aplicação monolítica e os serviços internos isolados da internet. A topologia de rede (VCN, subnets, gateways, IP público) é detalhada em `docs/architecture/NETWORK.md` — não duplicada aqui; o provisionamento dessa camada via Terraform está em `docs/architecture/IAC.md`.
 
 Responsabilidades do `itcenter-edge-01`:
 
@@ -89,8 +70,6 @@ Responsabilidades do `itcenter-edge-01`:
 * Aplicar migrations no início do backend.
 * Manter PostgreSQL como Data Layer, separado conceitualmente da aplicação mesmo rodando no mesmo host.
 * Executar preflight, deploy, rollback, backup e restore por scripts versionados em `infra/scripts`.
-
-A subnet privada não hospeda serviços no MVP. Ela é uma reserva de capacidade para migrar backend, frontend e PostgreSQL para instâncias privadas futuramente, preservando o `itcenter-edge-01` como ponto de entrada e proxy reverso.
 
 ---
 
@@ -359,6 +338,7 @@ A fonte de verdade sobre rotas, contratos de request/response e regras de segura
 /api/v1/machines/{id}/metrics            métricas históricas
 /api/v1/machines/{id}/programs           programas instalados
 /api/v1/machines/{id}/admins             administradores locais
+/api/v1/machines/{id}/rustdesk (PATCH)   cadastro do ID do RustDesk (ADR-027)
 /api/v1/security-events                  eventos de segurança (SOC Light)
 /api/v1/alerts, /alerts/{id}/resolve     alertas e resolução
 /api/v1/dashboard/summary                resumo agregado para o dashboard executivo (ADR-029)
@@ -484,6 +464,8 @@ Edge Node: itcenter-edge-01
             └── Host layout: /opt/itcenter
 ```
 
+A partir da ADR-024, a Infrastructure Layer abaixo do sistema operacional (VCN, subnets, security list, instância) é provisionada e versionada via Terraform, introduzido por `terraform import` sem destroy/recreate — ver `docs/architecture/IAC.md`.
+
 O Compose de produção deve criar a rede `itcenter-network` explicitamente. Isso evita depender do nome gerado automaticamente pelo Compose e facilita troubleshooting, backup, monitoramento e futuras migrações.
 
 Persistência e montagem:
@@ -587,7 +569,7 @@ Em produção, o Nginx executa no `itcenter-edge-01` e é o único container com
 
 # Roadmap Técnico
 
-O roadmap detalhado (fases e EPICs) vive em `docs/development/ROADMAP.md` e `docs/development/TASKS.md` — não duplicado aqui. Resumo histórico: a base do MVP (infraestrutura, primeira API, agente, banco, dashboard, SOC Light) corresponde às EPICs 1-6; produção, governança/autenticação e hardening vieram nas EPICs 7-18.
+O roadmap detalhado (fases e EPICs) vive em `docs/development/ROADMAP.md` e `docs/development/TASKS.md` — não duplicado aqui. Resumo histórico: a base do MVP (infraestrutura, primeira API, agente, banco, dashboard, SOC Light) corresponde às EPICs 1-6; produção, governança/autenticação e hardening vieram nas EPICs 7-18; o hub de integração RustDesk/Snipe-IT (EPIC 19) e os relatórios/dashboard executivo (EPIC 20) já estão concluídos; observabilidade de infraestrutura via Prometheus/Grafana (EPIC 21) está em planejamento (ADR-030).
 
 ---
 

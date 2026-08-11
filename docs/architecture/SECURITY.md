@@ -20,7 +20,7 @@ Nginx aplica:
 * HSTS.
 * Headers de seguranca.
 * HTTP Basic Auth no dashboard.
-* Rate limit no check-in do agente.
+* Rate limit no check-in do agente (Nginx, `limit_req`) — implementado.
 * Proxy para frontend/backend.
 
 ## Autenticacao
@@ -80,8 +80,8 @@ PostgreSQL:
 
 ## Evolucao recomendada
 
-* Rate limit basico na API.
+* Rate limit geral nas demais rotas da API (hoje implementado apenas no check-in do agente, via Nginx `limit_req`).
 * Rotacao de secrets (incluindo API Key por agente).
 * Wazuh.
-* Prometheus, Loki e Grafana.
+* Prometheus, Loki e Grafana para observabilidade da infraestrutura (ja com plano formal em ADR-030/EPIC 21).
 * Reavaliar a necessidade do Basic Auth do Nginx agora que o login administrativo esta em producao (ADR-023).

@@ -55,7 +55,13 @@ AGENT_API_KEY
 AUTH_TOKEN_SECRET
 ```
 
-O arquivo `.env.production` nunca deve ser commitado.
+Para evitar caracteres que exigiriam codificação na `DATABASE_URL`, gere os segredos com `openssl rand -hex 32` (hexadecimal, sem caracteres especiais); o valor de `POSTGRES_PASSWORD` deve ser reproduzido literalmente na URL. Gere valores distintos para os três; nunca reutilize `change-me` nem mantenha os valores `REPLACE_WITH...`.
+
+O arquivo `.env.production` nunca deve ser commitado. Depois de editado, restrinja a permissão:
+
+```bash
+chmod 600 .env.production
+```
 
 ## Secrets do dashboard
 
@@ -73,6 +79,8 @@ docker run --rm httpd:2.4-alpine htpasswd -Bbn admin 'SENHA_FORTE_AQUI' > .secre
 chmod 644 .secrets/dashboard.htpasswd
 ```
 
+Esse arquivo é montado somente leitura no container do Nginx, por isso precisa ser legível pelo worker do Nginx. Permissão `600` (como no `.env.production`) causaria `500 Internal Server Error` com `Permission denied`; mantenha `644` especificamente para `.secrets/dashboard.htpasswd`.
+
 ## Rede Docker
 
 Todos os servicos de producao usam:
@@ -82,6 +90,20 @@ itcenter-network
 ```
 
 Essa rede isola PostgreSQL, backend e frontend da internet. O Nginx e o unico servico publicado no host.
+
+## Certificado TLS inicial
+
+Com o DNS já propagado e as portas 80/443 liberadas, emita o certificado **antes** do primeiro `up` — o preflight de produção falha se o certificado ainda não existir:
+
+```bash
+sudo docker run --rm -p 80:80 \
+  -v /etc/letsencrypt:/etc/letsencrypt \
+  -v /var/lib/letsencrypt:/var/lib/letsencrypt \
+  certbot/certbot:v5.7.0 certonly --standalone \
+  -d SEU_DOMINIO --email SEU_EMAIL --agree-tos --no-eff-email
+```
+
+Substitua `SEU_DOMINIO` pelo mesmo valor de `DOMAIN_NAME`. Não publique com certificado autoassinado nem HTTP aberto. Detalhes de DNS, renovação e da imagem do Certbot ficam em `docs/deployment/HTTPS.md`.
 
 ## Deploy
 

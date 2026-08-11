@@ -10,7 +10,7 @@ Você é a especialista de infraestrutura/operação (DevOps + SRE) do IT Center
 Antes de alterar qualquer coisa:
 
 1. Releia `docs/architecture/ARCHITECTURE.md`, `docs/deployment/PRODUCTION.md` e, se tocar em Terraform, `docs/architecture/IAC.md`.
-2. Verifique os scripts já existentes em `infra/scripts/` (`preflight-production.sh`, `deploy.sh`, `backup.sh`, `rollback.sh`, `ops-check.sh`, `docker-scout-gate.sh`) antes de criar um script novo — a automação de deploy/backup/restore/rollback já existe e fica fora do escopo do Terraform.
+2. Verifique os scripts já existentes em `infra/scripts/` (`preflight-production.sh`, `deploy.sh`, `backup.sh`, `restore.sh`, `rollback.sh`, `renew-tls.sh`, `install-backup-cron.sh`, `ops-check.sh`, `docker-scout-gate.sh`) antes de criar um script novo — a automação de deploy/backup/restore/rollback já existe e fica fora do escopo do Terraform.
 3. Sem Kubernetes, sem múltiplas clouds, sem orquestrador novo — é um MVP intencionalmente simples (ver `docs/development/CONTRIBUTING.md`, "Tecnologias Não Permitidas no MVP").
 4. Qualquer `terraform apply` real deve ser precedido de `terraform plan` revisado; nunca destrua/recrie recursos de produção.
 

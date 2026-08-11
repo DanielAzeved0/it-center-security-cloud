@@ -106,6 +106,10 @@ Exemplo de envio:
       "publisher": "Google"
     }
   ],
+  "processes": [
+    "chrome.exe",
+    "explorer.exe"
+  ],
   "security": {
     "firewall_enabled": true,
     "defender_enabled": true,
@@ -120,6 +124,8 @@ Exemplo de envio:
 }
 ```
 
+`processes` é opcional e traz os nomes dos processos em execução no momento da coleta. Eles passam pelas mesmas listas de ferramentas monitoradas usadas em `installed_programs` (remoto autorizado/não autorizado, VPN, torrent, ferramentas dual-use e indicadores de malware/ransomware) — ver `malware_or_ransomware_indicator` e `suspicious_tool_detected` abaixo.
+
 Efeitos SOC atuais:
 
 ```text
@@ -133,6 +139,8 @@ installed_programs com RustDesk -> security_event remote_access_tool_detected lo
 installed_programs com AnyDesk, TeamViewer ou UltraViewer -> security_event unauthorized_remote_access_tool + alerta medium
 installed_programs com Hamachi, ZeroTier, Radmin VPN ou Tailscale -> security_event unauthorized_vpn_tool + alerta high
 installed_programs com uTorrent, BitTorrent ou qBittorrent -> security_event torrent_software_detected + alerta high
+installed_programs ou processes com Mimikatz, WannaCry, WCry, LockBit, BlackCat, ALPHV, Conti, Ryuk, REvil ou DarkSide -> security_event malware_or_ransomware_indicator + alerta high
+installed_programs ou processes com Advanced IP Scanner, Angry IP Scanner, Nmap, Masscan, PsExec, PAExec, Metasploit, Cobalt Strike, Process Hacker, Netcat, Rclone, MegaSync ou Tor Browser -> security_event suspicious_tool_detected + alerta medium
 ```
 
 Alertas abertos nao sao duplicados para a mesma maquina e mesmo tipo. Novos eventos continuam sendo registrados a cada check-in que mantiver o estado de risco.
@@ -167,6 +175,8 @@ Erros esperados:
 ```
 
 Payload invalido retorna `422 Unprocessable Entity` com a lista de campos invalidados pelo FastAPI/Pydantic.
+
+Se `AGENT_API_KEY` nao estiver configurada no servidor, a API retorna `500 Internal Server Error` com `{"detail": "Agent API key is not configured"}`, antes mesmo de validar o header enviado pelo agente.
 
 ---
 
@@ -506,6 +516,8 @@ Marca um alerta como resolvido.
 PATCH /api/v1/alerts/{alert_id}/resolve
 ```
 
+Requer papel `admin` ou `analyst` (`viewer` recebe `403`).
+
 Resposta:
 
 ```json
@@ -609,7 +621,7 @@ Estado atual (EPIC 12/13):
 Autenticação no dashboard: implementada (Bearer token HMAC SHA-256, ver docs/security/AUTH.md).
 HTTPS: implementado (Nginx em produção).
 Logs de auditoria: implementados (audit_logs — login, falha de login, logout, resolução de alerta).
-Rate limit básico: ainda não implementado.
+Rate limit implementado no check-in do agente (Nginx, `limit_req_zone ... zone=agent_checkins`, validado em produção); rate limit geral nas demais rotas ainda não implementado.
 ```
 
 ---
@@ -645,6 +657,8 @@ Novo administrador local
 USB conectado
 Hostname fora da allowlist de ativos conhecidos (unknown_asset)
 Máquina sem check-in por mais de 10 minutos (machine_offline)
+Indicador de malware ou ransomware (malware_or_ransomware_indicator)
+Ferramenta sensível ou dual-use detectada (suspicious_tool_detected)
 ```
 
 ---
@@ -666,6 +680,39 @@ Radmin VPN
 uTorrent
 BitTorrent
 qBittorrent
+```
+
+Ferramentas dual-use (evento `suspicious_tool_detected`, severidade medium, gera alerta):
+
+```text
+Advanced IP Scanner
+Angry IP Scanner
+Nmap
+Masscan
+PsExec
+PAExec
+Metasploit
+Cobalt Strike
+Process Hacker
+Netcat
+Rclone
+MegaSync
+Tor Browser
+```
+
+Indicadores de malware/ransomware (evento `malware_or_ransomware_indicator`, severidade high, gera alerta):
+
+```text
+Mimikatz
+WannaCry
+WCry
+LockBit
+BlackCat
+ALPHV
+Conti
+Ryuk
+REvil
+DarkSide
 ```
 
 ---

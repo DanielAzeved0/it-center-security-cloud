@@ -40,9 +40,21 @@ AGENT_API_KEY
 DATABASE_URL
 AUTH_TOKEN_SECRET
 AUTH_TOKEN_EXPIRATION_MINUTES
+APP_ENV
+```
+
+Opcionais (integracao Snipe-IT, EPIC 19, ADR-028 — deixe vazias para manter a integracao desativada):
+
+```text
+SNIPEIT_BASE_URL
+SNIPEIT_API_TOKEN
+SNIPEIT_DEFAULT_MODEL_ID
+SNIPEIT_DEFAULT_STATUS_ID
 ```
 
 No Docker Compose, `DATABASE_URL` aponta para o servico interno `postgres`.
+
+Quando `APP_ENV=production`, o startup da API roda `validate_runtime_configuration` (`app/core/config.py`) e falha rapido (`RuntimeError`) se `AGENT_API_KEY`, `AUTH_TOKEN_SECRET` ou `DATABASE_URL` ainda estiverem com valor padrao/inseguro (`change-me`, vazio, etc.), evitando subir em produção com credenciais de exemplo.
 
 ## Execucao manual
 

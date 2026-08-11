@@ -137,6 +137,22 @@ docs/development/AI_WORKFLOW.md
 
 ---
 
+## Autenticação e Autorização
+
+Responsável:
+
+docs/security/AUTH.md
+
+---
+
+## Deploy e Produção
+
+Responsável:
+
+docs/deployment/DEPLOYMENT_HISTORY.md e docs/deployment/CHANGELOG_DEPLOYMENT.md
+
+---
+
 # Padrão de Documentação
 
 Dois estilos são válidos neste projeto, dependendo do papel do arquivo:
@@ -307,14 +323,7 @@ Todo Pull Request deve responder:
 
 # Regras para Agentes de IA
 
-Antes de implementar qualquer funcionalidade:
-
-1. Ler docs/development/ROADMAP.md
-2. Ler docs/development/TASKS.md
-3. Ler docs/architecture/ARCHITECTURE.md
-4. Ler docs/backend/DATABASE.md
-5. Ler docs/backend/API.md
-6. Ler docs/development/DECISIONS.md
+Antes de implementar qualquer funcionalidade, ler a lista completa em "Documentação Obrigatória" (topo deste documento) — inclui ROADMAP.md, TASKS.md, ARCHITECTURE.md, DATABASE.md, API.md, CHECKIN.md, SECURITY.md, SOC_RULES.md, ASSET_POLICY.md, DECISIONS.md e AI_WORKFLOW.md. Não reenumerar um subconjunto: a lista completa é a única fonte válida.
 
 ---
 

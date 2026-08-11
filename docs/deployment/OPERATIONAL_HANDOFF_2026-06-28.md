@@ -1,5 +1,7 @@
 # Handoff operacional - 2026-06-28
 
+> **Snapshot historico do deploy/incidentes/validacoes ate 2026-06-28.** Nao e atualizado continuamente — para o runbook operacional atual, ver `docs/deployment/WEEKLY_OPERATIONS.md`, `docs/deployment/KNOWN_ISSUES.md` e `docs/agent/INSTALLATION.md`.
+
 Este documento consolida o que foi feito, validado e corrigido durante a publicacao do IT Center Security Cloud e a integracao inicial do Windows Agent.
 
 Ele deve ser usado como referencia rapida para reproduzir o deploy, diagnosticar falhas parecidas e instalar novos agentes sem repetir o ciclo de tentativa e erro.

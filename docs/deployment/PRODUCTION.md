@@ -179,6 +179,8 @@ Ele expõe somente o Nginx nas portas `80` e `443`. PostgreSQL, FastAPI e Next.j
 * Registro DNS `A` de `DOMAIN_NAME` apontando para o IP público da VM.
 * Acesso SSH por chave; login por senha e login direto do root desabilitados.
 
+Nota: a VCN, as subnets, a security list e a instância `itcenter-edge-01` já são geridas via Terraform (`infra/terraform/`, ADR-024), introduzido por `terraform import` dos recursos existentes em produção, sem destroy/recreate. Qualquer mudança nesses recursos deve passar por `terraform plan`/`apply` revisado — não mais pelo Console Oracle manualmente. Ver `infra/terraform/README.md` e `docs/architecture/IAC.md`.
+
 ## Bootstrap versionado do Edge Node
 
 A preparacao inicial do host passara a ser feita por scripts versionados. A proposta esta documentada em:
@@ -445,28 +447,6 @@ backend
 frontend
 ```
 
-Comando principal:
-
-```powershell
-cd "C:\Users\Famili Azevedo\Desktop\it-center-security-cloud"
-docker compose -f infra/docker-compose.yml up --build
-```
-
-Em segundo plano:
-
-```powershell
-cd "C:\Users\Famili Azevedo\Desktop\it-center-security-cloud"
-docker compose -f infra/docker-compose.yml up --build -d
-```
-
-URLs locais:
-
-```text
-Dashboard: http://127.0.0.1:3000
-Backend:   http://127.0.0.1:8000/api/v1/health
-Postgres:  127.0.0.1:5432
-```
-
 Fluxo de inicializacao:
 
 ```text
@@ -478,19 +458,7 @@ Fluxo de inicializacao:
 6. frontend inicia Next.js em 0.0.0.0:3000.
 ```
 
-Parar:
-
-```powershell
-cd "C:\Users\Famili Azevedo\Desktop\it-center-security-cloud"
-docker compose -f infra/docker-compose.yml down
-```
-
-Parar e remover dados locais:
-
-```powershell
-cd "C:\Users\Famili Azevedo\Desktop\it-center-security-cloud"
-docker compose -f infra/docker-compose.yml down -v
-```
+Comandos para subir, parar, ver status/logs e as URLs locais ficam documentados em `infra/README.md`, fonte única desses comandos para não manter duas cópias divergentes.
 
 ---
 
@@ -531,51 +499,6 @@ Responsabilidades:
 
 ---
 
-# HTTPS
-
-Ferramenta:
-
-Let's Encrypt
-
-Cliente:
-
-Certbot
-
-Objetivo:
-
-Criptografar comunicação.
-
----
-
-# Firewall
-
-Liberar apenas:
-
-80
-443
-
-Bloquear:
-
-5432
-
-8000
-
-3000
-
-externamente.
-
----
-
-# Backups
-
-Backup manual, agendamento periódico via cron e restore já estão implementados e documentados em "Backup e restore" (seção anterior) e na rotina semanal (`docs/deployment/WEEKLY_OPERATIONS.md`).
-
-Retenção padrão: 7 dias (configurável via `RETENTION_DAYS`).
-
-Local: `/opt/itcenter/backups`.
-
----
-
 # Variáveis de Ambiente
 
 Utilizar:
@@ -594,13 +517,19 @@ no GitHub.
 
 # Domínio
 
-Inicial:
+Domínio real em uso:
 
-IP público Oracle
+```text
+itcenter-daniel.chickenkiller.com
+```
 
-Futuro:
+IP público associado — **efêmero** (não reservado, decisão consciente de não travar a associação a um IP fixo neste estágio do MVP; ver `docs/architecture/IAC.md`):
 
-itcentercloud.com
+```text
+147.15.78.220
+```
+
+Detalhes de DNS, Certbot e TLS ficam em `docs/deployment/HTTPS.md`.
 
 ---
 
@@ -612,20 +541,6 @@ Monitorar:
 * RAM
 * Disco
 * Containers
-
----
-
-# Critério de Produção
-
-Ambiente será considerado pronto quando:
-
-* HTTPS ativo
-* Banco funcionando
-* Backend funcionando
-* Frontend funcionando
-* Script de backup disponivel
-* Firewall configurado
-* Docker Compose operacional
 
 ---
 
@@ -654,7 +569,7 @@ Criterio:
 Build limpo recomendado apos mudancas de imagem/dependencia:
 
 ```powershell
-cd "C:\Users\Famili Azevedo\Desktop\it-center-security-cloud"
+cd "<caminho-local>\it-center-security-cloud"
 docker compose -f infra/docker-compose.yml build --no-cache backend frontend
 docker compose -f infra/docker-compose.yml up -d
 ```

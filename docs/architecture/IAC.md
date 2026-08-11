@@ -47,15 +47,7 @@ NAT Gateway e Service Gateway (existem, ver secao "Descoberta real" abaixo)
 
 ## Mapeamento com as camadas da arquitetura
 
-A divisao de camadas ja definida em `docs/architecture/INFRASTRUCTURE.md` continua valendo. O Terraform e responsavel apenas pela primeira:
-
-```text
-Infrastructure Layer  -> Terraform (VCN, subnets, security list, instancia, volume de boot)
-Platform Layer        -> Docker Compose (Nginx, Certbot)
-Application Layer     -> Docker Compose (Next.js, FastAPI)
-Data Layer            -> Docker Compose (PostgreSQL)
-Security Layer        -> Transversal (HTTPS, Basic Auth, RBAC, secrets fora do Git)
-```
+A divisao de camadas completa esta em `docs/architecture/INFRASTRUCTURE.md` — nao duplicada aqui. O Terraform e responsavel apenas pela Infrastructure Layer (VCN, subnets, security list, instancia, volume de boot); as demais camadas continuam sob Docker Compose, como ja documentado la.
 
 ## Modulos
 
@@ -72,17 +64,14 @@ Dois modulos pequenos, nao um por recurso individual: o ciclo de vida de rede e 
 
 ## Descoberta real (import executado em 2026-08-04)
 
-A descoberta via `oci` CLI revelou uma topologia mais rica do que a descrita acima: a VCN foi originalmente criada pelo "VCN Wizard" da Oracle, que provisiona automaticamente um NAT Gateway e um Service Gateway junto com a subnet privada, alem de dar a cada subnet sua propria route table e security list dedicadas (a subnet publica usa a route table/security list *default* da VCN; a subnet privada usa uma route table/security list separadas, com rota para o NAT Gateway). Isso significa que:
+A topologia completa descoberta via `oci` CLI (VCN criada pelo "VCN Wizard" da Oracle, NAT Gateway, Service Gateway, route tables e security lists dedicadas por subnet, IP publico efemero) esta descrita em `docs/architecture/NETWORK.md` — nao duplicada aqui. Implicacao para o Terraform:
 
 ```text
-Subnet privada -> nao esta "sem uso": ja tem saida de internet via NAT Gateway
-Route table    -> existem 2 (default, da subnet publica; dedicada, da subnet privada)
-Security list  -> existem 2 (default, da subnet publica; dedicada, da subnet privada)
+NAT Gateway e Service Gateway       -> fora do escopo (block_traffic = false desde a criacao, nada os toca)
+Route table/security list privada   -> referenciadas por OCID via variavel (private_route_table_id, private_security_list_ids), nao geridas como recurso Terraform proprio
+Route table/security list publica   -> geridas pelo Terraform (oci_core_route_table.public, oci_core_security_list.public), pois governam o trafego de entrada real do Edge Node
+IP publico efemero                  -> mantido efemero por enquanto; risco detalhado na secao "Riscos" abaixo
 ```
-
-Decisao tomada: NAT Gateway e Service Gateway permanecem fora do escopo do Terraform (nao ha necessidade de geri-los - nada os toca, `block_traffic = false` desde a criacao). A route table e a security list da subnet privada tambem nao sao modeladas como recursos Terraform proprios - a subnet privada as referencia por OCID via variavel (`private_route_table_id`, `private_security_list_ids`), sem tentar gerir o NAT Gateway/Service Gateway que elas apontam. Route table e security list da subnet *publica* continuam totalmente geridas pelo Terraform (`oci_core_route_table.public`, `oci_core_security_list.public`), pois governam o trafego de entrada real do Edge Node.
-
-O IP publico `147.15.78.220` foi confirmado como `EPHEMERAL` (nao `RESERVED`). Decisao: manter efemero por enquanto (nenhum `apply` de recriacao roda durante a introducao do Terraform, entao o risco abaixo nao se materializa hoje). Reservar no futuro exige criar um IP novo (a OCI nao converte um efemero em reservado no mesmo endereco) e migrar o DNS numa janela planejada.
 
 ## Introducao via import, nunca destroy/recreate
 

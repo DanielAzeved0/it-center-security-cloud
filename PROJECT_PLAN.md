@@ -145,6 +145,8 @@ Não implementar neste momento:
 
 Esses recursos serão avaliados futuramente.
 
+Esta lista é sobre escopo de produto/funcionalidade (o que o MVP ainda não faz). A lista de tecnologias de infraestrutura proibidas no código (Kubernetes, RabbitMQ, Kafka, Redis, microsserviços, Elasticsearch) é uma categoria diferente e está em `docs/development/CONTRIBUTING.md` ("Tecnologias Não Permitidas no MVP") — as duas coexistem intencionalmente, não são a mesma lista desalinhada por acidente.
+
 ---
 
 # Princípios do Projeto
@@ -193,28 +195,9 @@ Manter custo zero durante o desenvolvimento e MVP.
 
 # Stack Oficial
 
-Backend:
+Stack oficial completa e regras para adotar tecnologia nova estão em `docs/development/CONTRIBUTING.md` ("Stack Oficial").
 
-* Python
-* FastAPI
-
-Banco:
-
-* PostgreSQL
-
-Frontend:
-
-* Next.js
-
-Agente:
-
-* PowerShell
-
-Infraestrutura:
-
-* Docker
-* Docker Compose
-* Nginx
+Resumo: Python/FastAPI + PostgreSQL no backend, Next.js no frontend, PowerShell no agente, Docker/Docker Compose/Nginx na infraestrutura, mais Terraform para a camada de VCN/subnets/instância (ADR-024).
 
 ---
 
@@ -236,3 +219,11 @@ O MVP será considerado bem-sucedido quando:
 Transformar o IT Center Security Cloud em uma plataforma SaaS de monitoramento, inventário e segurança para pequenas e médias empresas.
 
 A plataforma deverá manter uma versão gratuita para laboratórios, aprendizado e pequenas operações.
+
+---
+
+# Ver também
+
+* `README.md` — visão técnica, arquitetura, stack, como executar e status resumido do projeto.
+* `docs/development/ROADMAP.md` — fases, matriz de rastreabilidade e ADRs relacionados.
+* `docs/development/TASKS.md` — backlog oficial, sempre atualizado.

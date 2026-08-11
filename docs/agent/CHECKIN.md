@@ -78,30 +78,15 @@ O agente nunca deverá coletar:
 
 # Frequência de Coleta
 
-Métricas:
+Todo o payload (hostname, métricas, inventário e segurança) é coletado e enviado junto, numa única execução da Tarefa Agendada, no intervalo configurado em `checkin_interval_minutes` (padrão 5 minutos).
 
-5 minutos
-
-Inventário:
-
-24 horas
-
-Segurança:
-
-15 minutos
+Não há throttling diferenciado por tipo de dado hoje: o código atual (`agent-windows/itcenter-agent.ps1`) não implementa frequências separadas para métricas, inventário e segurança. Os campos `collect_inventory`, `collect_metrics` e `collect_security` do `config.json` são aceitos e validados, mas atualmente não têm efeito sobre a coleta — servem apenas como reserva para uma futura implementação de coleta seletiva.
 
 ---
 
 # Estrutura
 
-agent-windows/
-
-* itcenter-agent.ps1
-* install-agent.ps1
-* uninstall-agent.ps1
-* config.json
-* cache/
-* logs/
+Ver estrutura completa de arquivos em `agent-windows/README.md`.
 
 ---
 
@@ -159,11 +144,13 @@ ram_usage
 disk_usage
 uptime_seconds
 installed_programs
+processes
 security
 ```
 
 Observações:
 
+* `processes` é um campo opcional do contrato (`backend/app/schemas/agent.py`), já usado ativamente pelo backend para detecção SOC de ferramentas dual-use/malware em execução (ex.: `LockBit.exe`, `anydesk.exe`), mas hoje **não é populado pelo agente PowerShell atual** — o agente não coleta lista de processos em execução. Se omitido, o backend trata como lista vazia.
 * `installed_programs` agora é preenchido com o snapshot local dos programas instalados.
 * O bloco `security` usa coletas reais do EPIC 6 para Firewall, Defender, RDP, administradores locais, USB e falhas de login.
 * O agente já envia o check-in para `POST /api/v1/agent/checkin`.

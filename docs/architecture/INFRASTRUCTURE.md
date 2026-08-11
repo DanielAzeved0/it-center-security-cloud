@@ -93,20 +93,7 @@ Controles:
 
 ## Principio de exposicao minima
 
-Somente o Nginx expoe portas no host:
-
-```text
-80/tcp
-443/tcp
-```
-
-Nao expor publicamente:
-
-```text
-3000/tcp
-8000/tcp
-5432/tcp
-```
+Somente o Nginx expoe portas no host (80/443). A tabela completa de portas publicas/internas por servico esta em `docs/architecture/NETWORK.md` ("Publicacao de portas"), sem duplicacao aqui.
 
 ## Provisionamento
 

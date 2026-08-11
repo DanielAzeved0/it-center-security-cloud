@@ -1159,7 +1159,7 @@ A tarefa agendada do agente roda `powershell.exe -ExecutionPolicy Bypass` (`agen
 * Só a chave pública (`.cer`) é distribuída, embutida no próprio pacote de instalação (`agent-windows/`).
 * `install-agent.ps1` (que já roda elevado durante a instalação) passa a importar o `.cer` em dois certificate stores: `Cert:\LocalMachine\Root` (Trusted Root) e `Cert:\LocalMachine\TrustedPublisher` — os dois são necessários porque, sendo self-signed, o próprio certificado é sua raiz; sem estar em Root, o Windows nunca confia nele mesmo estando em TrustedPublisher. Como o ambiente não tem AD/GPO centralizado, essa importação pelo próprio instalador (por máquina) é o mecanismo de distribuição.
 * O argumento da `New-ScheduledTaskAction` em `install-agent.ps1` passa de `-ExecutionPolicy Bypass` para `-ExecutionPolicy AllSigned`.
-* O item correspondente na EPIC 16 (`docs/development/TASKS.md`) permanece não concluído (`[ ]`) até a implementação de fato — esta ADR formaliza apenas a abordagem decidida, removendo o bloqueio por custo/aquisição de certificado.
+* O item correspondente na EPIC 16 (`docs/development/TASKS.md`) foi implementado e está concluído (`[x]`) — commit `969201b`. Esta ADR registra a abordagem decidida (certificado self-signed), que removeu o bloqueio por custo/aquisição de certificado e foi de fato implementada nos três scripts do agente.
 
 Impactos:
 
@@ -1167,7 +1167,7 @@ Impactos:
 * Sem CRL/OCSP de terceiro (self-signed não tem revogação centralizada externa).
 * O processo de release do agente muda: assinatura manual é o último passo, sempre antes de empacotar; nenhuma automação de assinatura entra no CI.
 * Falha silenciosa possível se o certificado expirar ou o `.cer` não for importado corretamente numa máquina nova — `AllSigned` bloqueia a execução do agente sem alerta automático, porque é o próprio agente que reportaria esse alerta.
-* `docs/architecture/SECURITY.md` e `docs/development/TASKS.md` (EPIC 16) atualizados para refletir que a abordagem já foi decidida, sem bloqueio de custo; a implementação em código (`agent-windows/*.ps1`) permanece pendente.
+* `docs/architecture/SECURITY.md` e `docs/development/TASKS.md` (EPIC 16) atualizados para refletir a implementação concluída (commit `969201b`); a abordagem decidida nesta ADR já está em vigor no agente Windows (`agent-windows/*.ps1`).
 
 ---
 

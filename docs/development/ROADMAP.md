@@ -8,6 +8,35 @@ Guiar a evolução do IT Center Security Cloud.
 
 ---
 
+## Correspondência Fase ↔ EPIC
+
+Este documento numera as fases detalhadas abaixo como "Fase N" (a partir de 0). O backlog oficial (`docs/development/TASKS.md`) numera o mesmo trabalho como "EPIC N" (a partir de 1). Os números não coincidem — esta tabela traduz um para o outro e existe justamente para evitar o desalinhamento que já ocorreu entre esta numeração e a de TASKS.md:
+
+| Fase | EPIC(s) correspondente(s) |
+| --- | --- |
+| Fase 0 | EPIC 1 |
+| Fase 1 | EPIC 2 e EPIC 3 |
+| Fase 2 | EPIC 4 |
+| Fase 3 | EPIC 5 |
+| Fase 4 | EPIC 6 |
+| Fase 5 | EPIC 7 |
+| Fase 6 | EPIC 8 |
+| Fase 7 | EPIC 9, EPIC 10 e EPIC 11 |
+| Fase 8 | EPIC 12 |
+| Fase 9 | EPIC 13 |
+| Fase 10 | sem EPIC dedicado ainda (parte de EPIC 14 - Melhorias Futuras) |
+| Fase 11 | sem EPIC dedicado ainda (parte de EPIC 14 - Melhorias Futuras) |
+| Fase 12 | EPIC 15 |
+| Fase 13 | EPIC 16 |
+| Fase 14 | EPIC 17 |
+| Fase 15 | EPIC 18 |
+| Fase 16 | EPIC 19 |
+| Fase 17 | EPIC 20 |
+| Fase 18 | EPIC 21 |
+| Fase 19 | EPIC 22 |
+
+---
+
 # Matriz de Rastreabilidade
 
 Esta seção liga o planejamento oficial às tarefas do backlog.
@@ -38,6 +67,7 @@ EPIC 18 - Orquestracao de Agentes de IA (Claude Code nativo)
 EPIC 19 - Hub de Integracao: RustDesk e Snipe-IT
 EPIC 20 - Relatorios PDF e Dashboard Executivo
 EPIC 21 - Observabilidade de Infraestrutura (Prometheus + Grafana)
+EPIC 22 - Auto-atualizacao do Agente Windows (Updater Dedicado)
 ```
 
 ## Arquitetura
@@ -132,6 +162,8 @@ ADR-027 -> RustDesk como acesso remoto integrado (EPIC 19)
 ADR-028 -> integracao com Snipe-IT como fonte de ITAM (EPIC 19)
 ADR-029 -> ReportLab para relatorios PDF e dashboard executivo (EPIC 20)
 ADR-030 -> Prometheus + Grafana para observabilidade de infraestrutura (EPIC 21)
+ADR-031 -> certificado self-signed + ExecutionPolicy AllSigned para assinatura de codigo do agente Windows (EPIC 16)
+ADR-032 -> updater dedicado (Tarefa Agendada propria) para auto-atualizacao do agente Windows (EPIC 22)
 ```
 
 ---
@@ -412,7 +444,7 @@ Produto comercializável.
 
 # Fase 12
 
-Infraestrutura como Codigo
+Infraestrutura como Codigo — quase concluida (ADR-024), 4 pendencias de infraestrutura
 
 Meta:
 
@@ -421,10 +453,15 @@ Provisionar e versionar via Terraform a camada de infraestrutura Oracle Cloud se
 Entregas:
 
 * Modulos Terraform (network e compute)
-* Import dos recursos existentes
-* Plan zero-diff validado
-* Backend remoto em OCI Object Storage
-* Documentacao de shape, availability domain, regiao e compartment antes ausente
+* Import dos recursos existentes, com `terraform plan` em "No changes." (concluido em 2026-08-04)
+* Documentacao de shape, availability domain, regiao e compartment antes ausente (concluido)
+
+Pendente (4 itens; detalhes e progresso em EPIC 15 de `docs/development/TASKS.md`):
+
+* Bucket OCI Object Storage para state remoto
+* Migracao do state para o backend remoto (`terraform init -migrate-state`)
+* Scripts de bootstrap (`infra/bootstrap/{01-system,02-packages,03-directories,04-docker,05-firewall,bootstrap}.sh`) conforme `docs/deployment/BOOTSTRAP.md`
+* Variavel opcional de cloud-init/bootstrap no module compute (sem ativar em producao)
 
 Resultado Esperado:
 
@@ -434,7 +471,7 @@ Infraestrutura reproduzivel e auditavel em codigo, sem alterar o fluxo de deploy
 
 # Fase 13
 
-Hardening do Agente Windows
+Hardening do Agente Windows — concluida (ADR-025, ADR-031)
 
 Meta:
 
@@ -449,7 +486,7 @@ Entregas:
 * Inventario cobrindo apps UWP/Store
 * Deteccao de USB alem de armazenamento
 * Tratamento de erro no nivel mais alto do agente
-* Scripts assinados e ExecutionPolicy mais restritiva
+* Scripts assinados com certificado Authenticode self-signed e ExecutionPolicy `AllSigned` (ADR-031; `RemoteSigned` foi descartado por nao verificar scripts sobrescritos localmente, o vetor de ataque real) — implementado no commit `969201b`
 
 Resultado Esperado:
 
@@ -503,7 +540,7 @@ Especialistas de dominio dentro do Claude Code sem nenhuma tecnologia nova na st
 
 # Fase 16
 
-Hub de Integracao: RustDesk e Snipe-IT — planejamento concluido (ADR-027, ADR-028), implementacao pendente
+Hub de Integracao: RustDesk e Snipe-IT — concluida (ADR-027, ADR-028)
 
 Meta:
 
@@ -518,11 +555,13 @@ Resultado Esperado:
 
 Acesso remoto e inventario administrativo integrados ao dashboard sem o IT Center reimplementar nenhuma das duas especialidades.
 
+Validado em 2026-08-11: suite completa do backend com 87 testes passando (`pytest`, PostgreSQL local via Docker Compose), incluindo os testes dedicados de RustDesk e Snipe-IT. EPIC 19 encerrada.
+
 ---
 
 # Fase 17
 
-Relatorios PDF e Dashboard Executivo — planejamento concluido (ADR-029), implementacao pendente
+Relatorios PDF e Dashboard Executivo — concluida (ADR-029)
 
 Meta:
 
@@ -538,6 +577,8 @@ Entregas:
 Resultado Esperado:
 
 Visao executiva e relatorios exportaveis, sem mudanca de arquitetura nem dependencia externa nova.
+
+Validado em 2026-08-11: suite completa do backend com 96 testes passando e build de producao do frontend (`npm run build`) com Postgres local via Docker Compose. EPIC 20 encerrada.
 
 ---
 
@@ -559,3 +600,25 @@ Entregas:
 Resultado Esperado:
 
 Visibilidade operacional da infraestrutura sem aumentar a superficie publica nem duplicar responsabilidade com o agente.
+
+---
+
+# Fase 19
+
+Auto-atualizacao do Agente Windows — planejamento concluido (ADR-032), implementacao pendente
+
+Meta:
+
+Implementar atualizacao automatica do agente Windows via um updater dedicado, 100% PowerShell puro, com Tarefa Agendada propria (`ITCenterAgentUpdater`) e frequencia menor que o check-in de coleta. Sem Servico Windows nativo via SCM, sem NSSM/WinSW. Resolve, apenas para este caso, o item "Criar servico Windows" da Fase B de `docs/architecture/FUTURE_ARCHITECTURE.md`; o caso geral (servico Windows para a coleta em si) continua pendente.
+
+Entregas:
+
+* Novo script `agent-windows/itcenter-agent-updater.ps1` com Tarefa Agendada dedicada, registrada por `install-agent.ps1`
+* Endpoints `GET /api/v1/agent/manifest` e `GET /api/v1/agent/download`, autenticados por `X-Agent-Api-Key`
+* Validacao obrigatoria de assinatura Authenticode (certificado do ADR-031) e hash SHA-256 antes de substituir o script, sem fallback de bypass
+* Backup automatico (`itcenter-agent.ps1.previous`) e auto-rollback apos N falhas consecutivas de check-in
+* Rollout controlado por `machines.target_agent_version` e visibilidade via `machines.agent_version`
+
+Resultado Esperado:
+
+Atualizacao do agente Windows sem intervencao manual por maquina, mantendo 100% PowerShell puro e sem Servico Windows via SCM. Somente planejamento/documentacao nesta rodada (EPIC 22 de `docs/development/TASKS.md`).

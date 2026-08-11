@@ -195,6 +195,8 @@ Observação:
 
 A lista real será mantida conforme o inventário crescer.
 
+Relação com a seção RDP: esta é a lista geral de máquinas autorizadas a acesso remoto (perfil equipe de TI). O caso de uso específico de RDP habilitado é coberto pela allowlist de hostnames em `RDP > Hostnames Autorizados no MVP` (abaixo) e pela Regra 5 de `SOC_RULES.md` — no MVP, é a mesma lista de hostnames aplicada a esse caso de uso especifico.
+
 ---
 
 # RDP
@@ -211,6 +213,8 @@ NOTE-DANIEL
 PC-TI-01
 PC-TI-02
 ```
+
+Esta lista corresponde, no MVP, à mesma allowlist de `Acesso Remoto > Máquinas Autorizadas` (acima), aqui aplicada especificamente à regra operacional de RDP (Regra 5 de `SOC_RULES.md`).
 
 Regra operacional:
 

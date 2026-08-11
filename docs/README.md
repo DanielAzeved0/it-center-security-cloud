@@ -90,24 +90,21 @@ curl -I https://itcenter-daniel.chickenkiller.com
 | `deployment/SETUP.md` | Preparacao do ambiente. |
 | `deployment/PRODUCTION.md` | Estrategia e operacao de producao. |
 | `deployment/TROUBLESHOOTING.md` | Diagnostico de falhas. |
-| `deployment/OPERATIONAL_HANDOFF_2026-06-28.md` | Consolidado operacional do deploy real e integracao do agente. |
+| `deployment/OPERATIONAL_HANDOFF_2026-06-28.md` | Snapshot historico do deploy/incidentes/validacoes ate 2026-06-28 — para o runbook atual, use `WEEKLY_OPERATIONS.md`. |
 | `security/SECURITY.md` | Politicas de seguranca. |
 | `security/AUTH.md` | Autenticacao do dashboard e do agente. |
+| `security/ASSET_POLICY.md` | Fonte de verdade sobre softwares/ferramentas autorizados. |
+| `security/SOC_RULES.md` | Regras de deteccao e alertas do SOC Light. |
 | `backend/API.md` | Contrato da API. |
 | `backend/DATABASE.md` | Modelo de dados. |
 | `agent/CHECKIN.md` | Contrato do check-in do agente. |
 | `agent/TROUBLESHOOTING.md` | Diagnostico operacional do agente Windows. |
 | `development/CONTRIBUTING.md` | Regras de contribuicao. |
 | `development/ROADMAP.md` | Roadmap do projeto. |
+| `development/DECISIONS.md` | Registro de decisoes arquiteturais (ADRs). |
+| `development/TASKS.md` | Backlog oficial, sempre atualizado. |
 | `development/AI_WORKFLOW.md` | Orquestracao de agentes de IA no Claude Code (ADR-026). |
 
 ## Estado atual
 
-```text
-Infraestrutura: publicada
-HTTPS: ativo
-Dashboard: ativo
-Backend: ativo
-PostgreSQL: ativo
-Windows Agent: integrado ao check-in de producao
-```
+Ambiente publicado e operacional (HTTPS ativo, dashboard ativo, backend ativo, PostgreSQL ativo, agente Windows integrado ao check-in de producao). Progresso detalhado por EPIC esta em `development/TASKS.md` (backlog oficial, sempre atualizado).

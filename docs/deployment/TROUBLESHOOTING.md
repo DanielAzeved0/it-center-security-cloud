@@ -154,6 +154,56 @@ open() "/etc/nginx/auth/dashboard.htpasswd" failed (13: Permission denied)
 
 O arquivo e montado no container como somente leitura; a permissao `600` para o usuario `ubuntu` no host pode impedir leitura pelo worker do Nginx dentro do container.
 
+## Login administrativo retorna "Invalid credentials" mesmo com senha certa
+
+Sintomas:
+
+```text
+{"detail":"Invalid credentials"}
+```
+
+em `/login`, para qualquer tentativa, mesmo com email e senha corretos.
+
+Causa comum:
+
+* A tabela `users` esta vazia em producao. Isso acontece quando `backend/create_admin.py` nunca foi executado apos o deploy, ou quando um restore recriou o volume do banco do zero. O script nao roda automaticamente: nao faz parte da imagem Docker do backend nem do `deploy.sh`. Ja aconteceu em producao (INCIDENTE 019 em `POSTMORTEMS.md`).
+
+Validar:
+
+```bash
+docker exec -i itcenter-postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT count(*) FROM users WHERE role='admin' AND status='active';"
+```
+
+Corrigir:
+
+```bash
+docker cp backend/create_admin.py itcenter-backend:/app/create_admin.py
+docker exec -it itcenter-backend python create_admin.py
+```
+
+Executar apos qualquer provisionamento novo do banco (primeiro deploy ou restore que recria o volume `postgres_data` do zero).
+
+## Loop de login / 401 em /me, /machines, /alerts, /security-events apos login bem sucedido
+
+Sintomas:
+
+* O login administrativo funciona (retorna token), mas o navegador volta repetidamente ao prompt de Basic Auth, ou as chamadas seguintes do dashboard falham.
+* `/api/backend/api/v1/auth/me`, `/machines`, `/alerts` e `/security-events` retornam `401`.
+
+Causa:
+
+* O Nginx aplica `auth_basic` em `location /` sem excecao. O HTTP permite apenas um cabecalho `Authorization` por requisicao, e chamadas do dashboard com `Authorization: Bearer <token>` perdem, do ponto de vista do Nginx, a credencial Basic Auth que ele exige. Incidente registrado como INCIDENTE 020 em `POSTMORTEMS.md`.
+
+Corrigir:
+
+* Confirmar que a rota `^~ /api/backend/` no Nginx esta isenta de `auth_basic` (ADR-023 em `docs/development/DECISIONS.md`). Qualquer rota nova adicionada sob `location /` que tambem exija Bearer token reproduz o mesmo loop se nao for isenta da mesma forma.
+
+Validar:
+
+```bash
+curl -s -o /dev/null -w '%{http_code}' -u admin:SENHA https://itcenter-daniel.chickenkiller.com/api/backend/api/v1/health
+```
+
 ## DNS nao resolve
 
 Testar resolvers publicos:

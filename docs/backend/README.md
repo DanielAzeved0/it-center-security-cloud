@@ -16,6 +16,8 @@ Python
 FastAPI
 PostgreSQL
 psycopg
+httpx      (integracao Snipe-IT, app/services/snipeit.py — EPIC 19, ADR-028)
+reportlab  (relatorios PDF, app/services/reports.py — EPIC 20, ADR-029)
 ```
 
 ## Health check
@@ -27,3 +29,7 @@ GET /api/v1/health
 ## Banco
 
 O PostgreSQL e o Data Layer oficial do MVP. Ele nao deve ser exposto publicamente.
+
+## Execucao e variaveis de ambiente
+
+Guia completo de execucao (Docker Compose e manual) e lista de variaveis de ambiente: `backend/README.md`.

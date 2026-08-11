@@ -44,6 +44,15 @@ Servico Windows nativo fica reservado para evolucao futura.
 
 ## Comando de instalacao
 
+**Atencao (ADR-031):** ao instalar a partir de um clone/checkout do repositorio-fonte (e nao de um pacote de release ja assinado), o certificado `agent-windows\itcenter-agent-signing.cer` normalmente ainda nao existe — ele so e gerado pelo mantenedor, uma unica vez, numa maquina de confianca (nunca numa maquina monitorada). Sem ele, o comando abaixo falha em "Signing certificate not found" antes de copiar qualquer arquivo. Antes de rodar o comando padrao:
+
+```text
+1. Gerar o certificado uma unica vez com agent-windows\scripts\New-AgentSigningCertificate.ps1.
+2. Assinar os 3 scripts com agent-windows\scripts\Sign-AgentScripts.ps1.
+```
+
+Ou, para instalacao local/dev sem assinatura, adicione `-SkipSignatureCheck` ao comando (a Tarefa Agendada volta a usar `ExecutionPolicy Bypass` nesse caso — nunca use isso em producao). Detalhes completos na secao "Code-signing do agente (ADR-031)" mais abaixo.
+
 Ambiente publicado:
 
 ```powershell

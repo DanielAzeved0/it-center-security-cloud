@@ -54,10 +54,11 @@ Implementado:
 * Login administrativo com Bearer token assinado por HMAC SHA-256 (ADR-022, não JWT)
 * RBAC (`admin`/`analyst`/`viewer`)
 * Logs de auditoria (login, falha de login, logout, resolução de alerta)
+* Rate limit no check-in do agente (Nginx, `limit_req` na zona `agent_checkins`, `infra/nginx/nginx.conf.template`), validado em produção
 
 Futuro:
 
-* Rate limit
+* Rate limit geral nas demais rotas da API (hoje só o check-in do agente tem limite aplicado)
 
 ---
 
@@ -72,6 +73,8 @@ Primeira dependência externa de dados do projeto (fora de Terraform/Oracle Clou
 * A criação de ativo novo no Snipe-IT só ocorre quando `SNIPEIT_DEFAULT_MODEL_ID`/`SNIPEIT_DEFAULT_STATUS_ID` estiverem configurados; sem eles, a criação é pulada (evita erro 422 da API do Snipe-IT por falta de campos obrigatórios).
 * Monitoramento de disponibilidade do Snipe-IT em si fica fora do escopo do IT Center (ver ADR-028).
 
+Nota sobre RustDesk (EPIC 19, ADR-027): não tem uma seção de controles equivalente a esta porque `machines.rustdesk_id` é apenas um identificador armazenado (não uma credencial) e o backend não faz nenhuma chamada de rede externa para o RustDesk — o botão "Conectar" apenas abre o cliente já instalado na máquina do operador.
+
 ---
 
 ## Proteção do Banco
@@ -79,6 +82,8 @@ Primeira dependência externa de dados do projeto (fora de Terraform/Oracle Clou
 * Acesso apenas interno
 * Sem exposição pública
 * Backups automáticos
+
+Ver detalhes de rede/volume/caminho de backup em `docs/architecture/SECURITY.md`.
 
 ---
 
@@ -89,6 +94,7 @@ Primeira dependência externa de dados do projeto (fora de Terraform/Oracle Clou
 * Header oficial: X-Agent-Api-Key
 * Validação de payload
 * Cache offline sem dados sensíveis
+* Hardening da EPIC 16 concluído: scripts do agente assinados com certificado Authenticode self-signed e Tarefa Agendada executando com `ExecutionPolicy AllSigned` (ADR-025/ADR-031, commit `969201b`)
 
 ---
 

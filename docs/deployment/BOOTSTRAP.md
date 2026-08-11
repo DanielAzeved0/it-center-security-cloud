@@ -17,6 +17,8 @@ Edge Node: itcenter-edge-01
 Raiz operacional: /opt/itcenter
 ```
 
+A VCN, as subnets, a security list e a própria instância `itcenter-edge-01` são geridas por `infra/terraform/` (ver `docs/architecture/IAC.md` e ADR-024) e estão fora do escopo deste bootstrap: este documento cobre apenas o que acontece **dentro** do sistema operacional já provisionado (pacotes, diretórios, Docker, UFW).
+
 ## Decisao
 
 Antes de instalar a aplicacao, o projeto deve documentar e depois implementar um bootstrap versionado em:

@@ -68,6 +68,8 @@ openssl rand -hex 32
 
 ## Checklist Oracle Cloud
 
+Nota: a VCN, as subnets, a security list e a instância `itcenter-edge-01` já são geridas via Terraform (`infra/terraform/README.md`, `docs/architecture/IAC.md`, ADR-024) — os itens de rede/instância abaixo não são mais um passo avulso de Console, e sim resultado de `terraform import`/`apply` já executado e auditável em código. O IP público (`147.15.78.220`) é **efêmero** (não reservado), decisão consciente de não travar a associação a um IP fixo neste estágio do MVP.
+
 - [ ] VM Ubuntu 24.04 LTS criada.
 - [ ] IP publico associado.
 - [ ] Porta 22 liberada apenas para origem administrativa.

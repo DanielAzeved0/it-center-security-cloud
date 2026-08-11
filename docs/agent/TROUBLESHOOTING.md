@@ -329,6 +329,7 @@ Interpretacao:
 * Nenhum certificado retornado pela consulta em `Cert:\LocalMachine\Root`/`TrustedPublisher`: o certificado de assinatura nao foi importado (reinstale sem `-SkipSignatureCheck`, ou confirme que `agent-windows\itcenter-agent-signing.cer` existe no pacote usado na instalacao).
 * Certificado presente, mas com `NotAfter` no passado: o certificado expirou (validade padrao de 10 anos definida em `New-AgentSigningCertificate.ps1`) — gere um novo certificado, reassine os scripts com `Sign-AgentScripts.ps1` e reinstale.
 * Script editado manualmente apos a assinatura (mesmo uma unica linha) invalida a assinatura — sempre rode `Sign-AgentScripts.ps1` como ultimo passo antes de empacotar um release.
+* Arquivo `agent-windows\itcenter-agent-signing.cer` inexistente na origem do pacote de instalacao: comum em checkout limpo do repositorio-fonte, quando nenhum certificado ainda foi gerado pelo mantenedor — rode `scripts\New-AgentSigningCertificate.ps1` e `scripts\Sign-AgentScripts.ps1` antes de instalar, ou use `-SkipSignatureCheck` para instalacao local/dev sem assinatura.
 
 Acao corretiva:
 

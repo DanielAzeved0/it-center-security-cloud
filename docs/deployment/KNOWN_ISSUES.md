@@ -113,18 +113,6 @@ Evolucao esperada:
 
 * Se for necessario rodar `npm audit`/`npm install` localmente antes de abrir PR, o bloqueio de TLS pode ser contornado pontualmente exportando a cadeia de certificado do proxy/antivirus (`openssl s_client -connect registry.npmjs.org:443 -showcerts`) e apontando `NODE_EXTRA_CA_CERTS` para esse arquivo — nao adicionar isso como configuracao permanente do repositorio nem desabilitar `strict-ssl`.
 
-## .dockerignore do frontend nao exclui arquivos .env*
-
-`frontend/dashboard/.dockerignore` hoje so ignora `node_modules`, `.next` e `*.log`. Nao existe nenhum `.env` no repositorio, entao nao ha vazamento ativo, mas o `Dockerfile` faz `COPY . .` no estagio de build sem essa exclusao.
-
-Risco:
-
-* Se um `.env.local` for criado no futuro para desenvolvimento e esquecido, valores de `NEXT_PUBLIC_*` seriam embutidos estaticamente no build da imagem Docker.
-
-Evolucao esperada:
-
-* Adicionar `.env*` ao `.dockerignore` do frontend como prevencao. Rastreado na EPIC 17 de `docs/development/TASKS.md`.
-
 ## `npm run lint` quebrado no frontend
 
 Descoberto em 2026-08-04 durante a implementacao da EPIC 19: `npm run lint` (`next lint`) falha em `frontend/dashboard/`.

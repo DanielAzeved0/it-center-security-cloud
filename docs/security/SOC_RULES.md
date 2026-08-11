@@ -194,7 +194,7 @@ Ferramentas monitoradas:
 
 Condição:
 
-Ferramenta instalada em máquina não autorizada.
+Ferramenta instalada. Não existe allowlist de máquinas autorizadas para AnyDesk, TeamViewer ou UltraViewer em ASSET_POLICY.md — a regra dispara para qualquer máquina onde a ferramenta for detectada.
 
 Ação:
 
