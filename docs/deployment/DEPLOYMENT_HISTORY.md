@@ -2,6 +2,20 @@
 
 Este documento registra o processo real de implantacao do IT Center Security Cloud na Oracle Cloud.
 
+## 2026-08-11 - Validacao dos testes de RustDesk/Snipe-IT (fechamento da EPIC 19)
+
+Contexto: EPIC 19 tinha backend e frontend implementados desde 2026-08-04, mas a execucao real de `pytest` ficara pendente por falta de ambiente com Docker/Postgres na sessao original.
+
+1. Subido apenas o servico `postgres` de `infra/docker-compose.yml` via `docker compose up -d postgres` (imagem `postgres:16-alpine`, saudavel apos healthcheck).
+2. Criado virtualenv local em `backend/.venv` e instaladas as dependencias de `backend/requirements.txt`.
+3. Migrations aplicadas com `python apply_migrations.py` (5 arquivos, incluindo `004_machines_rustdesk.sql` e `005_machines_snipeit.sql`).
+4. Suite completa executada com `pytest -q` a partir de `backend/`: 87 passed, 0 failed. Confirmado especificamente `tests/test_snipeit_service.py` (7 testes) e `tests/test_machines_rustdesk.py` (5 testes), todos PASSED.
+
+Resultado:
+
+* EPIC 19 (RustDesk + Snipe-IT) concluida em `docs/development/TASKS.md` - implementacao e validacao de testes fechadas.
+* Nenhum codigo de producao alterado; apenas validacao local do que ja estava implementado desde 2026-08-04.
+
 ## 2026-08-04 - Adocao de Terraform via import (fechamento da EPIC 15)
 
 Contexto: EPIC 15 tinha os modulos e o ADR-024 prontos, mas nenhum recurso real havia sido importado. Executado de ponta a ponta nesta sessao, com acesso real a conta Oracle Cloud.

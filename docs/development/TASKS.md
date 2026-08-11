@@ -791,7 +791,7 @@ Configurar o Claude Code para atuar como especialistas de dominio (backend, fron
 
 Objetivo:
 
-Implementar as duas primeiras integracoes do Hub (Fase H de `docs/architecture/FUTURE_ARCHITECTURE.md`), priorizadas em 2026-08-03 por serem as de menor esforco e maior valor imediato de produto (ver ADR-027 e ADR-028). Backend e frontend implementados em 2026-08-04, com revisao de seguranca aplicada (RBAC do botao "Conectar" corrigido no cliente; sincronizacao Snipe-IT movida para `BackgroundTasks` para nao atrasar o check-in sob lentidao do Snipe-IT). Execucao real dos testes novos (`pytest`) ainda pendente de ambiente com Docker/Postgres.
+Implementar as duas primeiras integracoes do Hub (Fase H de `docs/architecture/FUTURE_ARCHITECTURE.md`), priorizadas em 2026-08-03 por serem as de menor esforco e maior valor imediato de produto (ver ADR-027 e ADR-028). Backend e frontend implementados em 2026-08-04, com revisao de seguranca aplicada (RBAC do botao "Conectar" corrigido no cliente; sincronizacao Snipe-IT movida para `BackgroundTasks` para nao atrasar o check-in sob lentidao do Snipe-IT). Execucao real dos testes novos (`pytest`) validada em 2026-08-11 com PostgreSQL local via Docker Compose: suite completa com 87 passed, incluindo os 7 testes de `test_snipeit_service.py` e os 5 de `test_machines_rustdesk.py`. EPIC 19 encerrada.
 
 ### Tarefas - RustDesk (ADR-027)
 
