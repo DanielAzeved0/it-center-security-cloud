@@ -995,3 +995,48 @@ Requisito explicito desta EPIC (nao negociavel na implementacao): **testar de fa
 [ ] Atualizar `docs/agent/CHECKIN.md`, `docs/backend/API.md`, `docs/backend/DATABASE.md` e `docs/security/AUTH.md` refletindo a nova origem do campo e o comportamento de fallback
 
 [ ] Testar explicitamente o cenario de falha antes de considerar a EPIC concluida: forcar uma versao/instalacao de RustDesk fora do caminho esperado e confirmar que o agente nao trava, nao gera erro no check-in, e o cadastro manual continua funcionando normalmente
+
+---
+
+# EPIC 24 - Polimento Visual do Dashboard (GSAP)
+
+Objetivo:
+
+Adicionar animacoes de polimento (entrada de cards/paineis/linhas, contadores animados, preenchimento das barras de metrica) nas telas ja existentes do dashboard, sem mudar nenhuma logica de dados/API — so camada visual. Avaliadas duas opcoes (GSAP e Three.js, ver ADR-035); GSAP escolhida por ser leve e ter encaixe direto com um app funcional que so precisa de polimento, nao de grafismo 3D. Implementada e encerrada em 2026-08-11.
+
+### Tarefas
+
+[x] Instalar a skill oficial de IA `greensock/gsap-skills` (5 das 8 skills: `gsap-core`, `gsap-react`, `gsap-timeline`, `gsap-performance`, `gsap-utils`) via `npx skills add`, para garantir uso correto da API antes de escrever qualquer animacao
+
+    Conteudo versionado em `.agents/skills/gsap-*/SKILL.md` +
+    `skills-lock.json`; symlinks de `.claude/skills/` (absolutos, por
+    maquina) adicionados ao `.gitignore`, regeneraveis via
+    `npx skills experimental_install`. Documentado em
+    `docs/development/AI_WORKFLOW.md`.
+
+[x] Instalar `gsap` e `@gsap/react` no frontend
+
+[x] Criar `frontend/dashboard/lib/motion.ts` com 3 primitivas reaproveitadas em todas as telas: `useStaggerEntrance` (entrada com fade+translateY e stagger via `useGSAP`+`gsap.matchMedia`), `animateCountUp` (contador animado) e `animateProgressValue` (preenchimento de `<progress>`)
+
+[x] Toda animacao usa apenas `transform`/`opacity` (`autoAlpha`, `y`, `scale`) — nunca `width`/`height`/`top`/`left` — e respeita `prefers-reduced-motion` via `gsap.matchMedia()`, conforme a skill oficial de performance/acessibilidade
+
+[x] `Shell.tsx`: entrada suave do conteudo principal a cada tela/navegacao
+
+[x] `Ui.tsx`: `StatCard` com contador animado quando `value` for numero; `LoadingBlock` com pulso sutil (desativado automaticamente com reduced-motion)
+
+[x] Aplicar `useStaggerEntrance` em `DashboardView`, `ExecutiveDashboardView`, `MachinesView`, `AlertsView`, `SecurityView` e `MachineDetailView` (stat cards, paineis e linhas de tabela/lista)
+
+[x] Animar o preenchimento das barras de metrica (CPU/RAM/disco) em `MetricTile` (`MachineDetailView`) e `MetricBar` (`MachinesView`) de 0 até o valor real ao carregar os dados
+
+[x] `LoginView`: entrada (fade + escala leve) do painel de login
+
+[x] Atualizar `frontend/dashboard/README.md` (secao "Animacoes (GSAP)")
+
+Validacao em 2026-08-11: `npm run build` limpo (TypeScript OK). Dev
+server + backend + Postgres local com dados reais (check-in real via
+curl): as 6 rotas autenticadas (`/`, `/executive`, `/machines`,
+`/alerts`, `/security`, `/machines/{id}`) retornaram 200 sem erro no
+log do servidor. **Nao verificado visualmente em navegador real** —
+sem ferramenta de automacao de browser conectada nesta sessao;
+recomendado `npm run dev` + revisao visual manual antes de considerar
+isso validado de ponta a ponta em produção. EPIC 24 encerrada.

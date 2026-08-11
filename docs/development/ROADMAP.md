@@ -35,6 +35,7 @@ Este documento numera as fases detalhadas abaixo como "Fase N" (a partir de 0). 
 | Fase 18 | EPIC 21 |
 | Fase 19 | EPIC 22 |
 | Fase 20 | EPIC 23 |
+| Fase 21 | EPIC 24 |
 
 ---
 
@@ -70,6 +71,7 @@ EPIC 20 - Relatorios PDF e Dashboard Executivo
 EPIC 21 - Observabilidade de Infraestrutura (Prometheus + Grafana)
 EPIC 22 - Auto-atualizacao do Agente Windows (Updater Dedicado)
 EPIC 23 - Auto-deteccao do ID do RustDesk no Agente
+EPIC 24 - Polimento Visual do Dashboard (GSAP)
 ```
 
 ## Arquitetura
@@ -168,6 +170,7 @@ ADR-031 -> certificado self-signed + ExecutionPolicy AllSigned para assinatura d
 ADR-032 -> updater dedicado (Tarefa Agendada propria) para auto-atualizacao do agente Windows (EPIC 22)
 ADR-033 -> reversao da integracao Snipe-IT (EPIC 19), sem Snipe-IT real conectado em producao
 ADR-034 -> auto-deteccao do ID do RustDesk pelo agente Windows, planejamento (EPIC 23)
+ADR-035 -> GSAP para polimento visual do dashboard, escolhido sobre Three.js (EPIC 24)
 ```
 
 ---
@@ -649,3 +652,23 @@ Entregas:
 Resultado Esperado:
 
 Menos fricção operacional no cadastro do RustDesk por maquina, sem enfraquecer a garantia de que o cadastro manual sempre funciona. Somente planejamento/documentacao nesta rodada (EPIC 23 de `docs/development/TASKS.md`).
+
+---
+
+# Fase 21
+
+Polimento Visual do Dashboard (GSAP) — concluida (ADR-035)
+
+Meta:
+
+Adicionar animacoes de polimento (entrada de cards/paineis/linhas, contadores animados, preenchimento das barras de metrica) nas telas ja existentes, sem mudar logica de dados/API. Avaliadas GSAP e Three.js; GSAP escolhida por ser leve e ter encaixe direto com um app funcional que so precisa de polimento, nao de grafismo 3D (ADR-035).
+
+Entregas:
+
+* Skill oficial `greensock/gsap-skills` instalada (5 de 8 skills) antes de escrever qualquer animacao, garantindo uso correto da API
+* `gsap`/`@gsap/react` + `frontend/dashboard/lib/motion.ts` (`useStaggerEntrance`, `animateCountUp`, `animateProgressValue`) — so `transform`/`opacity`, respeitando `prefers-reduced-motion` via `gsap.matchMedia()`
+* Aplicado em `Shell.tsx`, `Ui.tsx`, `LoginView.tsx` e nas 6 telas de dados (Dashboard, Executivo, Maquinas, Alertas, Seguranca, Detalhe de Maquina)
+
+Resultado Esperado:
+
+Dashboard com a mesma funcionalidade, com polimento visual consistente em todas as telas. Validado via `npm run build` e smoke test das rotas autenticadas com dados reais; nao verificado visualmente em navegador real nesta rodada (sem ferramenta de automacao de browser conectada) — revisao visual manual recomendada antes de producao. EPIC 24 de `docs/development/TASKS.md` encerrada.

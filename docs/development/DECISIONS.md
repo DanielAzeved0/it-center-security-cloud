@@ -1295,6 +1295,41 @@ Impactos:
 
 ---
 
+# ADR-035
+
+## Data
+
+2026-08-11
+
+## Decisão
+
+Adotar GSAP (`gsap` + `@gsap/react`) para polimento visual do dashboard (EPIC 24) — entrada de cards/painéis/listas, contadores animados, preenchimento de barras de métrica. Antes de escrever qualquer animação, instalada a skill oficial de IA `greensock/gsap-skills` (5 das 8 skills: core, react, timeline, performance, utils) para garantir uso correto da API (transforms/opacity, `useGSAP`, `gsap.matchMedia()` para `prefers-reduced-motion`).
+
+## Motivo
+
+O dashboard estava funcional mas sem nenhuma animação (`grep` em `globals.css` não encontrou `transition`/`animation`/`@keyframes` antes desta EPIC) — pedido explícito de polimento visual sem tocar em lógica de dados/API. O projeto tinha duas bibliotecas de referência à disposição: GSAP (animação) e Three.js (gráficos 3D/WebGL).
+
+## Alternativas Avaliadas
+
+* **Three.js** — descartada para este pedido: é uma biblioteca de gráficos 3D pesada (WebGL/WebGPU), sem encaixe óbvio num dashboard de monitoramento/SOC sem um caso de uso 3D concreto (ex.: mapa de rede, globo). Adicionar só pelo efeito visual contrariaria o princípio de simplicidade do projeto (`CONTRIBUTING.md`) e engordaria o bundle sem ganho real para o usuário (analista de SOC quer clareza/velocidade, não grafismo). Fica registrada como opção futura **somente se** surgir um caso de uso 3D concreto e específico.
+* **Só CSS (transitions/keyframes)** — suficiente para transições simples, mas sem controle de runtime (pause/reverse/seek), sem sequenciamento de timeline, sem stagger nativo — todas as necessidades reais deste pedido (entrada em cascata de cards/linhas, contador animado, preenchimento de `<progress>`).
+* **GSAP** — escolhida: framework-agnostic, license MIT, risco de segurança baixo (superfície mínima, é só animação), com API de stagger/timeline/matchMedia nativa para exatamente o que foi pedido, e uma skill oficial de IA que documenta o uso correto (evitando erros comuns como animar propriedades de layout ou esquecer cleanup em componentes React).
+
+## Resultado
+
+* `gsap` e `@gsap/react` adicionados a `frontend/dashboard/package.json`.
+* Skill `greensock/gsap-skills` instalada via `npx skills add` (5 de 8 skills — `gsap-frameworks` (Vue/Svelte), `gsap-scrolltrigger` e `gsap-plugins` não instaladas por não terem caso de uso identificado num app React/Next.js interno sem páginas de rolagem longa). Conteúdo em `.agents/skills/gsap-*/SKILL.md` (versionado); symlinks de `.claude/skills/` (absolutos, por máquina) no `.gitignore`, regeneráveis via `skills-lock.json`.
+* `frontend/dashboard/lib/motion.ts`: 3 primitivas reaproveitadas em todas as telas (`useStaggerEntrance`, `animateCountUp`, `animateProgressValue`), todas usando apenas `transform`/`opacity` e respeitando `prefers-reduced-motion` via `gsap.matchMedia()`.
+* Aplicado em `Shell.tsx`, `Ui.tsx` (`StatCard`, `LoadingBlock`), `LoginView.tsx` e nas 6 telas de dados (`DashboardView`, `ExecutiveDashboardView`, `MachinesView`, `AlertsView`, `SecurityView`, `MachineDetailView`). Backlog em EPIC 24 (`docs/development/TASKS.md`).
+
+Impactos:
+
+* Uma dependência nova no frontend (peso aceitável: só core+react do GSAP, sem plugins pagos/pesados como ScrollTrigger/Draggable/SVG).
+* Nenhuma mudança de dados, API ou schema — puramente camada de apresentação.
+* Validado via `npm run build` (TypeScript) e smoke test das 6 rotas autenticadas com dados reais (sem erro no log do servidor); **não verificado visualmente em navegador real** nesta rodada por falta de ferramenta de automação de browser conectada na sessão — risco residual conhecido, mitigado pela aderência estrita aos padrões oficiais da skill GSAP (não elimina a necessidade de uma revisão visual manual antes de produção).
+
+---
+
 # ADR-XXX
 
 ## Data

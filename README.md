@@ -2,7 +2,7 @@
 
 > Plataforma full stack para monitoramento, inventário, observabilidade e segurança de máquinas Windows, com agente PowerShell, API FastAPI, PostgreSQL, dashboard web e práticas iniciais de SOC/Blue Team.
 
-Status resumido: Fases 0 a 9 concluídas (governança/autenticação e operação/segurança de produção validadas em produção real) | Fase 12 (Terraform/IaC) quase concluída — 4 pendências de infraestrutura | Fases 13 a 17 concluídas (hardening do agente Windows, incluindo assinatura de código; hardening do dashboard; orquestração de agentes de IA; hub de integração RustDesk — Snipe-IT foi implementado e revertido, ver ADR-033; relatórios/dashboard executivo) | Fase 18 (observabilidade de infraestrutura) e Fase 19 (auto-atualização do agente) com planejamento e ADRs concluídos, implementação pendente | Ambiente local Docker operacional | Produção publicada na Oracle Cloud | Agente Windows integrado ao check-in. Progresso detalhado por EPIC está em `docs/development/TASKS.md` (backlog oficial, sempre atualizado); fases, matriz de rastreabilidade e ADRs relacionados estão em `docs/development/ROADMAP.md`.
+Status resumido: Fases 0 a 9 concluídas (governança/autenticação e operação/segurança de produção validadas em produção real) | Fase 12 (Terraform/IaC) quase concluída — 4 pendências de infraestrutura | Fases 13 a 17 concluídas (hardening do agente Windows, incluindo assinatura de código; hardening do dashboard; orquestração de agentes de IA; hub de integração RustDesk — Snipe-IT foi implementado e revertido, ver ADR-033; relatórios/dashboard executivo) | Fase 18 (observabilidade de infraestrutura) e Fase 19 (auto-atualização do agente) com planejamento e ADRs concluídos, implementação pendente | Fase 20 (auto-detecção do ID do RustDesk) planejada (ADR-034) | Fase 21 (polimento visual com GSAP) concluída, pendente revisão visual manual em navegador | Ambiente local Docker operacional | Produção publicada na Oracle Cloud | Agente Windows integrado ao check-in. Progresso detalhado por EPIC está em `docs/development/TASKS.md` (backlog oficial, sempre atualizado); fases, matriz de rastreabilidade e ADRs relacionados estão em `docs/development/ROADMAP.md`.
 
 ---
 
@@ -286,6 +286,8 @@ Visão resumida por fase. Entregas detalhadas, critérios de conclusão e o stat
 | 17 | Relatórios PDF e Dashboard Executivo (ADR-029) | Concluída |
 | 18 | Observabilidade de Infraestrutura — Prometheus + Grafana (ADR-030) | Planejamento concluído, implementação pendente |
 | 19 | Auto-atualização do Agente Windows (ADR-032) | Planejamento concluído, implementação pendente |
+| 20 | Auto-detecção do ID do RustDesk no Agente (ADR-034) | Planejamento concluído, implementação pendente |
+| 21 | Polimento Visual do Dashboard — GSAP (ADR-035) | Concluída (pendente revisão visual manual) |
 
 ---
 
