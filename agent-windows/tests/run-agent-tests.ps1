@@ -27,6 +27,10 @@ function Assert-Percent {
 
 . $AgentScriptPath
 
+Assert-True -Condition ((ConvertTo-AgentNormalizedMacAddress -MacAddress "00-14-22-01-23-45") -eq "00:14:22:01:23:45") -Message "MAC address must normalize dashes to colons."
+Assert-True -Condition ((ConvertTo-AgentNormalizedMacAddress -MacAddress "aa:bb:cc:dd:ee:ff") -eq "AA:BB:CC:DD:EE:FF") -Message "MAC address must normalize to uppercase."
+Assert-True -Condition ($null -eq (ConvertTo-AgentNormalizedMacAddress -MacAddress $null)) -Message "MAC address normalization must return null for empty input."
+
 $cpuUsage = Get-AgentCpuUsage
 $ramUsage = Get-AgentRamUsage
 $diskUsage = Get-AgentDiskUsage
@@ -420,6 +424,7 @@ $mockPayload = [pscustomobject]@{
     hostname = $payload.hostname
     username = $payload.username
     ip_address = $payload.ip_address
+    mac_address = $payload.mac_address
     operating_system = $operatingSystem.operating_system
     os_version = $operatingSystem.os_version
     cpu_usage = $payload.cpu_usage

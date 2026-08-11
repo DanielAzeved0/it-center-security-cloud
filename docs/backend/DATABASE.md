@@ -84,6 +84,7 @@ id BIGSERIAL PRIMARY KEY
 hostname VARCHAR(255) NOT NULL UNIQUE
 username VARCHAR(255) NULL
 ip_address INET NULL
+mac_address VARCHAR(17) NULL
 operating_system VARCHAR(255) NULL
 os_version VARCHAR(100) NULL
 status VARCHAR(20) NOT NULL DEFAULT 'offline'
@@ -100,6 +101,7 @@ updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 * last_seen será atualizado a cada check-in do agente.
 * status deve aceitar apenas: online, offline.
 * hostname deve ser normalizado antes da gravação para evitar duplicidade por diferença de caixa.
+* `mac_address` é opcional, coletado pelo agente a cada check-in (migration `007_machines_mac_address.sql`) da mesma interface de rede escolhida para `ip_address`. Normalizado para o formato `AA:BB:CC:DD:EE:FF`; pode ser `null` se nenhuma interface valida for encontrada (ex.: resolução via DNS não carrega MAC).
 * `rustdesk_id` é opcional, cadastrado manualmente por `admin`/`analyst` via `PATCH /api/v1/machines/{id}/rustdesk` (EPIC 19, ADR-027). Não é coletado pelo agente. Referencia o ID do RustDesk já instalado na máquina; não é uma credencial.
 
 A coluna `snipeit_asset_id`, introduzida pela migration `005_machines_snipeit.sql` (integração Snipe-IT, ADR-028), foi removida pela migration `006_remove_machines_snipeit.sql` — a integração foi revertida em 2026-08-11 (ver ADR-033 em `docs/development/DECISIONS.md`) por nunca ter existido um Snipe-IT real conectado em produção.

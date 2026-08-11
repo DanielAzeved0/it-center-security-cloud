@@ -328,30 +328,67 @@ function Get-AgentUsername {
     $username.Trim()
 }
 
-function Get-AgentIpAddress {
+function ConvertTo-AgentNormalizedMacAddress {
+    param(
+        [string]$MacAddress
+    )
+
+    if ([string]::IsNullOrWhiteSpace($MacAddress)) {
+        return $null
+    }
+
+    ($MacAddress.Trim() -replace "-", ":").ToUpperInvariant()
+}
+
+function Get-AgentNetworkInfo {
     $ipAddress = $null
+    $macAddress = $null
 
     if (Get-Command -Name Get-NetIPAddress -ErrorAction SilentlyContinue) {
-        $ipAddress = Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue |
+        $candidate = Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue |
             Where-Object {
                 $_.IPAddress -ne "127.0.0.1" -and
                 $_.IPAddress -notlike "169.254.*" -and
                 $_.PrefixOrigin -ne "WellKnown"
             } |
             Sort-Object -Property InterfaceMetric, InterfaceIndex |
-            Select-Object -ExpandProperty IPAddress -First 1
+            Select-Object -First 1
+
+        if ($candidate) {
+            $ipAddress = $candidate.IPAddress
+
+            if (Get-Command -Name Get-NetAdapter -ErrorAction SilentlyContinue) {
+                $adapter = Get-NetAdapter -InterfaceIndex $candidate.InterfaceIndex -ErrorAction SilentlyContinue
+                $macAddress = ConvertTo-AgentNormalizedMacAddress -MacAddress $adapter.MacAddress
+            }
+        }
     }
 
     if ([string]::IsNullOrWhiteSpace($ipAddress)) {
-        $ipAddress = Get-CimInstance -ClassName Win32_NetworkAdapterConfiguration -ErrorAction SilentlyContinue |
+        $candidate = Get-CimInstance -ClassName Win32_NetworkAdapterConfiguration -ErrorAction SilentlyContinue |
             Where-Object { $_.IPEnabled -eq $true -and $_.IPAddress } |
-            ForEach-Object { $_.IPAddress } |
             Where-Object {
-                $_ -match "^\d{1,3}(\.\d{1,3}){3}$" -and
-                $_ -ne "127.0.0.1" -and
-                $_ -notlike "169.254.*"
+                @($_.IPAddress) | Where-Object {
+                    $_ -match "^\d{1,3}(\.\d{1,3}){3}$" -and
+                    $_ -ne "127.0.0.1" -and
+                    $_ -notlike "169.254.*"
+                }
             } |
             Select-Object -First 1
+
+        if ($candidate) {
+            $ipAddress = @($candidate.IPAddress) |
+                Where-Object {
+                    $_ -match "^\d{1,3}(\.\d{1,3}){3}$" -and
+                    $_ -ne "127.0.0.1" -and
+                    $_ -notlike "169.254.*"
+                } |
+                Select-Object -First 1
+
+            if ([string]::IsNullOrWhiteSpace($macAddress)) {
+                $macAddress = ConvertTo-AgentNormalizedMacAddress -MacAddress $candidate.MACAddress
+            }
+        }
     }
 
     if ([string]::IsNullOrWhiteSpace($ipAddress)) {
@@ -364,13 +401,14 @@ function Get-AgentIpAddress {
                 $_ -notlike "169.254.*"
             } |
             Select-Object -First 1
+
+        # Resolucao via DNS nao carrega informacao de interface - sem MAC neste nivel de fallback.
     }
 
-    if ([string]::IsNullOrWhiteSpace($ipAddress)) {
-        return $null
+    [PSCustomObject]@{
+        IPAddress  = if ([string]::IsNullOrWhiteSpace($ipAddress)) { $null } else { $ipAddress.Trim() }
+        MacAddress = $macAddress
     }
-
-    $ipAddress.Trim()
 }
 
 function Get-AgentCpuUsageFallback {
@@ -801,7 +839,7 @@ function Get-AgentSecurityPayload {
 function New-AgentCheckinPayload {
     $hostname = Get-AgentHostname
     $username = Get-AgentUsername
-    $ipAddress = Get-AgentIpAddress
+    $networkInfo = Get-AgentNetworkInfo
     $operatingSystem = Get-AgentOperatingSystem
     $cpuUsage = Get-AgentCpuUsage
     $ramUsage = Get-AgentRamUsage
@@ -813,7 +851,8 @@ function New-AgentCheckinPayload {
     [ordered]@{
         hostname = $hostname
         username = $username
-        ip_address = $ipAddress
+        ip_address = $networkInfo.IPAddress
+        mac_address = $networkInfo.MacAddress
         operating_system = $operatingSystem.operating_system
         os_version = $operatingSystem.os_version
         cpu_usage = $cpuUsage
@@ -1163,6 +1202,13 @@ function Start-ItCenterAgent {
     }
     else {
         Write-AgentLog -Message "IP address collected: $($payload.ip_address)"
+    }
+
+    if ([string]::IsNullOrWhiteSpace($payload.mac_address)) {
+        Write-AgentLog -Message "MAC address not found." -Level "WARN"
+    }
+    else {
+        Write-AgentLog -Message "MAC address collected: $($payload.mac_address)"
     }
 
     Write-AgentLog -Message "CPU usage collected: $($payload.cpu_usage)%"

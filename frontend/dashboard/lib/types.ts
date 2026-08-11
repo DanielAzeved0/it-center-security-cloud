@@ -3,6 +3,7 @@ export type MachineSummary = {
   hostname: string;
   username: string | null;
   ip_address: string | null;
+  mac_address: string | null;
   status: "online" | "offline" | string;
   last_seen: string | null;
   rustdesk_id: string | null;

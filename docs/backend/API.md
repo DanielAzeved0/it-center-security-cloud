@@ -93,6 +93,7 @@ Exemplo de envio:
   "hostname": "PC-FINANCEIRO-01",
   "username": "daniel",
   "ip_address": "192.168.15.25",
+  "mac_address": "AA:BB:CC:DD:EE:FF",
   "operating_system": "Windows 11 Pro",
   "os_version": "23H2",
   "cpu_usage": 22.5,
@@ -262,6 +263,7 @@ Resposta:
     "hostname": "PC-FINANCEIRO-01",
     "username": "daniel",
     "ip_address": "192.168.15.25",
+    "mac_address": "AA:BB:CC:DD:EE:FF",
     "status": "online",
     "last_seen": "2026-06-24T20:00:00",
     "rustdesk_id": "123456789"
@@ -295,6 +297,7 @@ Resposta:
   "hostname": "PC-FINANCEIRO-01",
   "username": "daniel",
   "ip_address": "192.168.15.25",
+  "mac_address": "AA:BB:CC:DD:EE:FF",
   "operating_system": "Windows 11 Pro",
   "os_version": "23H2",
   "status": "online",

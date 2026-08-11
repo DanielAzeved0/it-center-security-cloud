@@ -154,6 +154,18 @@ Coleta de informações.
 
 [x] Reenviar dados em caso de falha
 
+[x] Coletar MAC Address (adicionado em 2026-08-11)
+
+    Get-AgentNetworkInfo substitui Get-AgentIpAddress e retorna IP e MAC
+    da mesma interface de rede selecionada (mesma logica de fallback em
+    cascata: Get-NetIPAddress+Get-NetAdapter -> Win32_NetworkAdapterConfiguration
+    -> resolucao DNS, sem MAC nesse ultimo nivel). Normalizado para o
+    formato AA:BB:CC:DD:EE:FF. Persistido em machines.mac_address
+    (migration 007_machines_mac_address.sql), exposto em GET /machines
+    e GET /machines/{id}, exibido no detalhe da maquina no dashboard.
+    docs/agent/CHECKIN.md, docs/backend/API.md e docs/backend/DATABASE.md
+    atualizados.
+
 ---
 
 # EPIC 5 - Dashboard
@@ -521,8 +533,6 @@ Registrar evolucoes de produto fora do escopo operacional imediato.
 [ ] Integracao Snipe-IT (ITAM: patrimonio, garantia, licencas). Implementada e revertida em 2026-08-11 (ADR-028 -> ADR-033): nunca existiu um Snipe-IT real conectado em producao (SNIPEIT_BASE_URL nunca configurado), sem necessidade concreta de ITAM identificada. Revisitar apenas se surgir essa necessidade real - nesse caso, decidir tambem onde hospedar o Snipe-IT (self-hosted na mesma VM arrisca OOM na itcenter-edge-01 de 1GB; uma segunda VM Always Free e a opcao mais provavel).
 
 [ ] Integracao NetBox (source of truth de infraestrutura de rede, IPAM e topologia)
-
-[ ] Coletar MAC Address no agente Windows (sugerido em 2026-08-11). Pegar o MAC da mesma interface de rede hoje escolhida para `ip_address` (mesma logica de fallback em cascata de `itcenter-agent.ps1`: `Get-NetIPAddress` -> `Win32_NetworkAdapterConfiguration` -> DNS), evitando decidir duas vezes "qual e a interface certa" para a mesma maquina. Adicionar `mac_address` ao payload de check-in (`AgentCheckinRequest`), coluna `machines.mac_address` (nullable) via migration, e exibir no detalhe da maquina no dashboard. Valor de negocio: identificador mais estavel que o IP (nao muda com DHCP), util para nao perder o historico de uma maquina quando o IP mudar e para detectar troca de placa de rede. Ambiguidade conhecida em maquinas com Wi-Fi + Ethernet ou VMs com multiplas interfaces - resolvida pela mesma priorizacao por `InterfaceMetric` que o IP ja usa.
 
 [ ] Avaliar reescrita do agente Windows em Go (condicional, ver ADR-025 e EPIC 16)
 

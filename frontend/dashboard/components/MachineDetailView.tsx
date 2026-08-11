@@ -282,6 +282,7 @@ export function MachineDetailView({ machineId }: { machineId: string }) {
             <dl className="detail-grid detail-grid-wide">
               <DetailItem label="Usuario" value={detail.username} />
               <DetailItem label="IP" value={detail.ip_address} />
+              <DetailItem label="MAC Address" value={detail.mac_address} />
               <DetailItem label="Sistema operacional" value={detail.operating_system} />
               <DetailItem label="Versao" value={detail.os_version} />
               <DetailItem label="Ultimo check-in" value={formatDateTime(detail.last_seen)} helper={lastSeenLabel} />

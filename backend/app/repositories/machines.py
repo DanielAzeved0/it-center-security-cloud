@@ -18,26 +18,29 @@ def save_machine_checkin(payload: AgentCheckinRequest) -> MachineSummary:
                     hostname,
                     username,
                     ip_address,
+                    mac_address,
                     operating_system,
                     os_version,
                     status,
                     last_seen
                 )
-                VALUES (%s, %s, %s, %s, %s, 'online', now())
+                VALUES (%s, %s, %s, %s, %s, %s, 'online', now())
                 ON CONFLICT (hostname)
                 DO UPDATE SET
                     username = EXCLUDED.username,
                     ip_address = EXCLUDED.ip_address,
+                    mac_address = EXCLUDED.mac_address,
                     operating_system = EXCLUDED.operating_system,
                     os_version = EXCLUDED.os_version,
                     status = 'online',
                     last_seen = now()
-                RETURNING id, hostname, username, host(ip_address) AS ip_address, status, last_seen
+                RETURNING id, hostname, username, host(ip_address) AS ip_address, mac_address, status, last_seen
                 """,
                 (
                     hostname,
                     payload.username,
                     payload.ip_address,
+                    payload.mac_address,
                     payload.operating_system,
                     payload.os_version,
                 ),
@@ -114,6 +117,7 @@ def list_machines() -> list[MachineSummary]:
                 hostname,
                 username,
                 host(ip_address) AS ip_address,
+                mac_address,
                 status,
                 last_seen,
                 rustdesk_id
@@ -136,6 +140,7 @@ def get_machine(machine_id: int) -> MachineDetail | None:
                 hostname,
                 username,
                 host(ip_address) AS ip_address,
+                mac_address,
                 operating_system,
                 os_version,
                 status,

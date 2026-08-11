@@ -1,0 +1,5 @@
+BEGIN;
+
+ALTER TABLE machines ADD COLUMN IF NOT EXISTS mac_address VARCHAR(17);
+
+COMMIT;

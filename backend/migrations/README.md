@@ -9,6 +9,7 @@ Migrations SQL do PostgreSQL, aplicadas em ordem:
 004_machines_rustdesk.sql tabela machines ganha rustdesk_id (integração RustDesk — EPIC 19, ADR-027)
 005_machines_snipeit.sql  tabela machines ganha snipeit_asset_id (integração Snipe-IT — EPIC 19, ADR-028)
 006_remove_machines_snipeit.sql  remove snipeit_asset_id (integração revertida — ADR-033)
+007_machines_mac_address.sql     tabela machines ganha mac_address (coleta no check-in do agente)
 ```
 
 Em execução normal (Docker Compose ou `python apply_migrations.py`), todas as migrations são aplicadas automaticamente antes da API iniciar.
