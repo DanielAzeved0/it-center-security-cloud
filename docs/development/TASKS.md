@@ -522,6 +522,8 @@ Registrar evolucoes de produto fora do escopo operacional imediato.
 
 [ ] Integracao NetBox (source of truth de infraestrutura de rede, IPAM e topologia)
 
+[ ] Coletar MAC Address no agente Windows (sugerido em 2026-08-11). Pegar o MAC da mesma interface de rede hoje escolhida para `ip_address` (mesma logica de fallback em cascata de `itcenter-agent.ps1`: `Get-NetIPAddress` -> `Win32_NetworkAdapterConfiguration` -> DNS), evitando decidir duas vezes "qual e a interface certa" para a mesma maquina. Adicionar `mac_address` ao payload de check-in (`AgentCheckinRequest`), coluna `machines.mac_address` (nullable) via migration, e exibir no detalhe da maquina no dashboard. Valor de negocio: identificador mais estavel que o IP (nao muda com DHCP), util para nao perder o historico de uma maquina quando o IP mudar e para detectar troca de placa de rede. Ambiguidade conhecida em maquinas com Wi-Fi + Ethernet ou VMs com multiplas interfaces - resolvida pela mesma priorizacao por `InterfaceMetric` que o IP ja usa.
+
 [ ] Avaliar reescrita do agente Windows em Go (condicional, ver ADR-025 e EPIC 16)
 
 ---
