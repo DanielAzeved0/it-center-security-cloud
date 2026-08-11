@@ -34,6 +34,7 @@ Este documento numera as fases detalhadas abaixo como "Fase N" (a partir de 0). 
 | Fase 17 | EPIC 20 |
 | Fase 18 | EPIC 21 |
 | Fase 19 | EPIC 22 |
+| Fase 20 | EPIC 23 |
 
 ---
 
@@ -68,6 +69,7 @@ EPIC 19 - Hub de Integracao: RustDesk (Snipe-IT implementado e revertido, ver AD
 EPIC 20 - Relatorios PDF e Dashboard Executivo
 EPIC 21 - Observabilidade de Infraestrutura (Prometheus + Grafana)
 EPIC 22 - Auto-atualizacao do Agente Windows (Updater Dedicado)
+EPIC 23 - Auto-deteccao do ID do RustDesk no Agente
 ```
 
 ## Arquitetura
@@ -165,6 +167,7 @@ ADR-030 -> Prometheus + Grafana para observabilidade de infraestrutura (EPIC 21)
 ADR-031 -> certificado self-signed + ExecutionPolicy AllSigned para assinatura de codigo do agente Windows (EPIC 16)
 ADR-032 -> updater dedicado (Tarefa Agendada propria) para auto-atualizacao do agente Windows (EPIC 22)
 ADR-033 -> reversao da integracao Snipe-IT (EPIC 19), sem Snipe-IT real conectado em producao
+ADR-034 -> auto-deteccao do ID do RustDesk pelo agente Windows, planejamento (EPIC 23)
 ```
 
 ---
@@ -623,3 +626,26 @@ Entregas:
 Resultado Esperado:
 
 Atualizacao do agente Windows sem intervencao manual por maquina, mantendo 100% PowerShell puro e sem Servico Windows via SCM. Somente planejamento/documentacao nesta rodada (EPIC 22 de `docs/development/TASKS.md`).
+
+---
+
+# Fase 20
+
+Auto-deteccao do ID do RustDesk no Agente — planejamento concluido (ADR-034), implementacao pendente
+
+Meta:
+
+Eliminar a digitacao manual do ID do RustDesk (ADR-027) sempre que possivel: o agente tenta ler o ID ja configurado no RustDesk instalado (arquivo `RustDesk2.toml` e/ou `RustDesk.exe --get-id`, ambos a testar de fato contra a versao real usada no ambiente antes de decidir qual usar) e envia-lo no check-in. O cadastro manual continua existindo e disponivel a qualquer momento — a deteccao automatica e um atalho, nunca uma dependencia.
+
+Requisito explicito, herdado da licao da reversao do Snipe-IT (ADR-033): falha de leitura automatica, versao do RustDesk diferente da testada, ou instalacao em caminho nao previsto **nunca bloqueiam o check-in nem impedem o cadastro manual**.
+
+Entregas:
+
+* Validacao empirica dos dois metodos de leitura (arquivo de config vs. flag `--get-id`) contra a instalacao real, antes de fixar a abordagem
+* Deteccao condicionada a RustDesk ja identificado como instalado (reaproveita deteccao existente em `app/services/agent.py`)
+* `rustdesk_id` enviado no check-in quando a leitura automatica funcionar, reaproveitando campo/schema/coluna do ADR-027 (sem migration nova)
+* Indicacao no dashboard da origem do dado (automatico vs. manual), sem remover o formulario de edicao manual
+
+Resultado Esperado:
+
+Menos fricção operacional no cadastro do RustDesk por maquina, sem enfraquecer a garantia de que o cadastro manual sempre funciona. Somente planejamento/documentacao nesta rodada (EPIC 23 de `docs/development/TASKS.md`).

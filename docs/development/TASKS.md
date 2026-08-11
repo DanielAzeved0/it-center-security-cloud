@@ -963,3 +963,35 @@ Implementar atualizacao automatica do agente Windows via um updater dedicado, 10
 [ ] Exibir `agent_version` no dashboard (telas de maquina)
 
 [ ] Atualizar `docs/backend/API.md`, `docs/backend/DATABASE.md`, `docs/agent/CHECKIN.md` e `docs/agent/INSTALLATION.md` no momento da implementacao
+
+---
+
+# EPIC 23 - Auto-deteccao do ID do RustDesk no Agente
+
+Objetivo:
+
+Eliminar a digitacao manual do ID do RustDesk por maquina (ADR-027, EPIC 19) sempre que possivel: o agente Windows tenta coletar automaticamente o ID ja configurado no RustDesk instalado e envia-lo no check-in, exatamente como ja faz hoje para IP e MAC Address. O cadastro manual via `PATCH /api/v1/machines/{id}/rustdesk` continua existindo e tem prioridade de sobrescrita pelo operador - a deteccao automatica e um atalho, nunca uma obrigacao. Somente planejamento/documentacao nesta rodada (ADR-034).
+
+Requisito explicito desta EPIC (nao negociavel na implementacao): **testar de fato os dois metodos de leitura abaixo** contra a versao real do RustDesk usada no ambiente, e **garantir que uma leitura automatica que falhe, ou uma versao/instalacao de RustDesk diferente da testada, nunca bloqueia o check-in nem impede o cadastro manual** - mesma politica de resiliencia ja aplicada em toda integracao externa deste projeto (Snipe-IT antes de ser revertido, ADR-028/033).
+
+### Tarefas
+
+[ ] Testar leitura do arquivo de config local do RustDesk (`RustDesk2.toml`, campo `id`) nos caminhos conhecidos por modo de instalacao (servico do sistema vs. execucao por usuario) - validar contra a versao real instalada no ambiente de testes, nao assumir o caminho/formato por documentacao de terceiros
+
+[ ] Testar `RustDesk.exe --get-id` (captura de stdout) como metodo alternativo - validar se a flag existe e funciona na versao instalada, e se exige o servico do RustDesk em execucao
+
+[ ] Com base no resultado real dos dois testes acima, decidir a ordem de tentativa (qual metodo e mais confiavel) e registrar em ADR-034 - esta decisao so pode ser tomada apos testar, nao antes
+
+[ ] Só tentar a leitura automatica quando o agente ja detectar RustDesk instalado (reaproveitar `AUTHORIZED_REMOTE_TOOLS`/deteccao existente em `app/services/agent.py`, sem nova varredura de disco desnecessaria)
+
+[ ] Tratamento explicito de falha: RustDesk instalado mas ID nao encontrado (versao diferente da testada, caminho de instalacao nao previsto, servico nao iniciado, TOML com schema diferente) - logar e seguir sem `rustdesk_id`, nunca lancar excecao que interrompa o check-in
+
+[ ] Quando a leitura automatica funcionar, enviar `rustdesk_id` no payload de check-in (reaproveitar o campo/schema/coluna ja existentes do ADR-027, sem migration nova)
+
+[ ] Persistencia: check-in automatico so sobrescreve `rustdesk_id` quando o valor atual estiver vazio OU quando decidirmos explicitamente que a leitura automatica deve ter precedencia sobre o valor manual (avaliar na implementacao; por padrao, nao pisar num valor cadastrado manualmente sem essa decisao)
+
+[ ] Frontend: quando o `rustdesk_id` vier do agente, indicar a origem no dashboard (ex.: "coletado automaticamente da maquina" vs. "cadastrado manualmente"); o formulario de edicao manual continua existindo e disponivel para admin/analyst sobrescrever a qualquer momento
+
+[ ] Atualizar `docs/agent/CHECKIN.md`, `docs/backend/API.md`, `docs/backend/DATABASE.md` e `docs/security/AUTH.md` refletindo a nova origem do campo e o comportamento de fallback
+
+[ ] Testar explicitamente o cenario de falha antes de considerar a EPIC concluida: forcar uma versao/instalacao de RustDesk fora do caminho esperado e confirmar que o agente nao trava, nao gera erro no check-in, e o cadastro manual continua funcionando normalmente

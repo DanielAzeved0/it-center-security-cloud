@@ -1260,6 +1260,41 @@ Impactos:
 
 ---
 
+# ADR-034
+
+## Data
+
+2026-08-11
+
+## Decisão
+
+Planejar a auto-detecção do ID do RustDesk pelo agente Windows (EPIC 23), eliminando a digitação manual sempre que possível, sem remover o cadastro manual existente (ADR-027) — a detecção automática é um atalho opcional, o cadastro manual continua sendo a via garantida. Esta ADR registra a decisão de planejamento; a escolha final entre os dois métodos de leitura abaixo só será fixada depois de testados de fato contra a versão real do RustDesk usada no ambiente (tarefa explícita da EPIC 23, não decidida antecipadamente aqui).
+
+## Motivo
+
+Hoje o operador precisa abrir o RustDesk na máquina de destino, copiar o ID manualmente e colar no dashboard — um passo manual por máquina que a EPIC 19 já resolveu para o resto do fluxo (RBAC, botão "Conectar", persistência), mas não para a origem do dado. O RustDesk grava esse ID localmente (arquivo de configuração e/ou flag de linha de comando do próprio executável); o agente já roda com privilégio suficiente para ler esse dado, na mesma tarefa agendada que já coleta IP, MAC Address e programas instalados.
+
+## Alternativas Avaliadas
+
+* Manter só o cadastro manual (nunca automatizar) — descartada por reintroduzir fricção operacional que o restante da EPIC 19 já eliminou; mas é o fallback padrão sempre disponível, não uma alternativa mutuamente exclusiva.
+* Ler o arquivo de configuração local do RustDesk (`RustDesk2.toml`, campo `id`) — candidata; risco conhecido: caminho varia por modo de instalação (serviço do sistema vs. usuário) e o schema pode mudar entre versões do RustDesk, por ser um formato interno não documentado como API pública.
+* Invocar `RustDesk.exe --get-id` e capturar a saída — candidata; risco conhecido: depende da flag existir e funcionar na versão instalada, possivelmente exigindo o serviço do RustDesk em execução.
+* Decidir entre as duas candidatas **sem testar contra a instalação real** — descartada: dado que ambas dependem de comportamento não documentado como API estável de terceiro, a escolha (ou a ordem de tentativa entre as duas) só é confiável depois de validada empiricamente, não por suposição.
+
+## Resultado
+
+* EPIC 23 registrada em `docs/development/TASKS.md`, com a validação empírica dos dois métodos como tarefa explícita antes de qualquer implementação de produção.
+* Requisito de resiliência obrigatório, herdado da lição da ADR-033 (Snipe-IT): falha de leitura automática, versão de RustDesk diferente da testada, ou instalação em caminho não previsto **nunca bloqueiam o check-in nem impedem o cadastro manual** — mesmo padrão de qualquer integração externa deste projeto (capturar, logar, seguir sem o dado).
+* Sem coluna nova nem endpoint novo previsto: reaproveita `machines.rustdesk_id` e `PATCH /api/v1/machines/{id}/rustdesk` já existentes do ADR-027.
+* Decisão de precedência (automático vs. manual quando os dois existirem) fica para a implementação, não fixada nesta ADR de planejamento.
+
+Impactos:
+
+* Nenhuma tecnologia nova entra na stack — leitura de arquivo local e/ou execução do próprio executável já instalado, sem dependência externa.
+* Acoplamento a comportamento não documentado de um app de terceiro (RustDesk) é o principal risco técnico desta EPIC — mitigado pelo requisito de teste empírico antes de decidir, e pela resiliência obrigatória a falhas.
+
+---
+
 # ADR-XXX
 
 ## Data
