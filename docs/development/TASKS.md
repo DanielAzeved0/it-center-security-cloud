@@ -785,6 +785,14 @@ Configurar o Claude Code para atuar como especialistas de dominio (backend, fron
 
 [ ] Configurar hooks em .claude/settings.json somente se aparecer um gatilho concreto (ex.: rodar pytest automaticamente apos editar backend/)
 
+EPIC 18 encerrada em 2026-08-11: todas as tarefas do escopo real (subagents,
+slash commands, /feature, AI_WORKFLOW.md, ADR-026) estao concluidas. Os 2
+itens acima permanecem deliberadamente nao marcados - sao gatilhos
+condicionais (pentest formal com ADR proprio; automacao com gatilho
+concreto), nao pendencias do MVP, conforme ja documentado em
+docs/development/AI_WORKFLOW.md ("O que foi deliberadamente descartado").
+Revisitar apenas se e quando a condicao de cada um se materializar.
+
 ---
 
 # EPIC 19 - Hub de Integracao: RustDesk e Snipe-IT
