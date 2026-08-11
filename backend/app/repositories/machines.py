@@ -140,8 +140,7 @@ def get_machine(machine_id: int) -> MachineDetail | None:
                 os_version,
                 status,
                 last_seen,
-                rustdesk_id,
-                snipeit_asset_id
+                rustdesk_id
             FROM machines
             WHERE id = %s
             """,
@@ -167,18 +166,6 @@ def update_machine_rustdesk_id(machine_id: int, rustdesk_id: str | None) -> bool
         ).fetchone()
 
     return row is not None
-
-
-def update_machine_snipeit_asset_id(machine_id: int, snipeit_asset_id: int) -> None:
-    with get_connection() as connection:
-        connection.execute(
-            """
-            UPDATE machines
-            SET snipeit_asset_id = %s
-            WHERE id = %s
-            """,
-            (snipeit_asset_id, machine_id),
-        )
 
 
 def list_machine_metrics(machine_id: int) -> list[MachineMetric] | None:

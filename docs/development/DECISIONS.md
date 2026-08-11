@@ -1056,6 +1056,8 @@ Impactos:
 * Primeira dependência externa de dados do projeto (fora de Terraform/Oracle Cloud, que é infraestrutura, não dado de produto). Precisa de monitoramento próprio de disponibilidade do Snipe-IT antes de produção.
 * `docs/backend/DATABASE.md`, `docs/backend/API.md` e `docs/security/SECURITY.md` serão atualizados no momento da implementação.
 
+**Revertido em 2026-08-11 — ver ADR-033.** A implementação chegou a ir para produção (código + testes), mas nunca existiu um Snipe-IT real conectado (`SNIPEIT_BASE_URL` nunca configurado), sem necessidade concreta de ITAM identificada até então. Código, testes, coluna `machines.snipeit_asset_id` e menções em outras docs foram removidos. Esta decisão permanece como registro histórico do racional original; se a necessidade de ITAM surgir de fato, reavaliar a partir daqui.
+
 ---
 
 # ADR-029
@@ -1217,6 +1219,44 @@ Impactos:
 * Uma segunda Tarefa Agendada por máquina monitorada (além da já existente de coleta) — mais um processo periódico rodando com privilégio SYSTEM, mitigado pela mesma validação de assinatura Authenticode obrigatória do ADR-031, sem fallback de bypass.
 * Nenhuma tecnologia nova entra na stack: continua 100% PowerShell + FastAPI + PostgreSQL, sem Serviço Windows via SCM e sem dependências de terceiros.
 * O caso genérico de "Serviço Windows" (para a coleta, não só para o updater) continua pendente e sem decisão na Fase B.
+
+---
+
+# ADR-033
+
+## Data
+
+2026-08-11
+
+## Decisão
+
+Reverter a integração com o Snipe-IT (ADR-028): remover código, testes, coluna `machines.snipeit_asset_id` e o bloco correspondente no dashboard. Manter o RustDesk (ADR-027) intacto — funciona e não depende de nenhum serviço externo. A ideia de integração ITAM volta para EPIC 14 (Melhorias Futuras) como item aspiracional, sem ADR ativo.
+
+## Motivo
+
+Revisão da produção (11/08/2026) mostrou que uma máquina com semanas de check-in continuava exibindo "Ativo ainda não sincronizado com o Snipe-IT". Investigação confirmou que a causa raiz é estrutural, não um bug: `SNIPEIT_BASE_URL`/`SNIPEIT_API_TOKEN` nunca foram configurados em produção porque **nunca existiu um Snipe-IT real para o IT Center apontar**. A ADR-028 desenhou corretamente o lado cliente da integração (consumir um Snipe-IT já existente via REST), mas não avaliou onde esse Snipe-IT rodaria — e ninguém chegou a provisionar um.
+
+Hospedar um Snipe-IT real (PHP + MySQL/MariaDB) exigiria arriscar OOM na `itcenter-edge-01` (`VM.Standard.E2.1.Micro`, 1 GB RAM, já operando com folga de memória estreita) ou provisionar e manter uma segunda VM só para isso. Esse custo de infraestrutura contínuo não se justifica sem uma necessidade concreta de ITAM (rastrear garantia, nota fiscal, licença, patrimônio físico) — que não foi identificada até agora. A integração já foi desenhada para falhar em silêncio sem quebrar o check-in (`sync_machine_asset` engole qualquer exceção), então mantê-la desligada não causa dano nenhum além do código/documentação morta que ela deixa no repositório.
+
+## Alternativas Avaliadas
+
+* Manter o código como está, só documentando a limitação — descartada: deixa código morto/nunca exercitado em produção real, contrariando a prática do projeto de não manter implementações incompletas.
+* Provisionar uma segunda VM Always Free (Ampere A1) na Oracle Cloud só para o Snipe-IT — viável em custo zero, mas adiciona uma superfície de manutenção (patches, backup próprio, monitoramento) inteira para um caso de uso ainda hipotético; fica registrada aqui como opção futura caso a necessidade real apareça.
+* Self-hospedar na mesma `itcenter-edge-01` — descartada: risco real de faltar RAM na VM de 1GB que já roda Postgres/backend/frontend/Nginx.
+* Reverter a integração agora e revisitar só se surgir necessidade real de ITAM — escolhida, consistente com o mesmo princípio de YAGNI já aplicado a Strix/hooks na EPIC 18 (ADR-026).
+
+## Resultado
+
+* Removidos: `app/services/snipeit.py`, `backend/tests/test_snipeit_service.py`, `snipeit_*` de `app/core/config.py`, `snipeit_asset_id`/`snipeit_asset_url` de `app/schemas/machine.py`, `update_machine_snipeit_asset_id` de `app/repositories/machines.py`, a chamada via `BackgroundTasks` em `app/services/agent.py`/`app/routes/agent.py`, o bloco Snipe-IT em `MachineDetailView.tsx` e os campos correspondentes em `lib/types.ts`.
+* Nova migration `006_remove_machines_snipeit.sql` (`DROP COLUMN IF EXISTS snipeit_asset_id`), forward-only, aplicada quando o deploy de produção rodar de fato.
+* RustDesk (ADR-027) permanece sem nenhuma alteração — continua sendo só um ID armazenado, sem dependência de rede externa.
+* `docs/development/TASKS.md`: EPIC 19 passa a cobrir só RustDesk; a ideia de Snipe-IT/ITAM migra para EPIC 14 (Melhorias Futuras).
+* Suite de testes do backend caiu de 96 para 89 (removidos os 7 testes do Snipe-IT); `npm run build` do frontend validado sem os campos removidos.
+
+Impactos:
+
+* Nenhuma tecnologia nova entra nem sai da stack oficial — apenas reverte uma integração externa opcional que nunca chegou a operar de fato.
+* Reduz a superfície de segurança do projeto (um secret e uma dependência HTTP externa a menos).
 
 ---
 

@@ -64,7 +64,7 @@ EPIC 15 - Infraestrutura como Codigo (Terraform)
 EPIC 16 - Hardening do Agente Windows
 EPIC 17 - Hardening do Dashboard (Frontend)
 EPIC 18 - Orquestracao de Agentes de IA (Claude Code nativo)
-EPIC 19 - Hub de Integracao: RustDesk e Snipe-IT
+EPIC 19 - Hub de Integracao: RustDesk (Snipe-IT implementado e revertido, ver ADR-033)
 EPIC 20 - Relatorios PDF e Dashboard Executivo
 EPIC 21 - Observabilidade de Infraestrutura (Prometheus + Grafana)
 EPIC 22 - Auto-atualizacao do Agente Windows (Updater Dedicado)
@@ -159,11 +159,12 @@ ADR-014 -> padroniza execução local integrada com Docker Compose
 ADR-015 -> padroniza gate de seguranca das imagens Docker
 ADR-026 -> orquestracao de agentes de IA com recursos nativos do Claude Code
 ADR-027 -> RustDesk como acesso remoto integrado (EPIC 19)
-ADR-028 -> integracao com Snipe-IT como fonte de ITAM (EPIC 19)
+ADR-028 -> integracao com Snipe-IT como fonte de ITAM (EPIC 19) - revertida, ver ADR-033
 ADR-029 -> ReportLab para relatorios PDF e dashboard executivo (EPIC 20)
 ADR-030 -> Prometheus + Grafana para observabilidade de infraestrutura (EPIC 21)
 ADR-031 -> certificado self-signed + ExecutionPolicy AllSigned para assinatura de codigo do agente Windows (EPIC 16)
 ADR-032 -> updater dedicado (Tarefa Agendada propria) para auto-atualizacao do agente Windows (EPIC 22)
+ADR-033 -> reversao da integracao Snipe-IT (EPIC 19), sem Snipe-IT real conectado em producao
 ```
 
 ---
@@ -540,22 +541,22 @@ Especialistas de dominio dentro do Claude Code sem nenhuma tecnologia nova na st
 
 # Fase 16
 
-Hub de Integracao: RustDesk e Snipe-IT — concluida (ADR-027, ADR-028)
+Hub de Integracao: RustDesk — concluida (ADR-027)
 
 Meta:
 
-Entregar as duas integracoes do Hub (Fase H de `docs/architecture/FUTURE_ARCHITECTURE.md`) priorizadas em 2026-08-03 por menor esforco e maior valor imediato: RustDesk (acesso remoto) e Snipe-IT (ITAM).
+Entregar as integracoes do Hub (Fase H de `docs/architecture/FUTURE_ARCHITECTURE.md`) priorizadas em 2026-08-03 por menor esforco e maior valor imediato: RustDesk (acesso remoto) e Snipe-IT (ITAM).
 
 Entregas:
 
 * RustDesk: coluna `machines.rustdesk_id`, endpoint `PATCH /api/v1/machines/{id}/rustdesk`, botao "Conectar" no detalhe da maquina, RBAC restrito a admin/analyst.
-* Snipe-IT: servico de integracao desacoplado, secrets `SNIPEIT_BASE_URL`/`SNIPEIT_API_TOKEN`, coluna `machines.snipeit_asset_id`, sincronizacao automatica no check-in, link "Ver no Snipe-IT" no dashboard.
+* Snipe-IT: implementado em 2026-08-04 (servico de integracao desacoplado, secrets, coluna `machines.snipeit_asset_id`, sincronizacao automatica no check-in, link no dashboard), mas **revertido em 2026-08-11** (ADR-033) — nunca existiu um Snipe-IT real conectado em producao, sem necessidade concreta de ITAM identificada. Volta a EPIC 14 (Melhorias Futuras) como item aspiracional.
 
 Resultado Esperado:
 
-Acesso remoto e inventario administrativo integrados ao dashboard sem o IT Center reimplementar nenhuma das duas especialidades.
+Acesso remoto integrado ao dashboard sem o IT Center reimplementar essa especialidade. Inventario administrativo (ITAM) permanece uma lacuna conhecida, sem solucao ativa por ora.
 
-Validado em 2026-08-11: suite completa do backend com 87 testes passando (`pytest`, PostgreSQL local via Docker Compose), incluindo os testes dedicados de RustDesk e Snipe-IT. EPIC 19 encerrada.
+Validado em 2026-08-11: suite completa do backend com 89 testes passando (`pytest`, PostgreSQL local via Docker Compose) apos a reversao do Snipe-IT. EPIC 19 encerrada, cobrindo apenas RustDesk.
 
 ---
 

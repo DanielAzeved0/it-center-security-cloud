@@ -516,7 +516,9 @@ Registrar evolucoes de produto fora do escopo operacional imediato.
 
 [ ] SaaS
 
-[ ] Hub de integracao com ferramentas open source maduras, em vez de substitui-las (arquitetura detalhada em docs/architecture/FUTURE_ARCHITECTURE.md, Fase H). RustDesk e Snipe-IT saíram daqui e ganharam plano concreto na EPIC 19; NetBox continua aspiracional.
+[ ] Hub de integracao com ferramentas open source maduras, em vez de substitui-las (arquitetura detalhada em docs/architecture/FUTURE_ARCHITECTURE.md, Fase H). RustDesk saiu daqui e ganhou plano concreto na EPIC 19; NetBox continua aspiracional.
+
+[ ] Integracao Snipe-IT (ITAM: patrimonio, garantia, licencas). Implementada e revertida em 2026-08-11 (ADR-028 -> ADR-033): nunca existiu um Snipe-IT real conectado em producao (SNIPEIT_BASE_URL nunca configurado), sem necessidade concreta de ITAM identificada. Revisitar apenas se surgir essa necessidade real - nesse caso, decidir tambem onde hospedar o Snipe-IT (self-hosted na mesma VM arrisca OOM na itcenter-edge-01 de 1GB; uma segunda VM Always Free e a opcao mais provavel).
 
 [ ] Integracao NetBox (source of truth de infraestrutura de rede, IPAM e topologia)
 
@@ -795,11 +797,13 @@ Revisitar apenas se e quando a condicao de cada um se materializar.
 
 ---
 
-# EPIC 19 - Hub de Integracao: RustDesk e Snipe-IT
+# EPIC 19 - Hub de Integracao: RustDesk
 
 Objetivo:
 
-Implementar as duas primeiras integracoes do Hub (Fase H de `docs/architecture/FUTURE_ARCHITECTURE.md`), priorizadas em 2026-08-03 por serem as de menor esforco e maior valor imediato de produto (ver ADR-027 e ADR-028). Backend e frontend implementados em 2026-08-04, com revisao de seguranca aplicada (RBAC do botao "Conectar" corrigido no cliente; sincronizacao Snipe-IT movida para `BackgroundTasks` para nao atrasar o check-in sob lentidao do Snipe-IT). Execucao real dos testes novos (`pytest`) validada em 2026-08-11 com PostgreSQL local via Docker Compose: suite completa com 87 passed, incluindo os 7 testes de `test_snipeit_service.py` e os 5 de `test_machines_rustdesk.py`. EPIC 19 encerrada.
+Implementar a primeira integracao do Hub (Fase H de `docs/architecture/FUTURE_ARCHITECTURE.md`), priorizada em 2026-08-03 por ser a de menor esforco e maior valor imediato de produto (ver ADR-027). Backend e frontend implementados em 2026-08-04, com revisao de seguranca aplicada (RBAC do botao "Conectar" corrigido no cliente). Execucao real dos testes novos (`pytest`) validada em 2026-08-11 com PostgreSQL local via Docker Compose. EPIC 19 encerrada.
+
+A integracao com Snipe-IT (ADR-028) tambem foi implementada nesta EPIC, mas foi **revertida em 2026-08-11** (ver ADR-033): nunca existiu um Snipe-IT real conectado em producao, sem necessidade concreta de ITAM identificada. Codigo, testes, coluna `machines.snipeit_asset_id` e a secao correspondente no dashboard foram removidos; a ideia migrou para EPIC 14 (Melhorias Futuras) como item aspiracional. RustDesk nao foi afetado.
 
 ### Tarefas - RustDesk (ADR-027)
 
@@ -813,19 +817,19 @@ Implementar as duas primeiras integracoes do Hub (Fase H de `docs/architecture/F
 
 [x] Atualizar `docs/backend/DATABASE.md`, `docs/backend/API.md` e `docs/security/AUTH.md` no momento da implementacao (nao antes, para nao descrever schema/endpoint que ainda nao existe)
 
-### Tarefas - Snipe-IT (ADR-028)
+### Tarefas - Snipe-IT (ADR-028) — revertidas em 2026-08-11, ver ADR-033
 
-[x] Criar servico de integracao (`app/services/snipeit.py`) consumindo a API REST do Snipe-IT
+[x] ~~Criar servico de integracao (`app/services/snipeit.py`) consumindo a API REST do Snipe-IT~~ (implementado em 2026-08-04, removido em 2026-08-11)
 
-[x] Adicionar `SNIPEIT_BASE_URL` e `SNIPEIT_API_TOKEN` como secrets, nunca versionados (`.env.production.example`, `docs/security/SECURITY.md`)
+[x] ~~Adicionar `SNIPEIT_BASE_URL` e `SNIPEIT_API_TOKEN` como secrets~~ (removidos de `.env.production.example`/`docs/security/SECURITY.md` em 2026-08-11)
 
-[x] Adicionar coluna `machines.snipeit_asset_id` (nullable) via migration
+[x] ~~Adicionar coluna `machines.snipeit_asset_id` (nullable) via migration~~ (removida pela migration `006_remove_machines_snipeit.sql`)
 
-[x] Sincronizacao automatica no check-in: existe no Snipe-IT -> atualiza; nao existe -> cria (falha do Snipe-IT nao bloqueia o check-in)
+[x] ~~Sincronizacao automatica no check-in~~ (removida, ver `app/services/agent.py`)
 
-[x] Link "Ver no Snipe-IT" no `MachineDetailView` (aponta para a URL do ativo, sem espelhar todos os campos do Snipe-IT no banco do IT Center)
+[x] ~~Link "Ver no Snipe-IT" no `MachineDetailView`~~ (removido do dashboard)
 
-[x] Atualizar `docs/backend/DATABASE.md`, `docs/backend/API.md` e `docs/security/SECURITY.md` no momento da implementacao
+[x] Atualizar `docs/backend/DATABASE.md`, `docs/backend/API.md` e `docs/security/SECURITY.md` refletindo a remocao
 
 ---
 

@@ -219,7 +219,7 @@ Resultado esperado:
 
 Escala com justificativa tecnica, sem overengineering antecipado.
 
-### Fase H - Hub de integracao com ferramentas open source — RustDesk e Snipe-IT implementados (EPIC 19, concluida em 2026-08-04)
+### Fase H - Hub de integracao com ferramentas open source — RustDesk implementado (EPIC 19, concluida em 2026-08-04)
 
 Meta:
 
@@ -227,7 +227,7 @@ O IT Center nao deve substituir ferramentas maduras e consolidadas do mercado. E
 
 Ferramentas avaliadas:
 
-* **Snipe-IT** (ITAM — gestao de ativos) — implementado (ADR-028, EPIC 19, concluida em 2026-08-04): fonte oficial de inventario administrativo (computadores, notebooks, impressoras, monitores, licencas, garantias, historico de movimentacao, usuario responsavel, localizacao). O IT Center consome a API REST do Snipe-IT, sincroniza automaticamente computadores novos detectados pelo agente (existe -> atualiza; nao existe -> cria) e exibe/abre o ativo sem sair do dashboard.
+* **Snipe-IT** (ITAM — gestao de ativos) — implementado e **revertido em 2026-08-11** (ADR-028 -> ADR-033, EPIC 19): a integracao chegou a ir para producao (codigo + testes), mas nunca existiu um Snipe-IT real conectado (`SNIPEIT_BASE_URL` nunca configurado), sem necessidade concreta de ITAM identificada. Codigo, testes e a coluna `machines.snipeit_asset_id` foram removidos. Volta a ser aspiracional (registrado em EPIC 14) — revisitar apenas se surgir necessidade real, decidindo tambem onde hospedar um Snipe-IT de verdade.
 * **RustDesk** — implementado (ADR-027, EPIC 19, concluida em 2026-08-04): acesso remoto seguro entre tecnico e equipamento (open source, com opcao de auto-hospedagem, ja reconhecido em `docs/security/ASSET_POLICY.md`). O IT Center armazena o ID do RustDesk de cada equipamento e permite iniciar uma sessao remota com um clique associado ao ativo correspondente.
 * **NetBox** — ainda aspiracional (sem ADR/EPIC): source of truth da infraestrutura (data centers, racks, switches, roteadores, firewalls, VLANs, redes, prefixos, IPAM, conexoes fisicas, topologia). O IT Center consultaria dispositivos cadastrados, exibiria IPs/VLANs e relacionaria equipamentos aos ativos, sem duplicar o papel de source of truth do NetBox. Valor real depende do projeto operar em ambientes com infraestrutura de rede propria a gerenciar (racks, switches) — nao e o caso do MVP atual (uma unica VM).
 
@@ -243,14 +243,13 @@ Entregas recomendadas:
 
 * Consumir a API REST de cada ferramenta com autenticacao por token; usar Webhooks quando a ferramenta oferecer.
 * Implementar cada integracao como um servico desacoplado (Integration Service), que pode ser ativado, desativado ou substituido sem impactar o restante da plataforma.
-* Armazenar no banco do IT Center apenas o necessario para consulta rapida e relacionamento interno (ex.: ID do ativo no Snipe-IT, ID do host no RustDesk), evitando duplicar dados que ja tem fonte oficial externa.
-* Sincronizacao automatica de novos ativos detectados pelo agente com o Snipe-IT (criar ou atualizar).
+* Armazenar no banco do IT Center apenas o necessario para consulta rapida e relacionamento interno (ex.: ID do host no RustDesk), evitando duplicar dados que ja tem fonte oficial externa.
 * Botao de acesso remoto por ativo integrado ao RustDesk.
 * Consulta de infraestrutura de rede (IPs, VLANs, topologia) via NetBox associada ao ativo correspondente, quando/se essa integracao avancar.
 
 Resultado esperado:
 
-Experiencia unificada para o operador — Snipe-IT como fonte de inventario/ITAM e RustDesk para acesso remoto no curto prazo; NetBox como fonte de infraestrutura/IPAM/topologia se e quando o projeto operar em ambientes que justifiquem — sem o IT Center assumir a responsabilidade tecnica de nenhuma dessas especialidades.
+Experiencia unificada para o operador — RustDesk para acesso remoto no curto prazo; Snipe-IT (ITAM) e NetBox (infraestrutura/IPAM/topologia) como fontes de inventario especializado se e quando o projeto operar em contextos que justifiquem — sem o IT Center assumir a responsabilidade tecnica de nenhuma dessas especialidades.
 
 ## Ordem recomendada
 
@@ -262,7 +261,7 @@ Experiencia unificada para o operador — Snipe-IT como fonte de inventario/ITAM
 5. Criar estrategia de retencao e agregacao de dados
 6. Adicionar observabilidade de infraestrutura (Prometheus + Grafana, ADR-030, EPIC 21)
 7. Separar servicos somente quando a carga justificar
-8. Hub de integracao: RustDesk e Snipe-IT (concluido, ADR-027/028, EPIC 19) e relatorios/dashboard executivo (concluido, ADR-029, EPIC 20); NetBox somente se o projeto operar em ambiente que justifique
+8. Hub de integracao: RustDesk (concluido, ADR-027, EPIC 19) e relatorios/dashboard executivo (concluido, ADR-029, EPIC 20); Snipe-IT revertido (ADR-028 -> ADR-033) e NetBox somente se o projeto operar em contexto que justifique
 ```
 
 ## Principios de decisao

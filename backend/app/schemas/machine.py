@@ -16,8 +16,6 @@ class MachineSummary(BaseModel):
 class MachineDetail(MachineSummary):
     operating_system: str | None = Field(default=None, max_length=255)
     os_version: str | None = Field(default=None, max_length=100)
-    snipeit_asset_id: int | None = None
-    snipeit_asset_url: str | None = None
 
 
 class MachineMetric(BaseModel):

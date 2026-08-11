@@ -163,7 +163,6 @@ Registra uma nova linha em metrics.
 Substitui o snapshot atual de installed_programs da máquina.
 Cria agent_configs padrão para a máquina quando ainda não existir.
 Atualiza last_seen e status online da máquina.
-Agenda (via BackgroundTasks, após a resposta) a sincronização de machines.snipeit_asset_id com o Snipe-IT quando a integração estiver configurada (EPIC 19, ADR-028). Falha ou lentidão nessa sincronização é apenas logada e nunca atrasa nem bloqueia a resposta do check-in.
 ```
 
 Erros esperados:
@@ -300,13 +299,11 @@ Resposta:
   "os_version": "23H2",
   "status": "online",
   "last_seen": "2026-06-24T20:00:00",
-  "rustdesk_id": "123456789",
-  "snipeit_asset_id": 42,
-  "snipeit_asset_url": "https://snipeit.example.com/hardware/42"
+  "rustdesk_id": "123456789"
 }
 ```
 
-`rustdesk_id`, `snipeit_asset_id` e `snipeit_asset_url` são `null` quando ainda não cadastrados/sincronizados. `snipeit_asset_url` só é preenchido quando `snipeit_asset_id` existir e `SNIPEIT_BASE_URL` estiver configurado (EPIC 19, ADR-027/ADR-028).
+`rustdesk_id` é `null` quando ainda não cadastrado (EPIC 19, ADR-027).
 
 ---
 

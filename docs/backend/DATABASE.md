@@ -89,7 +89,6 @@ os_version VARCHAR(100) NULL
 status VARCHAR(20) NOT NULL DEFAULT 'offline'
 last_seen TIMESTAMPTZ NULL
 rustdesk_id VARCHAR(50) NULL
-snipeit_asset_id INTEGER NULL
 created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 ```
@@ -102,7 +101,8 @@ updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 * status deve aceitar apenas: online, offline.
 * hostname deve ser normalizado antes da gravação para evitar duplicidade por diferença de caixa.
 * `rustdesk_id` é opcional, cadastrado manualmente por `admin`/`analyst` via `PATCH /api/v1/machines/{id}/rustdesk` (EPIC 19, ADR-027). Não é coletado pelo agente. Referencia o ID do RustDesk já instalado na máquina; não é uma credencial.
-* `snipeit_asset_id` é opcional, sincronizado automaticamente pelo backend a cada check-in do agente com o Snipe-IT (EPIC 19, ADR-028), quando `SNIPEIT_BASE_URL`/`SNIPEIT_API_TOKEN` estiverem configurados. Referencia o `id` do hardware no Snipe-IT; os demais campos de ITAM (patrimônio, garantia, licença) continuam vivendo só no Snipe-IT, não em `machines`.
+
+A coluna `snipeit_asset_id`, introduzida pela migration `005_machines_snipeit.sql` (integração Snipe-IT, ADR-028), foi removida pela migration `006_remove_machines_snipeit.sql` — a integração foi revertida em 2026-08-11 (ver ADR-033 em `docs/development/DECISIONS.md`) por nunca ter existido um Snipe-IT real conectado em produção.
 
 ---
 
@@ -549,21 +549,7 @@ Quando `POST /api/v1/agent/checkin` recebe payload válido:
 7. Insere o snapshot atual de installed_programs recebido no payload.
 8. Sincroniza machine_local_admins para detectar novos administradores locais.
 9. Gera security_events e alerts conforme SOC_RULES.md.
-10. Agenda a sincronização de machines.snipeit_asset_id com o Snipe-IT via `BackgroundTasks` do FastAPI quando a integração estiver configurada (EPIC 19, ADR-028; ver "Integração Snipe-IT" abaixo).
 ```
-
-## Integração Snipe-IT (EPIC 19, ADR-028)
-
-Após responder ao check-in (via `BackgroundTasks` do FastAPI, sem bibliotecas de fila novas), o backend tenta sincronizar a máquina com o Snipe-IT em `app/services/snipeit.py`:
-
-```text
-Integração desativada (SNIPEIT_BASE_URL ou SNIPEIT_API_TOKEN ausentes): nenhuma chamada HTTP é feita.
-Ativo existente no Snipe-IT (busca por hostname): atualiza o nome do ativo e grava machines.snipeit_asset_id.
-Ativo inexistente no Snipe-IT: tenta criar um novo hardware, somente se SNIPEIT_DEFAULT_MODEL_ID e SNIPEIT_DEFAULT_STATUS_ID estiverem configurados (obrigatórios pela API do Snipe-IT); caso contrário, a criação é pulada e apenas logada.
-Qualquer falha de comunicação (rede, timeout, resposta inesperada) é capturada e logada, sem propagar erro.
-```
-
-A sincronização roda depois que a resposta do check-in já foi enviada ao agente (`BackgroundTasks`, executado no mesmo processo/worker, sem infraestrutura nova): mesmo uma lentidão do Snipe-IT (sem chegar a falhar) não atrasa a resposta ao agente nem ocupa o pool de requisições síncronas da API por mais tempo que o necessário.
 
 ## Consultas
 
@@ -579,15 +565,6 @@ O backend usa a variável:
 
 ```text
 DATABASE_URL
-```
-
-Variáveis opcionais da integração Snipe-IT (EPIC 19, ADR-028; deixe vazias para manter a integração desativada):
-
-```text
-SNIPEIT_BASE_URL
-SNIPEIT_API_TOKEN
-SNIPEIT_DEFAULT_MODEL_ID
-SNIPEIT_DEFAULT_STATUS_ID
 ```
 
 Valor local padrão:

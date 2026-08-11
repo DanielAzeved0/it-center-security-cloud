@@ -62,18 +62,11 @@ Futuro:
 
 ---
 
-## Integração Externa: Snipe-IT (EPIC 19, ADR-028)
+## RustDesk (EPIC 19, ADR-027)
 
-Primeira dependência externa de dados do projeto (fora de Terraform/Oracle Cloud, que é infraestrutura). Controles aplicados:
+`machines.rustdesk_id` é apenas um identificador armazenado (não uma credencial) e o backend não faz nenhuma chamada de rede externa para o RustDesk — o botão "Conectar" apenas abre o cliente já instalado na máquina do operador.
 
-* `SNIPEIT_BASE_URL` e `SNIPEIT_API_TOKEN` são secrets opcionais, lidos apenas via variável de ambiente (`.env.production`, nunca versionados) — mesma política de `AGENT_API_KEY`/`AUTH_TOKEN_SECRET`.
-* Sem `SNIPEIT_BASE_URL`/`SNIPEIT_API_TOKEN` configurados, `app/services/snipeit.py` não faz nenhuma chamada HTTP (integração desativada por padrão).
-* O IT Center só armazena `machines.snipeit_asset_id` (referência numérica). Nenhum dado de patrimônio, garantia, licença ou histórico de movimentação do Snipe-IT é replicado no banco do IT Center.
-* Qualquer falha de comunicação com o Snipe-IT (rede, timeout, resposta inesperada, erro HTTP) é capturada e apenas logada — nunca propaga erro nem bloqueia o check-in do agente, para que a indisponibilidade do Snipe-IT não vire indisponibilidade do IT Center.
-* A criação de ativo novo no Snipe-IT só ocorre quando `SNIPEIT_DEFAULT_MODEL_ID`/`SNIPEIT_DEFAULT_STATUS_ID` estiverem configurados; sem eles, a criação é pulada (evita erro 422 da API do Snipe-IT por falta de campos obrigatórios).
-* Monitoramento de disponibilidade do Snipe-IT em si fica fora do escopo do IT Center (ver ADR-028).
-
-Nota sobre RustDesk (EPIC 19, ADR-027): não tem uma seção de controles equivalente a esta porque `machines.rustdesk_id` é apenas um identificador armazenado (não uma credencial) e o backend não faz nenhuma chamada de rede externa para o RustDesk — o botão "Conectar" apenas abre o cliente já instalado na máquina do operador.
+A integração com Snipe-IT (ADR-028) foi implementada junto com o RustDesk na EPIC 19, mas foi **revertida em 2026-08-11** (ver ADR-033 em `docs/development/DECISIONS.md`): nunca existiu um Snipe-IT real conectado em produção, sem necessidade concreta de ITAM identificada. Código, secrets e a coluna `machines.snipeit_asset_id` foram removidos.
 
 ---
 

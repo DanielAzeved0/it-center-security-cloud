@@ -11,8 +11,6 @@ export type MachineSummary = {
 export type MachineDetail = MachineSummary & {
   operating_system: string | null;
   os_version: string | null;
-  snipeit_asset_id: number | null;
-  snipeit_asset_url: string | null;
 };
 
 export type MachineMetric = {

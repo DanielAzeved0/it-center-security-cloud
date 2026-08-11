@@ -292,7 +292,7 @@ export function MachineDetailView({ machineId }: { machineId: string }) {
           <section className="panel">
             <div className="panel-header">
               <h2>Integracoes</h2>
-              <span>RustDesk e Snipe-IT</span>
+              <span>RustDesk</span>
             </div>
             <div className="integrations-grid">
               <div className="integration-block">
@@ -342,22 +342,6 @@ export function MachineDetailView({ machineId }: { machineId: string }) {
                   </button>
                 </form>
                 {rustdeskError ? <div className="form-error" role="alert">{rustdeskError}</div> : null}
-              </div>
-
-              <div className="integration-block">
-                <span className="eyebrow">Snipe-IT</span>
-                {detail.snipeit_asset_url ? (
-                  <a
-                    className="secondary-button compact-button"
-                    href={detail.snipeit_asset_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    Ver no Snipe-IT
-                  </a>
-                ) : (
-                  <p className="panel-note">Ativo ainda nao sincronizado com o Snipe-IT.</p>
-                )}
               </div>
             </div>
           </section>

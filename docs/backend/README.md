@@ -16,7 +16,7 @@ Python
 FastAPI
 PostgreSQL
 psycopg
-httpx      (integracao Snipe-IT, app/services/snipeit.py — EPIC 19, ADR-028)
+httpx      (necessario pelo TestClient do FastAPI/Starlette em testes)
 reportlab  (relatorios PDF, app/services/reports.py — EPIC 20, ADR-029)
 ```
 

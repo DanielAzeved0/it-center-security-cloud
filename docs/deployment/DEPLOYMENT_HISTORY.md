@@ -2,6 +2,21 @@
 
 Este documento registra o processo real de implantacao do IT Center Security Cloud na Oracle Cloud.
 
+## 2026-08-11 - Reversao da integracao Snipe-IT (ADR-028 -> ADR-033)
+
+Contexto: revisao de uma tela de maquina em producao (`itcenter-daniel.chickenkiller.com/machines/23`) mostrou "Ativo ainda nao sincronizado com o Snipe-IT" numa maquina com semanas de check-in. Investigacao no codigo (`app/services/snipeit.py`) confirmou que a causa raiz e estrutural: `SNIPEIT_BASE_URL`/`SNIPEIT_API_TOKEN` nunca foram configurados em producao porque nunca existiu um Snipe-IT real para o backend apontar.
+
+1. Decisao: reverter a integracao em vez de provisionar um Snipe-IT real, por falta de necessidade concreta de ITAM identificada vs. custo de hospedar/manter um servico PHP+MySQL (arriscar OOM na `itcenter-edge-01` de 1GB ou manter uma segunda VM).
+2. Codigo removido: `app/services/snipeit.py`, `backend/tests/test_snipeit_service.py`, `snipeit_*` de `app/core/config.py`, `snipeit_asset_id`/`snipeit_asset_url` do schema/servico/repositorio de machines, a chamada via `BackgroundTasks` no check-in, e o bloco Snipe-IT em `MachineDetailView.tsx`/`lib/types.ts`.
+3. Nova migration `006_remove_machines_snipeit.sql` criada (forward-only, ainda nao aplicada em producao - so roda quando o deploy for disparado).
+4. ADR-033 registrado em `docs/development/DECISIONS.md`; ADR-028 marcado com nota apontando para a reversao.
+5. Suite completa do backend revalidada localmente (Postgres via Docker Compose): 89 passed (96 - 7 testes do Snipe-IT removidos). `npm run build` do frontend validado sem os campos removidos.
+
+Resultado:
+
+* EPIC 19 passa a cobrir só RustDesk (ADR-027), que continua funcionando sem alteracao. Snipe-IT volta para EPIC 14 (Melhorias Futuras) como item aspiracional.
+* Nenhum deploy real de producao foi feito nesta sessao - a migration 006 e as mudancas de codigo ficam commitadas, aplicando-se em producao apenas no proximo deploy manual.
+
 ## 2026-08-11 - Validacao dos testes de RustDesk/Snipe-IT (fechamento da EPIC 19)
 
 Contexto: EPIC 19 tinha backend e frontend implementados desde 2026-08-04, mas a execucao real de `pytest` ficara pendente por falta de ambiente com Docker/Postgres na sessao original.

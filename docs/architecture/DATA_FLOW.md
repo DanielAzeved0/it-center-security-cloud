@@ -30,7 +30,6 @@ Next.js Dashboard
 5. O backend valida o payload.
 6. O backend persiste dados no PostgreSQL.
 7. Eventos e alertas podem ser gerados.
-8. Agenda sincronizacao com Snipe-IT via BackgroundTasks, sem bloquear a resposta (ADR-028).
 
 Endpoint:
 

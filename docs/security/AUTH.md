@@ -164,7 +164,6 @@ Permissoes:
 | Resolver alertas | sim | sim | nao |
 | Cadastrar/editar RustDesk ID da maquina (EPIC 19) | sim | sim | nao |
 | Conectar via RustDesk (botao no dashboard, EPIC 19) | sim | sim | nao |
-| Ver link do ativo no Snipe-IT (EPIC 19) | sim | sim | sim |
 | Visualizar Dashboard Executivo / exportar relatorios PDF (EPIC 20) | sim | sim | sim |
 | Gerenciar usuarios | sim | nao | nao |
 | Alterar configuracoes administrativas | sim | nao | nao |
