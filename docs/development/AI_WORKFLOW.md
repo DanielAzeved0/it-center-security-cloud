@@ -25,6 +25,14 @@ Seis subagents de projeto, cada um com um `description` que o Claude Code usa pa
 
 Não existe um agente `sre` separado: na escala atual (uma VM, sem equipe de SRE dedicada) essas responsabilidades ficam dentro do agente `devops`.
 
+## Skills externas (`.agents/skills/`)
+
+Além dos subagents de projeto, o repositório também versiona skills de terceiros instaladas via `npx skills add` (ferramenta `skills.sh`) quando uma biblioteca específica exige instruções corretas de uso que vão além do conhecimento geral do modelo:
+
+* **gsap-skills** (`greensock/gsap-skills`, oficial GreenSock) — 5 das 8 skills do pacote (`gsap-core`, `gsap-react`, `gsap-timeline`, `gsap-performance`, `gsap-utils`), instaladas em 2026-08-11 para o polimento de animações do dashboard (EPIC 24). As 3 restantes (`gsap-frameworks`, `gsap-scrolltrigger`, `gsap-plugins`) não foram instaladas por não se aplicarem ao projeto: `gsap-frameworks` é para Vue/Svelte (o dashboard é React/Next.js), e `gsap-scrolltrigger`/`gsap-plugins` (Flip, Draggable, SVG drawing, scroll-linked animation) não têm caso de uso identificado numa aplicação interna de operação, sem páginas de rolagem longa.
+
+O conteúdo real das skills fica em `.agents/skills/<nome>/SKILL.md` (versionado). `.claude/skills/<nome>` são symlinks absolutos gerados por máquina — **não versionados** (`.gitignore`), regeneráveis com `npx skills experimental_install` (lê `skills-lock.json`, também versionado) em qualquer novo checkout.
+
 ## Slash commands (`.claude/commands/`)
 
 `/backend`, `/frontend`, `/devops`, `/security`, `/architecture` e `/docs` apenas delegam a tarefa ao subagent correspondente — são um jeito explícito de escolher o agente quando o roteamento automático não é suficiente.

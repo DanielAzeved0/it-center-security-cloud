@@ -21,6 +21,11 @@ out/
 dist/
 build/
 
+# Symlinks gerados por `npx skills` (absolutos, especificos da maquina).
+# Conteudo real fica em .agents/skills/ (versionado); skills-lock.json
+# permite regenerar com `npx skills experimental_install`.
+.claude/skills/
+
 *.log
 logs/
 cache/
