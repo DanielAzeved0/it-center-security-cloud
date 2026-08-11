@@ -1,7 +1,9 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useGSAP } from "@gsap/react";
+import gsap from "gsap";
 import { ApiError, requestBackend } from "@/lib/api";
 import type { LoginResponse } from "@/lib/types";
 
@@ -11,10 +13,24 @@ export function LoginView() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const panelRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     document.title = "Login | IT Center Security Cloud";
   }, []);
+
+  useGSAP(
+    () => {
+      const mm = gsap.matchMedia();
+
+      mm.add("(prefers-reduced-motion: no-preference)", () => {
+        gsap.from(panelRef.current, { autoAlpha: 0, scale: 0.96, duration: 0.5, ease: "power2.out" });
+      });
+
+      return () => mm.revert();
+    },
+    { scope: panelRef },
+  );
 
   const submitLogin = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -40,7 +56,7 @@ export function LoginView() {
 
   return (
     <main className="login-screen">
-      <section className="login-panel" aria-labelledby="login-title">
+      <section className="login-panel" aria-labelledby="login-title" ref={panelRef}>
         <div className="brand login-brand">
           <span className="brand-mark">IT</span>
           <div>

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Shell } from "@/components/Shell";
 import { EmptyState, ErrorState, LoadingBlock, SeverityBadge, StatCard, StatusBadge, ToolbarButton } from "@/components/Ui";
 import { formatDateTime, formatRelativeMinutes, requestBackend } from "@/lib/api";
+import { useStaggerEntrance } from "@/lib/motion";
 import type { AlertSummary, MachineSummary, SecurityEvent } from "@/lib/types";
 
 type DashboardData = {
@@ -50,6 +51,7 @@ export function DashboardView() {
     .map((machine) => machine.last_seen)
     .filter((value): value is string => Boolean(value))
     .sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0];
+  const scopeRef = useStaggerEntrance([loading]);
 
   return (
     <Shell
@@ -61,7 +63,7 @@ export function DashboardView() {
       {error ? <ErrorState message={error} onRetry={loadData} /> : null}
 
       {!loading && !error && data ? (
-        <>
+        <div ref={scopeRef}>
           <section className="stats-grid" aria-label="Indicadores principais">
             <StatCard label="Maquinas" value={machines.length} detail={`${onlineCount} online, ${offlineCount} offline`} />
             <StatCard label="Online" value={onlineCount} detail="Ativas pelo ultimo check-in" />
@@ -154,7 +156,7 @@ export function DashboardView() {
               </div>
             )}
           </section>
-        </>
+        </div>
       ) : null}
     </Shell>
   );

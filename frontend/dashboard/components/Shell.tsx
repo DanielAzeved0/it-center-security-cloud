@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import type { ReactNode } from "react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useGSAP } from "@gsap/react";
+import gsap from "gsap";
 import { requestBackend } from "@/lib/api";
 import type { AuthUser } from "@/lib/types";
 
@@ -27,6 +29,24 @@ export function Shell({ title, subtitle, children, actions }: ShellProps) {
   const router = useRouter();
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [checkingAuth, setCheckingAuth] = useState(true);
+  const mainRef = useRef<HTMLElement>(null);
+
+  useGSAP(
+    () => {
+      const mm = gsap.matchMedia();
+
+      mm.add("(prefers-reduced-motion: no-preference)", () => {
+        if (!mainRef.current) {
+          return;
+        }
+
+        gsap.from(mainRef.current, { autoAlpha: 0, y: 12, duration: 0.4, ease: "power2.out" });
+      });
+
+      return () => mm.revert();
+    },
+    { scope: mainRef, dependencies: [pathname, checkingAuth] },
+  );
 
   const loadCurrentUser = useCallback(async () => {
     setCheckingAuth(true);
@@ -86,7 +106,7 @@ export function Shell({ title, subtitle, children, actions }: ShellProps) {
         </nav>
       </aside>
 
-      <main className="main">
+      <main className="main" ref={mainRef}>
         <header className="page-header">
           <div>
             <h1>{title}</h1>

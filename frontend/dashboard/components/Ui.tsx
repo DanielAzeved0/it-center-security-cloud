@@ -1,4 +1,10 @@
+"use client";
+
 import type { ReactNode } from "react";
+import { useRef } from "react";
+import { useGSAP } from "@gsap/react";
+import gsap from "gsap";
+import { animateCountUp } from "@/lib/motion";
 
 type StatCardProps = {
   label: string;
@@ -7,10 +13,21 @@ type StatCardProps = {
 };
 
 export function StatCard({ label, value, detail }: StatCardProps) {
+  const valueRef = useRef<HTMLElement>(null);
+
+  useGSAP(
+    () => {
+      if (typeof value === "number") {
+        animateCountUp(valueRef.current, value);
+      }
+    },
+    { dependencies: [value], scope: valueRef },
+  );
+
   return (
     <section className="stat-card">
       <span>{label}</span>
-      <strong>{value}</strong>
+      <strong ref={valueRef}>{value}</strong>
       <small>{detail}</small>
     </section>
   );
@@ -48,7 +65,36 @@ export function ErrorState({ message, onRetry }: { message: string; onRetry: () 
 }
 
 export function LoadingBlock({ label = "Carregando dados" }: { label?: string }) {
-  return <div className="loading-block">{label}...</div>;
+  const ref = useRef<HTMLDivElement>(null);
+
+  useGSAP(
+    () => {
+      const mm = gsap.matchMedia();
+
+      mm.add("(prefers-reduced-motion: no-preference)", () => {
+        const tween = gsap.to(ref.current, {
+          autoAlpha: 0.5,
+          duration: 0.8,
+          ease: "sine.inOut",
+          repeat: -1,
+          yoyo: true,
+        });
+
+        return () => {
+          tween.kill();
+        };
+      });
+
+      return () => mm.revert();
+    },
+    { scope: ref },
+  );
+
+  return (
+    <div className="loading-block" ref={ref}>
+      {label}...
+    </div>
+  );
 }
 
 export function ToolbarButton({

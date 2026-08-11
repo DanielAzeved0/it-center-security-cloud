@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useGSAP } from "@gsap/react";
 import { Shell } from "@/components/Shell";
 import { EmptyState, ErrorState, LoadingBlock, StatCard, StatusBadge, ToolbarButton } from "@/components/Ui";
 import { formatDateTime, formatRelativeMinutes, formatUptime, requestBackend } from "@/lib/api";
+import { animateProgressValue, useStaggerEntrance } from "@/lib/motion";
 import type { MachineDetail, MachineMetric, MachineProgram, MachineSummary } from "@/lib/types";
 
 type MachineSelection = {
@@ -70,6 +72,7 @@ export function MachinesView() {
 
   const latestMetric = selection?.metrics[0];
   const onlineCount = useMemo(() => machines.filter((machine) => machine.status === "online").length, [machines]);
+  const scopeRef = useStaggerEntrance([loadingList, selectedId, loadingSelection]);
 
   return (
     <Shell
@@ -85,7 +88,7 @@ export function MachinesView() {
       ) : null}
 
       {!loadingList && machines.length > 0 ? (
-        <section className="content-grid machines-layout">
+        <section className="content-grid machines-layout" ref={scopeRef}>
           <div className="panel">
             <div className="panel-header">
               <h2>Inventario</h2>
@@ -222,6 +225,14 @@ export function MachinesView() {
 function MetricBar({ label, value }: { label: string; value: number | null }) {
   const normalized = typeof value === "number" && !Number.isNaN(value) ? Math.max(0, Math.min(100, value)) : 0;
   const displayValue = typeof value === "number" && !Number.isNaN(value) ? `${normalized.toFixed(1)}%` : "-";
+  const progressRef = useRef<HTMLProgressElement>(null);
+
+  useGSAP(
+    () => {
+      animateProgressValue(progressRef.current, normalized);
+    },
+    { dependencies: [normalized], scope: progressRef },
+  );
 
   return (
     <div className="metric-bar">
@@ -229,7 +240,7 @@ function MetricBar({ label, value }: { label: string; value: number | null }) {
         <span>{label}</span>
         <strong>{displayValue}</strong>
       </div>
-      <progress value={normalized} max={100} aria-label={`${label}: ${displayValue}`} />
+      <progress ref={progressRef} value={normalized} max={100} aria-label={`${label}: ${displayValue}`} />
     </div>
   );
 }

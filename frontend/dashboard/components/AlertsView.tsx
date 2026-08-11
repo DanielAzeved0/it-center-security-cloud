@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Shell } from "@/components/Shell";
 import { EmptyState, ErrorState, LoadingBlock, SeverityBadge, StatCard, StatusBadge, ToolbarButton } from "@/components/Ui";
 import { formatDateTime, requestBackend } from "@/lib/api";
+import { useStaggerEntrance } from "@/lib/motion";
 import type { AlertSummary, AuthUser } from "@/lib/types";
 
 export function AlertsView() {
@@ -87,6 +88,8 @@ export function AlertsView() {
     setMachineFilter("all");
   };
 
+  const scopeRef = useStaggerEntrance([loading]);
+
   return (
     <Shell
       title="Alertas"
@@ -97,7 +100,7 @@ export function AlertsView() {
       {error ? <ErrorState message={error} onRetry={loadAlerts} /> : null}
 
       {!loading && !error ? (
-        <>
+        <div ref={scopeRef}>
           <section className="stats-grid" aria-label="Resumo de alertas">
             <StatCard label="Total" value={alerts.length} detail="alertas registrados" />
             <StatCard label="Abertos" value={openAlerts.length} detail="pendentes de acao" />
@@ -183,7 +186,7 @@ export function AlertsView() {
               </div>
             )}
           </section>
-        </>
+        </div>
       ) : null}
     </Shell>
   );

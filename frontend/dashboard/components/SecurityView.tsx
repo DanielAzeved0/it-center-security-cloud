@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Shell } from "@/components/Shell";
 import { EmptyState, ErrorState, LoadingBlock, SeverityBadge, StatCard, ToolbarButton } from "@/components/Ui";
 import { formatDateTime, requestBackend } from "@/lib/api";
+import { useStaggerEntrance } from "@/lib/motion";
 import type { SecurityEvent } from "@/lib/types";
 
 export function SecurityView() {
@@ -67,6 +68,8 @@ export function SecurityView() {
     setMachineFilter("all");
   };
 
+  const scopeRef = useStaggerEntrance([loading]);
+
   return (
     <Shell
       title="Seguranca"
@@ -77,7 +80,7 @@ export function SecurityView() {
       {error ? <ErrorState message={error} onRetry={loadEvents} /> : null}
 
       {!loading && !error ? (
-        <>
+        <div ref={scopeRef}>
           <section className="stats-grid" aria-label="Resumo de eventos">
             <StatCard label="Eventos" value={events.length} detail="registros de seguranca" />
             <StatCard label="Medium" value={severityCounts.medium} detail="eventos de atencao" />
@@ -166,7 +169,7 @@ export function SecurityView() {
               </div>
             )}
           </section>
-        </>
+        </div>
       ) : null}
     </Shell>
   );

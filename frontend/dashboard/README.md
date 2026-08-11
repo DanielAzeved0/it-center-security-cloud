@@ -77,6 +77,10 @@ http://127.0.0.1:3000
 
 Em `/executive` e no detalhe de maquina (`/machines/[id]`), o botao "Exportar PDF" baixa um relatorio gerado pelo backend (`reportlab`) via `GET /api/v1/reports/executive.pdf` e `GET /api/v1/machines/{id}/report.pdf`.
 
+## Animacoes (GSAP)
+
+`gsap` e `@gsap/react` (hook `useGSAP`) sao usados para polimento visual (entrada de cards/listas, contadores animados, preenchimento das barras de metrica) em todas as telas. Toda animacao respeita `prefers-reduced-motion` via `gsap.matchMedia()` — ver `lib/motion.ts` (hook `useStaggerEntrance` e helpers `animateCountUp`/`animateProgressValue`, reaproveitados pelos componentes de tela). Instrucoes de uso corretas da API ficam na skill `.agents/skills/gsap-*` (ver `docs/development/AI_WORKFLOW.md`).
+
 ## Seguranca de dependencias
 
 O dashboard usa Next.js `16.2.12`, `picomatch` `4.0.4` e `overrides` de `postcss`/`sharp` (`8.5.25`/`0.35.3`) em `package.json` para fechar CVEs high de dependencias internas do Next que a versao atual ainda nao corrigiu.

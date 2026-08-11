@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Shell } from "@/components/Shell";
 import { EmptyState, ErrorState, LoadingBlock, SeverityBadge, StatCard, ToolbarButton } from "@/components/Ui";
 import { downloadBackendFile, formatDateTime, requestBackend } from "@/lib/api";
+import { useStaggerEntrance } from "@/lib/motion";
 import type { DashboardSummary } from "@/lib/types";
 
 export function ExecutiveDashboardView() {
@@ -45,6 +46,7 @@ export function ExecutiveDashboardView() {
   };
 
   const severity = summary?.alerts_open_by_severity;
+  const scopeRef = useStaggerEntrance([loading]);
 
   return (
     <Shell
@@ -64,7 +66,7 @@ export function ExecutiveDashboardView() {
       {exportError ? <div className="form-error" role="alert">{exportError}</div> : null}
 
       {!loading && !error && summary ? (
-        <>
+        <div ref={scopeRef}>
           <section className="stats-grid" aria-label="Indicadores executivos">
             <StatCard
               label="Maquinas"
@@ -116,7 +118,7 @@ export function ExecutiveDashboardView() {
               </div>
             )}
           </section>
-        </>
+        </div>
       ) : null}
     </Shell>
   );

@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useGSAP } from "@gsap/react";
 import { Shell } from "@/components/Shell";
 import { EmptyState, ErrorState, LoadingBlock, SeverityBadge, StatusBadge, ToolbarButton } from "@/components/Ui";
 import { downloadBackendFile, formatDateTime, formatRelativeMinutes, formatUptime, requestBackend } from "@/lib/api";
+import { animateProgressValue, useStaggerEntrance } from "@/lib/motion";
 import type { AlertSummary, AuthUser, MachineDetail, MachineLocalAdmin, MachineMetric, MachineProgram, SecurityEvent } from "@/lib/types";
 
 type SectionState<T> = {
@@ -243,6 +245,7 @@ export function MachineDetailView({ machineId }: { machineId: string }) {
   const metricSummary = useMemo(() => buildMetricSummary(metricHistory), [metricHistory]);
   const latestEvents = useMemo(() => events.data.slice(0, 10), [events.data]);
   const openAlerts = useMemo(() => alerts.data.filter((alert) => alert.status === "open"), [alerts.data]);
+  const scopeRef = useStaggerEntrance([detailLoading]);
 
   return (
     <Shell
@@ -265,7 +268,7 @@ export function MachineDetailView({ machineId }: { machineId: string }) {
       {reportError ? <div className="form-error" role="alert">{reportError}</div> : null}
 
       {detail && !detailLoading ? (
-        <section className="machine-detail-layout">
+        <section className="machine-detail-layout" ref={scopeRef}>
           <section className="panel machine-hero" aria-label="Resumo da maquina">
             <div className="machine-hero-main">
               <div>
@@ -566,6 +569,14 @@ function DetailItem({ label, value, helper }: { label: string; value: string | n
 
 function MetricTile({ label, value }: { label: string; value: number | null | undefined }) {
   const normalized = normalizePercent(value);
+  const progressRef = useRef<HTMLProgressElement>(null);
+
+  useGSAP(
+    () => {
+      animateProgressValue(progressRef.current, normalized.value);
+    },
+    { dependencies: [normalized.value], scope: progressRef },
+  );
 
   return (
     <div className="metric-bar">
@@ -573,7 +584,7 @@ function MetricTile({ label, value }: { label: string; value: number | null | un
         <span>{label}</span>
         <strong>{normalized.label}</strong>
       </div>
-      <progress value={normalized.value} max={100} aria-label={`${label}: ${normalized.label}`} />
+      <progress ref={progressRef} value={normalized.value} max={100} aria-label={`${label}: ${normalized.label}`} />
     </div>
   );
 }
