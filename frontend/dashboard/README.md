@@ -81,6 +81,12 @@ Em `/executive` e no detalhe de maquina (`/machines/[id]`), o botao "Exportar PD
 
 `gsap` e `@gsap/react` (hook `useGSAP`) sao usados para polimento visual (entrada de cards/listas, contadores animados, preenchimento das barras de metrica) em todas as telas. Toda animacao respeita `prefers-reduced-motion` via `gsap.matchMedia()` — ver `lib/motion.ts` (hook `useStaggerEntrance` e helpers `animateCountUp`/`animateProgressValue`, reaproveitados pelos componentes de tela). Instrucoes de uso corretas da API ficam na skill `.agents/skills/gsap-*` (ver `docs/development/AI_WORKFLOW.md`).
 
+## Design system (tokens e componentes compartilhados)
+
+Sem Tailwind/CSS Modules/CSS-in-JS: um unico `app/globals.css` com tokens via CSS custom properties no `:root` (cor, tipografia, espacamento, radius, sombra), incluindo **dark mode automatico** via `@media (prefers-color-scheme: dark)` (sem toggle manual). A paleta semantica (`--success`/`--warning`/`--danger`/`--info`/`--critical`) e a mesma usada por `StatusBadge`/`SeverityBadge` (`.badge`) e pelas variantes de cor do `StatCard` (prop `tone`), para o mesmo significado ter sempre a mesma cor em qualquer tela. `components/Ui.tsx` tambem exporta `Panel` (title/meta/actions/children), usado no lugar de repetir `<section className="panel"><div className="panel-header">` em cada view.
+
+Referencia de inspiracao (EPIC 25, `docs/development/TASKS.md`): "design DNA" extraido do Snipe-IT (admin panel do mesmo dominio) via a skill `zanwei/design-dna` — usado como referencia de padrao de organizacao (KPIs coloridos, sidebar escura + conteudo claro), nao como paleta literal.
+
 ## Seguranca de dependencias
 
 O dashboard usa Next.js `16.2.12`, `picomatch` `4.0.4` e `overrides` de `postcss`/`sharp` (`8.5.25`/`0.35.3`) em `package.json` para fechar CVEs high de dependencias internas do Next que a versao atual ainda nao corrigiu.

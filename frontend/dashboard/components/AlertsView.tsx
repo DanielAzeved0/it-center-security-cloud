@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Shell } from "@/components/Shell";
-import { EmptyState, ErrorState, LoadingBlock, SeverityBadge, StatCard, StatusBadge, ToolbarButton } from "@/components/Ui";
+import { EmptyState, ErrorState, LoadingBlock, Panel, SeverityBadge, StatCard, StatusBadge, ToolbarButton } from "@/components/Ui";
 import { formatDateTime, requestBackend } from "@/lib/api";
 import { useStaggerEntrance } from "@/lib/motion";
 import type { AlertSummary, AuthUser } from "@/lib/types";
@@ -102,18 +102,13 @@ export function AlertsView() {
       {!loading && !error ? (
         <div ref={scopeRef}>
           <section className="stats-grid" aria-label="Resumo de alertas">
-            <StatCard label="Total" value={alerts.length} detail="alertas registrados" />
-            <StatCard label="Abertos" value={openAlerts.length} detail="pendentes de acao" />
-            <StatCard label="Alta severidade" value={highAlerts.length} detail="high ou critical" />
-            <StatCard label="Resolvidos" value={resolvedAlerts} detail="finalizados" />
+            <StatCard tone="accent" label="Total" value={alerts.length} detail="alertas registrados" />
+            <StatCard tone="info" label="Abertos" value={openAlerts.length} detail="pendentes de acao" />
+            <StatCard tone="danger" label="Alta severidade" value={highAlerts.length} detail="high ou critical" />
+            <StatCard tone="success" label="Resolvidos" value={resolvedAlerts} detail="finalizados" />
           </section>
 
-          <section className="panel">
-            <div className="panel-header">
-              <h2>Fila de alertas</h2>
-              <span>{filteredAlerts.length} de {alerts.length} itens</span>
-            </div>
-
+          <Panel title="Fila de alertas" meta={<span>{filteredAlerts.length} de {alerts.length} itens</span>}>
             <div className="filter-bar" aria-label="Filtros de alertas">
               <label>
                 Severidade
@@ -185,7 +180,7 @@ export function AlertsView() {
                 ))}
               </div>
             )}
-          </section>
+          </Panel>
         </div>
       ) : null}
     </Shell>

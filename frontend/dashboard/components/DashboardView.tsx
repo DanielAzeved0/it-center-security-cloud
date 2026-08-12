@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Shell } from "@/components/Shell";
-import { EmptyState, ErrorState, LoadingBlock, SeverityBadge, StatCard, StatusBadge, ToolbarButton } from "@/components/Ui";
+import { EmptyState, ErrorState, LoadingBlock, Panel, SeverityBadge, StatCard, StatusBadge, ToolbarButton } from "@/components/Ui";
 import { formatDateTime, formatRelativeMinutes, requestBackend } from "@/lib/api";
 import { useStaggerEntrance } from "@/lib/motion";
 import type { AlertSummary, MachineSummary, SecurityEvent } from "@/lib/types";
@@ -65,17 +65,19 @@ export function DashboardView() {
       {!loading && !error && data ? (
         <div ref={scopeRef}>
           <section className="stats-grid" aria-label="Indicadores principais">
-            <StatCard label="Maquinas" value={machines.length} detail={`${onlineCount} online, ${offlineCount} offline`} />
+            <StatCard
+              tone="accent"
+              label="Maquinas"
+              value={machines.length}
+              detail={`${onlineCount} online, ${offlineCount} offline`}
+            />
             <StatCard label="Online" value={onlineCount} detail="Ativas pelo ultimo check-in" />
             <StatCard label="Alertas abertos" value={openAlerts} detail={`${alerts.length} alertas no total`} />
             <StatCard label="Ultimo check-in" value={formatRelativeMinutes(lastSeen)} detail={formatDateTime(lastSeen)} />
           </section>
 
           <section className="content-grid two-columns">
-            <div className="panel">
-              <div className="panel-header">
-                <h2>Maquinas recentes</h2>
-              </div>
+            <Panel title="Maquinas recentes">
               {machines.length === 0 ? (
                 <EmptyState title="Nenhuma maquina registrada" message="Execute o agente para enviar o primeiro check-in." />
               ) : (
@@ -105,12 +107,9 @@ export function DashboardView() {
                   </table>
                 </div>
               )}
-            </div>
+            </Panel>
 
-            <div className="panel">
-              <div className="panel-header">
-                <h2>Alertas recentes</h2>
-              </div>
+            <Panel title="Alertas recentes">
               {alerts.length === 0 ? (
                 <EmptyState title="Sem alertas" message="Nenhum alerta foi registrado ate o momento." />
               ) : (
@@ -129,14 +128,10 @@ export function DashboardView() {
                   ))}
                 </div>
               )}
-            </div>
+            </Panel>
           </section>
 
-          <section className="panel">
-            <div className="panel-header">
-              <h2>Eventos de seguranca</h2>
-              <span>{events.length} eventos</span>
-            </div>
+          <Panel title="Eventos de seguranca" meta={<span>{events.length} eventos</span>}>
             {events.length === 0 ? (
               <EmptyState title="Sem eventos" message="As regras SOC ainda nao registraram eventos." />
             ) : (
@@ -155,7 +150,7 @@ export function DashboardView() {
                 ))}
               </div>
             )}
-          </section>
+          </Panel>
         </div>
       ) : null}
     </Shell>

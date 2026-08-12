@@ -1040,3 +1040,21 @@ log do servidor. **Nao verificado visualmente em navegador real** —
 sem ferramenta de automacao de browser conectada nesta sessao;
 recomendado `npm run dev` + revisao visual manual antes de considerar
 isso validado de ponta a ponta em produção. EPIC 24 encerrada.
+
+# EPIC 25 - Modernizacao Visual do Dashboard (Design DNA)
+
+Objetivo:
+
+Harmonizar o visual das 7 telas do dashboard (design system consistente entre si), sem mudar nenhuma logica de dados/API/RBAC — so camada visual, seguindo o mesmo espirito da EPIC 24. Referencia de inspiracao: "design DNA" extraido via a skill `zanwei/design-dna` (instalada globalmente, fora deste repositorio) a partir de 3 screenshots reais da demo publica do Snipe-IT (`snipeitapp.com/demo`), um admin panel do mesmo dominio (gestao de ativos de TI). A extracao concluiu que o valor do Snipe-IT como referencia esta no padrao de organizacao (KPIs coloridos consistentes, sidebar escura + conteudo claro, mesma paleta reaproveitada entre card/badge/status) e nao no acabamento visual em si (e um admin panel Bootstrap/AdminLTE datado, ~2016-2018) — por isso a implementacao usa paleta propria do projeto (teal `--accent` ja existente), nao as cores do Snipe-IT.
+
+### Tarefas
+
+[x] Redesenhar os tokens de `app/globals.css`: paleta semantica unificada (`--success`/`--warning`/`--danger`/`--info`/`--critical`, cada uma com par soft/strong) reaproveitada entre `StatCard`, `.badge` e `.status-context`; tipografia com stack de sistema (`-apple-system, Segoe UI, Roboto...`, sem webfont nova) e hierarquia mais clara; radius/sombra mais suaves; **dark mode automatico** via `prefers-color-scheme` (sem toggle manual, fora de escopo)
+
+[x] `components/Ui.tsx`: `StatCard` ganhou prop `tone` (`neutral | accent | info | success | warning | danger | critical`) com variantes de cor solida; novo componente `Panel` (title/meta/actions/children) substituindo o `<section className="panel"><div className="panel-header">...` repetido em cada view
+
+[x] Aplicar `Panel` e `tone` em `DashboardView`, `ExecutiveDashboardView` (grade de severidade Baixa/Media/Alta/Critica com tone success/warning/danger/critical — o ponto mais direto de "conversa" entre KPI e badge), `AlertsView`, `SecurityView`, `MachinesView` e `MachineDetailView` (9 paineis), preservando o padrao RBAC visual existente (`disabled` + `title`) sem alteracao
+
+[x] Nenhuma mudanca em `lib/motion.ts`: `Panel` renderiza a mesma classe `.panel` ja coberta por `ENTRANCE_SELECTOR`, entao a infraestrutura GSAP da EPIC 24 continua funcionando sem ajuste
+
+Validacao em 2026-08-12: `npm run build` limpo (TypeScript OK, Turbopack), as 8 rotas compiladas sem erro novo. **Nao verificado visualmente em navegador real** — sem ferramenta de automacao de browser conectada nesta sessao (usuario optou por nao instalar a extensao); recomendado `npm run dev` + revisao visual manual (luz/escuro, e com cada papel admin/analyst/viewer) antes de considerar isso validado de ponta a ponta em producao. EPIC 25 encerrada.

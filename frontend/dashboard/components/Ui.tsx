@@ -6,13 +6,16 @@ import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
 import { animateCountUp } from "@/lib/motion";
 
+type StatCardTone = "neutral" | "accent" | "info" | "success" | "warning" | "danger" | "critical";
+
 type StatCardProps = {
   label: string;
   value: string | number;
   detail: string;
+  tone?: StatCardTone;
 };
 
-export function StatCard({ label, value, detail }: StatCardProps) {
+export function StatCard({ label, value, detail, tone = "neutral" }: StatCardProps) {
   const valueRef = useRef<HTMLElement>(null);
 
   useGSAP(
@@ -25,10 +28,33 @@ export function StatCard({ label, value, detail }: StatCardProps) {
   );
 
   return (
-    <section className="stat-card">
+    <section className={tone === "neutral" ? "stat-card" : `stat-card tone-${tone}`}>
       <span>{label}</span>
       <strong ref={valueRef}>{value}</strong>
       <small>{detail}</small>
+    </section>
+  );
+}
+
+type PanelProps = {
+  title?: string;
+  meta?: ReactNode;
+  actions?: ReactNode;
+  className?: string;
+  children: ReactNode;
+};
+
+export function Panel({ title, meta, actions, className, children }: PanelProps) {
+  return (
+    <section className={className ? `panel ${className}` : "panel"}>
+      {title ? (
+        <div className="panel-header">
+          <h2>{title}</h2>
+          {meta ?? null}
+          {actions ? <div className="panel-actions">{actions}</div> : null}
+        </div>
+      ) : null}
+      {children}
     </section>
   );
 }

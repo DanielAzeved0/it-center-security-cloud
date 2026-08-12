@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Shell } from "@/components/Shell";
-import { EmptyState, ErrorState, LoadingBlock, SeverityBadge, StatCard, ToolbarButton } from "@/components/Ui";
+import { EmptyState, ErrorState, LoadingBlock, Panel, SeverityBadge, StatCard, ToolbarButton } from "@/components/Ui";
 import { formatDateTime, requestBackend } from "@/lib/api";
 import { useStaggerEntrance } from "@/lib/motion";
 import type { SecurityEvent } from "@/lib/types";
@@ -82,18 +82,13 @@ export function SecurityView() {
       {!loading && !error ? (
         <div ref={scopeRef}>
           <section className="stats-grid" aria-label="Resumo de eventos">
-            <StatCard label="Eventos" value={events.length} detail="registros de seguranca" />
-            <StatCard label="Medium" value={severityCounts.medium} detail="eventos de atencao" />
-            <StatCard label="High" value={severityCounts.high} detail="eventos importantes" />
-            <StatCard label="Critical" value={severityCounts.critical} detail="acao imediata" />
+            <StatCard tone="accent" label="Eventos" value={events.length} detail="registros de seguranca" />
+            <StatCard tone="warning" label="Medium" value={severityCounts.medium} detail="eventos de atencao" />
+            <StatCard tone="danger" label="High" value={severityCounts.high} detail="eventos importantes" />
+            <StatCard tone="critical" label="Critical" value={severityCounts.critical} detail="acao imediata" />
           </section>
 
-          <section className="panel">
-            <div className="panel-header">
-              <h2>Eventos recentes</h2>
-              <span>{filteredEvents.length} de {events.length} eventos</span>
-            </div>
-
+          <Panel title="Eventos recentes" meta={<span>{filteredEvents.length} de {events.length} eventos</span>}>
             <div className="filter-bar" aria-label="Filtros de eventos de seguranca">
               <label>
                 Severidade
@@ -168,7 +163,7 @@ export function SecurityView() {
                 </table>
               </div>
             )}
-          </section>
+          </Panel>
         </div>
       ) : null}
     </Shell>

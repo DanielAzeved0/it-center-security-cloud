@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Shell } from "@/components/Shell";
-import { EmptyState, ErrorState, LoadingBlock, SeverityBadge, StatCard, ToolbarButton } from "@/components/Ui";
+import { EmptyState, ErrorState, LoadingBlock, Panel, SeverityBadge, StatCard, ToolbarButton } from "@/components/Ui";
 import { downloadBackendFile, formatDateTime, requestBackend } from "@/lib/api";
 import { useStaggerEntrance } from "@/lib/motion";
 import type { DashboardSummary } from "@/lib/types";
@@ -69,6 +69,7 @@ export function ExecutiveDashboardView() {
         <div ref={scopeRef}>
           <section className="stats-grid" aria-label="Indicadores executivos">
             <StatCard
+              tone="accent"
               label="Maquinas"
               value={summary.machines_total}
               detail={`${summary.machines_online} online, ${summary.machines_offline} offline`}
@@ -77,27 +78,20 @@ export function ExecutiveDashboardView() {
             <StatCard label="Eventos recentes" value={summary.recent_events.length} detail="Ultimas coletas" />
           </section>
 
-          <section className="panel">
-            <div className="panel-header">
-              <h2>Alertas abertos por severidade</h2>
-            </div>
+          <Panel title="Alertas abertos por severidade">
             {summary.alerts_open_total === 0 || !severity ? (
               <EmptyState title="Sem alertas abertos" message="Nenhum alerta esta pendente de acao." />
             ) : (
               <div className="stats-grid" aria-label="Alertas por severidade">
-                <StatCard label="Baixa" value={severity.low} detail="severidade low" />
-                <StatCard label="Media" value={severity.medium} detail="severidade medium" />
-                <StatCard label="Alta" value={severity.high} detail="severidade high" />
-                <StatCard label="Critica" value={severity.critical} detail="severidade critical" />
+                <StatCard tone="success" label="Baixa" value={severity.low} detail="severidade low" />
+                <StatCard tone="warning" label="Media" value={severity.medium} detail="severidade medium" />
+                <StatCard tone="danger" label="Alta" value={severity.high} detail="severidade high" />
+                <StatCard tone="critical" label="Critica" value={severity.critical} detail="severidade critical" />
               </div>
             )}
-          </section>
+          </Panel>
 
-          <section className="panel">
-            <div className="panel-header">
-              <h2>Eventos de seguranca recentes</h2>
-              <span>{summary.recent_events.length} eventos</span>
-            </div>
+          <Panel title="Eventos de seguranca recentes" meta={<span>{summary.recent_events.length} eventos</span>}>
             {summary.recent_events.length === 0 ? (
               <EmptyState title="Sem eventos" message="As regras SOC ainda nao registraram eventos." />
             ) : (
@@ -117,7 +111,7 @@ export function ExecutiveDashboardView() {
                 ))}
               </div>
             )}
-          </section>
+          </Panel>
         </div>
       ) : null}
     </Shell>

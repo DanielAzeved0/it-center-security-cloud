@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useGSAP } from "@gsap/react";
 import { Shell } from "@/components/Shell";
-import { EmptyState, ErrorState, LoadingBlock, SeverityBadge, StatusBadge, ToolbarButton } from "@/components/Ui";
+import { EmptyState, ErrorState, LoadingBlock, Panel, SeverityBadge, StatusBadge, ToolbarButton } from "@/components/Ui";
 import { downloadBackendFile, formatDateTime, formatRelativeMinutes, formatUptime, requestBackend } from "@/lib/api";
 import { animateProgressValue, useStaggerEntrance } from "@/lib/motion";
 import type { AlertSummary, AuthUser, MachineDetail, MachineLocalAdmin, MachineMetric, MachineProgram, SecurityEvent } from "@/lib/types";
@@ -293,11 +293,7 @@ export function MachineDetailView({ machineId }: { machineId: string }) {
             </dl>
           </section>
 
-          <section className="panel">
-            <div className="panel-header">
-              <h2>Integracoes</h2>
-              <span>RustDesk</span>
-            </div>
+          <Panel title="Integracoes" meta={<span>RustDesk</span>}>
             <div className="integrations-grid">
               <div className="integration-block">
                 <span className="eyebrow">RustDesk</span>
@@ -348,13 +344,9 @@ export function MachineDetailView({ machineId }: { machineId: string }) {
                 {rustdeskError ? <div className="form-error" role="alert">{rustdeskError}</div> : null}
               </div>
             </div>
-          </section>
+          </Panel>
 
-          <section className="panel">
-            <div className="panel-header">
-              <h2>Alertas da maquina</h2>
-              <span>{alerts.data.length} itens</span>
-            </div>
+          <Panel title="Alertas da maquina" meta={<span>{alerts.data.length} itens</span>}>
             {alerts.loading ? <LoadingBlock label="Carregando alertas" /> : null}
             {alerts.error ? <SectionError message={alerts.error} onRetry={loadAlerts} /> : null}
             {!alerts.loading && !alerts.error && alerts.data.length === 0 ? (
@@ -382,13 +374,9 @@ export function MachineDetailView({ machineId }: { machineId: string }) {
             {!alerts.loading && !alerts.error && openAlerts.length > 0 ? (
               <p className="panel-note">{openAlerts.length} alerta(s) aberto(s) exigem acompanhamento na tela de Alertas.</p>
             ) : null}
-          </section>
+          </Panel>
 
-          <section className="panel">
-            <div className="panel-header">
-              <h2>Metricas recentes</h2>
-              <span>{metrics.data.length} coletas</span>
-            </div>
+          <Panel title="Metricas recentes" meta={<span>{metrics.data.length} coletas</span>}>
             {metrics.loading ? <LoadingBlock label="Carregando metricas" /> : null}
             {metrics.error ? <SectionError message={metrics.error} onRetry={loadMetrics} /> : null}
             {!metrics.loading && !metrics.error && latestMetric ? (
@@ -406,13 +394,9 @@ export function MachineDetailView({ machineId }: { machineId: string }) {
             {!metrics.loading && !metrics.error && !latestMetric ? (
               <EmptyState title="Nenhuma metrica registrada" message="A maquina ainda nao enviou coletas de metricas." />
             ) : null}
-          </section>
+          </Panel>
 
-          <section className="panel">
-            <div className="panel-header">
-              <h2>Historico de metricas</h2>
-              <span>ultimas {metricHistory.length} coletas</span>
-            </div>
+          <Panel title="Historico de metricas" meta={<span>ultimas {metricHistory.length} coletas</span>}>
             {metrics.loading ? <LoadingBlock label="Carregando historico" /> : null}
             {metrics.error ? <SectionError message={metrics.error} onRetry={loadMetrics} /> : null}
             {!metrics.loading && !metrics.error && metricHistory.length === 0 ? (
@@ -452,13 +436,9 @@ export function MachineDetailView({ machineId }: { machineId: string }) {
                 </div>
               </div>
             ) : null}
-          </section>
+          </Panel>
 
-          <section className="panel">
-            <div className="panel-header">
-              <h2>Programas instalados</h2>
-              <span>{programs.data.length} itens</span>
-            </div>
+          <Panel title="Programas instalados" meta={<span>{programs.data.length} itens</span>}>
             {programs.loading ? <LoadingBlock label="Carregando programas" /> : null}
             {programs.error ? <SectionError message={programs.error} onRetry={loadPrograms} /> : null}
             {!programs.loading && !programs.error && programs.data.length === 0 ? (
@@ -486,13 +466,9 @@ export function MachineDetailView({ machineId }: { machineId: string }) {
                 </table>
               </div>
             ) : null}
-          </section>
+          </Panel>
 
-          <section className="panel">
-            <div className="panel-header">
-              <h2>Administradores locais</h2>
-              <span>{admins.data.length} contas</span>
-            </div>
+          <Panel title="Administradores locais" meta={<span>{admins.data.length} contas</span>}>
             {admins.loading ? <LoadingBlock label="Carregando administradores" /> : null}
             {admins.error ? <SectionError message={admins.error} onRetry={loadAdmins} /> : null}
             {!admins.loading && !admins.error && admins.data.length === 0 ? (
@@ -520,13 +496,9 @@ export function MachineDetailView({ machineId }: { machineId: string }) {
                 </table>
               </div>
             ) : null}
-          </section>
+          </Panel>
 
-          <section className="panel">
-            <div className="panel-header">
-              <h2>Eventos de seguranca</h2>
-              <span>{events.data.length} eventos</span>
-            </div>
+          <Panel title="Eventos de seguranca" meta={<span>{events.data.length} eventos</span>}>
             {events.loading ? <LoadingBlock label="Carregando eventos" /> : null}
             {events.error ? <SectionError message={events.error} onRetry={loadEvents} /> : null}
             {!events.loading && !events.error && events.data.length === 0 ? (
@@ -550,7 +522,7 @@ export function MachineDetailView({ machineId }: { machineId: string }) {
                 ))}
               </div>
             ) : null}
-          </section>
+          </Panel>
         </section>
       ) : null}
     </Shell>

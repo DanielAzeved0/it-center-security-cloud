@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useGSAP } from "@gsap/react";
 import { Shell } from "@/components/Shell";
-import { EmptyState, ErrorState, LoadingBlock, StatCard, StatusBadge, ToolbarButton } from "@/components/Ui";
+import { EmptyState, ErrorState, LoadingBlock, Panel, StatCard, StatusBadge, ToolbarButton } from "@/components/Ui";
 import { formatDateTime, formatRelativeMinutes, formatUptime, requestBackend } from "@/lib/api";
 import { animateProgressValue, useStaggerEntrance } from "@/lib/motion";
 import type { MachineDetail, MachineMetric, MachineProgram, MachineSummary } from "@/lib/types";
@@ -89,11 +89,7 @@ export function MachinesView() {
 
       {!loadingList && machines.length > 0 ? (
         <section className="content-grid machines-layout" ref={scopeRef}>
-          <div className="panel">
-            <div className="panel-header">
-              <h2>Inventario</h2>
-              <span>{machines.length} maquinas</span>
-            </div>
+          <Panel title="Inventario" meta={<span>{machines.length} maquinas</span>}>
             <div className="machine-list" role="list">
               {machines.map((machine) => (
                 <button
@@ -116,11 +112,11 @@ export function MachinesView() {
                 </button>
               ))}
             </div>
-          </div>
+          </Panel>
 
           <div className="detail-column">
             <section className="stats-grid compact-stats" aria-label="Resumo de maquinas">
-              <StatCard label="Total" value={machines.length} detail="maquinas registradas" />
+              <StatCard tone="accent" label="Total" value={machines.length} detail="maquinas registradas" />
               <StatCard label="Online" value={onlineCount} detail="com check-in recente" />
               <StatCard label="Offline" value={machines.length - onlineCount} detail="fora da janela atual" />
             </section>
@@ -129,16 +125,17 @@ export function MachinesView() {
 
             {selection && !loadingSelection ? (
               <>
-                <section className="panel">
-                  <div className="panel-header">
-                    <h2>{selection.detail.hostname}</h2>
-                    <div className="panel-actions">
+                <Panel
+                  title={selection.detail.hostname}
+                  actions={
+                    <>
                       <StatusBadge value={selection.detail.status} />
                       <Link className="secondary-button compact-button" href={`/machines/${selection.detail.id}`}>
                         Detalhes
                       </Link>
-                    </div>
-                  </div>
+                    </>
+                  }
+                >
                   <dl className="detail-grid">
                     <div>
                       <dt>Usuario</dt>
@@ -161,13 +158,9 @@ export function MachinesView() {
                       <dd>{formatDateTime(selection.detail.last_seen)}</dd>
                     </div>
                   </dl>
-                </section>
+                </Panel>
 
-                <section className="panel">
-                  <div className="panel-header">
-                    <h2>Metricas recentes</h2>
-                    <span>{selection.metrics.length} coletas</span>
-                  </div>
+                <Panel title="Metricas recentes" meta={<span>{selection.metrics.length} coletas</span>}>
                   {latestMetric ? (
                     <div className="metric-grid">
                       <MetricBar label="CPU" value={latestMetric.cpu_usage} />
@@ -181,13 +174,9 @@ export function MachinesView() {
                   ) : (
                     <EmptyState title="Sem metricas" message="A maquina ainda nao enviou metricas." />
                   )}
-                </section>
+                </Panel>
 
-                <section className="panel">
-                  <div className="panel-header">
-                    <h2>Programas instalados</h2>
-                    <span>{selection.programs.length} itens</span>
-                  </div>
+                <Panel title="Programas instalados" meta={<span>{selection.programs.length} itens</span>}>
                   {selection.programs.length === 0 ? (
                     <EmptyState title="Sem programas" message="O snapshot de programas ainda nao foi enviado." />
                   ) : (
@@ -212,7 +201,7 @@ export function MachinesView() {
                       </table>
                     </div>
                   )}
-                </section>
+                </Panel>
               </>
             ) : null}
           </div>
