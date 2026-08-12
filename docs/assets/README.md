@@ -10,7 +10,7 @@ assets/
 `-- images/
 ```
 
-Sempre que possivel, prefira diagramas em texto nos documentos Markdown em vez de arquivos binarios aqui.
+Pastas `diagrams/` e `images/` ainda nao foram criadas neste repositorio — este documento descreve a convencao para quando existirem. Hoje, prefira diagramas em texto (mermaid/ASCII) dentro dos proprios documentos Markdown.
 
 ## Diagramas
 

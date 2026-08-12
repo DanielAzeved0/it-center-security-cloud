@@ -204,6 +204,7 @@ docs/development/DECISIONS.md
 
 * Python
 * FastAPI
+* ReportLab (somente para geração de relatórios PDF — ver ADR-029)
 
 ---
 
@@ -217,6 +218,7 @@ docs/development/DECISIONS.md
 
 * Next.js
 * TypeScript
+* GSAP (`gsap` + `@gsap/react`, somente para animação/polimento visual do dashboard — ver ADR-035)
 
 ---
 

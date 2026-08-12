@@ -119,6 +119,23 @@ Revisão completa de `frontend/dashboard/` (nenhuma chave de banco ou de backend
 
 ---
 
+## OWASP Top 10 — Controles Reais Aplicados
+
+Mapeamento concreto para os riscos mais relevantes deste projeto (API FastAPI + PostgreSQL + dashboard Next.js) — não é uma lista genérica, cada item cita o controle real existente no código:
+
+* **Injection (SQL)**: o backend usa `psycopg` puro, sem ORM. Todas as queries em `backend/app/repositories/*.py` (`machines.py`, `alerts.py`, `audit_logs.py`, `local_admins.py`, `security_events.py`, `users.py`, `dashboard.py`) e em `backend/create_admin.py` usam parâmetros `%s` passados para `connection.execute(query, params)` — nenhuma ocorrência de concatenação ou f-string de valor de entrada dentro da string SQL foi encontrada no código atual.
+* **Cross-Site Scripting (XSS)**: o frontend não usa `dangerouslySetInnerHTML`, `eval` nem HTML não sanitizado em nenhum componente (revisão completa em 2026-07-29, ver `## Segurança do Dashboard` acima). `Content-Security-Policy` está ativa (`next.config.mjs`) e o token de sessão fica em cookie `httpOnly` — mesmo que surgisse um XSS, o token não seria lido por JavaScript.
+* **Server-Side Request Forgery (SSRF)**: o backend não faz chamada de rede de saída para URL fornecida por payload externo (agente ou usuário) — não existe cliente HTTP outbound configurável por entrada de request. A integração com RustDesk (EPIC 19, ADR-027) só armazena o identificador `machines.rustdesk_id`; quem abre a conexão remota é o cliente RustDesk já instalado na máquina do operador, não o backend.
+* **Path Traversal**: nenhum endpoint aceita caminho de arquivo como entrada do usuário para leitura em disco. O proxy interno do dashboard (`frontend/dashboard/app/api/backend/[...path]/route.ts`) valida uma allowlist explícita de prefixos de rota antes de repassar ao backend e responde `404` para qualquer path fora dela — o `[...path]` dinâmico do Next.js não vira um encaminhador aberto para rotas arbitrárias.
+* **Quebra de Controle de Acesso**: RBAC (`admin`/`analyst`/`viewer`) é decidido no backend via `require_roles()` (`backend/app/services/auth.py`), não apenas escondido no frontend — botões desabilitados no dashboard para `viewer` são só reforço de UX, a aplicação real da regra é sempre no servidor. Os dois mecanismos de autenticação não se misturam: `X-Agent-Api-Key` nunca concede papel de usuário humano, e Bearer token humano não é aceito no check-in do agente.
+
+Riscos conhecidos e aceitos relacionados a este tópico (detalhados também em `docs/security/AUTH.md`):
+
+* `POST /api/v1/auth/login` não tem rate limit nem lockout de conta hoje — nem no Nginx (só existe `limit_req_zone` para a zona `agent_checkins`, `infra/nginx/nginx.conf.template`) nem na aplicação. Mitigação parcial já existente: mensagem de erro genérica (não confirma se o e-mail existe) e log de auditoria (`auth.login_failed`) a cada tentativa. Uma correção efetiva (rate limit/lockout) exigiria planejamento e ADR formal antes de implementação, conforme `docs/development/CONTRIBUTING.md` — não é tratada como pendência com prazo, e sim como risco aceito enquanto o MVP roda em escala pequena.
+* O hash de senha usa PBKDF2-HMAC-SHA256 com `PASSWORD_ITERATIONS = 210_000` (`backend/app/services/auth.py`), abaixo da recomendação atual da OWASP para esse algoritmo (600.000+ iterações). Isso reduz a margem de segurança em caso de vazamento do banco (quebra offline do hash fica mais barata), mas não é, isoladamente, uma vulnerabilidade explorável sem esse vazamento adicional. Registrado como risco aceito/conhecido, sem mudança de valor planejada nesta etapa.
+
+---
+
 # Requisitos Obrigatórios
 
 Não serão aceitos:

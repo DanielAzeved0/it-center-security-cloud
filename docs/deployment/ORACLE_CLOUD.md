@@ -33,38 +33,7 @@ flowchart TD
 
 ## Etapas realizadas
 
-1. Instalar Docker Engine.
-2. Instalar Docker Compose.
-3. Adicionar o usuario `ubuntu` ao grupo `docker`.
-4. Validar instalacao:
-
-```bash
-docker --version
-docker compose version
-```
-
-5. Configurar chave SSH da Oracle VM no GitHub.
-6. Clonar o repositorio privado:
-
-```bash
-cd /opt/itcenter/app
-git clone git@github.com:DanielAzeved0/it-center-security-cloud.git it-center-security-cloud
-cd /opt/itcenter/app/it-center-security-cloud
-```
-
-7. Criar `.env.production` a partir de `.env.production.example`.
-8. Gerar secrets com:
-
-```bash
-openssl rand -hex 32
-```
-
-9. Criar `.secrets/dashboard.htpasswd` para HTTP Basic Auth.
-10. Validar `infra/docker-compose.production.yml`.
-11. Executar preflight de producao.
-12. Emitir certificado Let's Encrypt.
-13. Executar deploy.
-14. Validar containers e healthchecks.
+A cronologia detalhada do deploy inicial (2026-06-26) fica em `docs/deployment/DEPLOYMENT_HISTORY.md` ("Linha do tempo tecnica"), fonte de verdade dessa narrativa — nao duplicada aqui.
 
 ## Checklist Oracle Cloud
 

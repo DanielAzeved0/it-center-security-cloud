@@ -194,6 +194,14 @@ Regras:
 * Logout registra auditoria; o token expira naturalmente.
 * Erros de login sao genericos para nao enumerar usuarios.
 
+### Fallback de desenvolvimento do `AUTH_TOKEN_SECRET`
+
+O código (`backend/app/services/auth.py`) tem um fallback hardcoded, `DEFAULT_DEVELOPMENT_SECRET = "development-auth-secret-change-in-production"`, usado quando a variável de ambiente `AUTH_TOKEN_SECRET` não está definida. Isso existe para permitir rodar o backend localmente sem configurar `.env` na primeira vez.
+
+A única proteção real contra esse fallback vazar para produção é a validação de startup `validate_runtime_configuration()` (`backend/app/core/config.py`), chamada no evento `startup` do FastAPI (`backend/app/main.py`): se `APP_ENV=production` e `AUTH_TOKEN_SECRET` estiver ausente ou for um dos valores considerados inseguros (`None`, vazio, `change-me`, `CHANGE_ME`, `replace-me`), a API falha ao subir (`RuntimeError`) em vez de servir tráfego assinando tokens com o segredo de desenvolvimento.
+
+Essa validação é a última linha de defesa contra esse risco específico — não deve ser removida, enfraquecida ou contornada sem substituí-la por um controle equivalente (ex.: exigir `AUTH_TOKEN_SECRET` de um secret manager antes mesmo do container subir).
+
 ### Sessao do dashboard: cookie httpOnly (EPIC 17)
 
 Desde a EPIC 17, o dashboard nao guarda mais o `access_token` em `localStorage`. O proxy interno `/api/backend` (`frontend/dashboard/app/api/backend/[...path]/route.ts`, server-side) passou a ser o unico ponto que conhece o token:
@@ -255,6 +263,15 @@ Acoes auditaveis minimas:
 * alteracao de configuracao administrativa;
 * alteracao de politica SOC.
 
+## Regra 1 do SOC (`failed_login`) x falha de login do dashboard
+
+Não confundir os dois eventos, apesar do nome parecido:
+
+* A Regra 1 de `SOC_RULES.md` (evento `failed_login`) mede falhas de **logon local do Windows**, reportadas pelo agente no campo `security.failed_logins_last_hour` do payload de check-in (ver `docs/agent/CHECKIN.md`) — é sobre a máquina monitorada, não sobre o dashboard.
+* A auditoria `auth.login_failed` (tabela `audit_logs`, listada acima) registra tentativas malsucedidas de login **no dashboard** (`POST /api/v1/auth/login`), mas hoje é apenas um registro de auditoria — não existe regra SOC, alerta ou telemetria de brute-force olhando para esse evento.
+
+Ou seja: hoje não existe alerta cobrindo múltiplas tentativas de login incorretas contra `/api/v1/auth/login` — apenas o log de auditoria. Ver risco aceito relacionado em `docs/security/SECURITY.md` (seção "OWASP Top 10 — Controles Reais Aplicados").
+
 ## Rotas Protegidas
 
 Todas as rotas administrativas exigem autenticacao de usuario humano.
@@ -314,6 +331,8 @@ Ainda nao existe:
 * CRUD administrativo de usuarios;
 * revogacao server-side de token antes da expiracao;
 * API Key individual por agente;
-* auditoria de todas as acoes futuras ainda nao implementadas.
+* auditoria de todas as acoes futuras ainda nao implementadas;
+* rate limit ou lockout de conta apos multiplas falhas de login humano em `POST /api/v1/auth/login` — nem o Nginx (so existe `limit_req_zone` para a zona `agent_checkins`, `infra/nginx/nginx.conf.template`) nem a aplicacao aplicam esse controle hoje; risco aceito conhecido, detalhado em `docs/security/SECURITY.md`;
+* politica minima de senha (comprimento, complexidade) na criacao de usuario — `backend/create_admin.py` exige apenas que `ADMIN_PASSWORD` nao seja vazio, sem validar comprimento ou complexidade.
 
 Esses controles pertencem a proximas etapas de governanca.

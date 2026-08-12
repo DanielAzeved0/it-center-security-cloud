@@ -47,17 +47,22 @@ Risco:
 * Builds podem ficar lentos.
 * Uso intenso de swap degrada performance.
 
-## Basic Auth e controle administrativo
+## Chave SSH pessoal sem copia de backup
 
-HTTP Basic Auth protege o dashboard no MVP.
+Acesso administrativo a `itcenter-edge-01` depende de uma unica chave SSH pessoal.
 
-Limitacao:
+Risco:
 
-* Nao substitui login completo com usuarios, sessoes, RBAC e auditoria.
+* Perda da chave bloqueia todo acesso administrativo (backup/restore/rollback/TLS, credenciais do dashboard) ate uma recuperacao de emergencia. Ja aconteceu em producao (INCIDENTE 018 em `POSTMORTEMS.md`), inclusive com exposicao acidental de uma chave privada durante a recuperacao via workflow temporario.
+
+Mitigacao atual:
+
+* Workflow `workflow_dispatch` reaproveitando o secret `PROD_SSH_PRIVATE_KEY` ja usado pelo deploy, como recuperacao de ultimo recurso — removido do repositorio logo apos o uso.
 
 Evolucao esperada:
 
-* Implementar governanca de usuarios em fase futura.
+* Guardar uma copia de recuperacao da chave SSH pessoal em um cofre de senhas.
+* Documentar acesso alternativo via OCI Console/Serial Console como plano B.
 
 ## Rollback e migrations
 
@@ -84,7 +89,7 @@ Evolucao esperada:
 
 * Incluir o script na imagem ou chama-lo de forma idempotente a partir de `deploy.sh`.
 
-## Basic Auth nao pode competir com o cabecalho Authorization da aplicacao
+## Basic Auth no Nginx: reavaliar necessidade
 
 O Nginx aplica Basic Auth via cabecalho `Authorization: Basic ...`. Qualquer rota que o dashboard chame usando `Authorization: Bearer <token>` perde a credencial Basic Auth do ponto de vista do Nginx, pois o HTTP so permite um `Authorization` por requisicao.
 
@@ -95,6 +100,10 @@ Mitigacao atual:
 Risco:
 
 * Qualquer nova rota publica adicionada sob `location /` que tambem exija Bearer token reproduzira o mesmo loop de login (INCIDENTE 020 em `POSTMORTEMS.md`) se nao for isenta de Basic Auth da mesma forma.
+
+Pendencia real (ADR-023):
+
+* O login administrativo completo (usuarios, sessoes, RBAC e auditoria — ADR-021, ADR-022, `docs/security/AUTH.md`) ja esta em producao. O Basic Auth do Nginx continua sendo apenas uma camada adicional do MVP; sua real necessidade deve ser reavaliada agora que esse login existe, em vez de tratado como controle administrativo definitivo.
 
 ## Auditoria de dependencias do frontend bloqueada no ambiente de desenvolvimento
 

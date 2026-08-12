@@ -569,7 +569,7 @@ Em produção, o Nginx executa no `itcenter-edge-01` e é o único container com
 
 # Roadmap Técnico
 
-O roadmap detalhado (fases e EPICs) vive em `docs/development/ROADMAP.md` e `docs/development/TASKS.md` — não duplicado aqui. Resumo histórico: a base do MVP (infraestrutura, primeira API, agente, banco, dashboard, SOC Light) corresponde às EPICs 1-6; produção, governança/autenticação e hardening vieram nas EPICs 7-18; a integração RustDesk (EPIC 19) e os relatórios/dashboard executivo (EPIC 20) já estão concluídos; observabilidade de infraestrutura via Prometheus/Grafana (EPIC 21) está em planejamento (ADR-030).
+O roadmap detalhado (fases e EPICs) vive em `docs/development/ROADMAP.md` e `docs/development/TASKS.md` — não duplicado aqui. Resumo histórico: a base do MVP (infraestrutura, primeira API, agente, banco, dashboard, SOC Light) corresponde às EPICs 1-6; produção, governança/autenticação e hardening vieram nas EPICs 7-18; a integração RustDesk (EPIC 19, ADR-027), os relatórios/dashboard executivo (EPIC 20, ADR-029) e o polimento visual do dashboard com GSAP (EPIC 24, ADR-035) já estão concluídos; a integração com Snipe-IT feita na mesma EPIC 19 (ADR-028) foi revertida em 2026-08-11 (ADR-033) por falta de necessidade concreta de ITAM. Observabilidade de infraestrutura via Prometheus/Grafana (EPIC 21, ADR-030), auto-atualização do agente Windows (EPIC 22, ADR-032) e auto-detecção do ID do RustDesk (EPIC 23, ADR-034) estão apenas planejadas, sem código ainda.
 
 ---
 

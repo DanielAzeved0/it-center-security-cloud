@@ -25,7 +25,7 @@ ITCENTER_API_BASE_URL=http://backend:8000
 ## Requisitos para execucao manual
 
 ```text
-Node.js 25+
+Node.js 22+
 npm
 Backend FastAPI em execucao
 ```

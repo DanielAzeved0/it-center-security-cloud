@@ -32,7 +32,7 @@ O agente deve:
 
 ## Inventário
 
-* Hostname
+* Hostname (normalizado para maiúsculas antes do envio)
 * Usuário logado
 * Endereço IP
 * MAC Address
@@ -132,7 +132,7 @@ O JSON gerado deve seguir o contrato do endpoint:
 POST /api/v1/agent/checkin
 ```
 
-Campos gerados:
+Campos gerados pelo agente hoje (`New-AgentCheckinPayload` em `agent-windows/itcenter-agent.ps1`):
 
 ```text
 hostname
@@ -146,14 +146,20 @@ ram_usage
 disk_usage
 uptime_seconds
 installed_programs
-processes
 security
+```
+
+Campo suportado pelo contrato da API mas **não enviado pelo agente atual**:
+
+```text
+processes  (opcional, backend/app/schemas/agent.py)
 ```
 
 Observações:
 
+* `hostname` é normalizado para maiúsculas (`ToUpperInvariant()`) antes do envio — relevante para comparar com a allowlist de hostnames em `docs/security/ASSET_POLICY.md`, que deve considerar o mesmo padrão.
 * `mac_address` é obtido da mesma interface de rede escolhida para `ip_address` (mesma logica de fallback em cascata: `Get-NetIPAddress`+`Get-NetAdapter` -> `Win32_NetworkAdapterConfiguration` -> resolucao DNS, sem MAC neste ultimo nivel). Normalizado para o formato `AA:BB:CC:DD:EE:FF`. Pode ser `null` se nenhuma interface valida for encontrada.
-* `processes` é um campo opcional do contrato (`backend/app/schemas/agent.py`), já usado ativamente pelo backend para detecção SOC de ferramentas dual-use/malware em execução (ex.: `LockBit.exe`, `anydesk.exe`), mas hoje **não é populado pelo agente PowerShell atual** — o agente não coleta lista de processos em execução. Se omitido, o backend trata como lista vazia.
+* `processes` já é usado ativamente pelo backend para detecção SOC de ferramentas dual-use/malware em execução (ex.: `LockBit.exe`, `anydesk.exe`), mas o agente PowerShell não coleta lista de processos em execução. Se omitido, o backend trata como lista vazia.
 * `installed_programs` agora é preenchido com o snapshot local dos programas instalados.
 * O bloco `security` usa coletas reais do EPIC 6 para Firewall, Defender, RDP, administradores locais, USB e falhas de login.
 * O agente já envia o check-in para `POST /api/v1/agent/checkin`.

@@ -9,8 +9,9 @@ Esta pasta documenta o agente Windows.
 | `INSTALLATION.md` | Instalacao, desinstalacao e validacao manual do agente. |
 | `CHECKIN.md` | Contrato de check-in e comunicacao com a API. |
 | `TROUBLESHOOTING.md` | Diagnostico operacional de instalacao, execucao, rede, retry, cache e dashboard. |
-| `README_AGENT_LEGACY.md` | Documento legado de agentes/IA preservado. |
 | `agent-windows/README.md` | README tecnico da pasta de codigo: estrutura de arquivos, execucao local e testes. |
+
+O documento legado de orquestracao de agentes de IA (anterior ao `CLAUDE.md` e aos subagents nativos) foi movido para `docs/development/README_AGENT_LEGACY.md` — nao e sobre o agente Windows, entao nao faz mais parte do indice desta pasta.
 
 ## Estado atual
 
@@ -27,4 +28,5 @@ Enquanto nenhum agente realizar check-in, o dashboard pode aparecer vazio. Depoi
 ## Proxima fase
 
 * Atualizacao automatica: planejamento completo em ADR-032/EPIC 22 (2026-08-10, `docs/development/DECISIONS.md`, `docs/development/TASKS.md`), implementacao ainda pendente.
+* Auto-deteccao do ID do RustDesk pelo agente, sem substituir o cadastro manual: planejamento completo em ADR-034/EPIC 23, implementacao ainda pendente.
 * Adicionar assinatura dos payloads (sem plano formal ainda).

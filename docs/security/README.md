@@ -11,6 +11,8 @@ Esta pasta documenta os controles de seguranca do projeto.
 | `ASSET_POLICY.md` | Politica de ativos e softwares autorizados. |
 | `SOC_RULES.md` | Regras iniciais de SOC Light. |
 
+Documento complementar fora desta pasta: `docs/architecture/SECURITY.md` cobre segurança de infraestrutura/rede/TLS (VM, Nginx, backups, volumes); os quatro documentos acima cobrem segurança de aplicação/API/RBAC.
+
 ## Principios
 
 * Nao versionar secrets.

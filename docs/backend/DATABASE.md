@@ -73,6 +73,16 @@ audit_logs
 
 ---
 
+# Coluna updated_at e o trigger set_updated_at()
+
+Quatro tabelas têm coluna `updated_at`: `machines`, `installed_programs`, `agent_configs` e `users`. Em nenhuma delas a aplicação (camada `repositories`) grava esse valor diretamente — quem preenche é o próprio PostgreSQL.
+
+A função `set_updated_at()` (`CREATE OR REPLACE FUNCTION`, migration `001_initial_schema.sql`) seta `NEW.updated_at = now()` e é usada por um trigger `BEFORE UPDATE` dedicado em cada tabela: `trg_machines_updated_at`, `trg_installed_programs_updated_at` e `trg_agent_configs_updated_at` (todos criados em `001_initial_schema.sql`) e `trg_users_updated_at` (criado em `002_users.sql`, reaproveitando a mesma função `set_updated_at()`).
+
+Na prática: `updated_at` só muda quando há um `UPDATE` de fato executado na linha (o valor `DEFAULT now()` da coluna cobre o `INSERT` inicial); a aplicação não precisa — e não deve — incluir `updated_at` nas suas queries de `UPDATE`.
+
+---
+
 # Tabela: machines
 
 Armazena os computadores e servidores cadastrados.
@@ -101,6 +111,8 @@ updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 * last_seen será atualizado a cada check-in do agente.
 * status deve aceitar apenas: online, offline.
 * hostname deve ser normalizado antes da gravação para evitar duplicidade por diferença de caixa.
+* Constraint `machines_hostname_not_blank` (`CHECK (btrim(hostname) <> '')`, migration `001_initial_schema.sql`) impede hostname vazio ou só com espaços.
+* `updated_at` é preenchido pelo trigger `trg_machines_updated_at` (ver "Coluna updated_at e o trigger set_updated_at()" acima), não pela aplicação.
 * `mac_address` é opcional, coletado pelo agente a cada check-in (migration `007_machines_mac_address.sql`) da mesma interface de rede escolhida para `ip_address`. Normalizado para o formato `AA:BB:CC:DD:EE:FF`; pode ser `null` se nenhuma interface valida for encontrada (ex.: resolução via DNS não carrega MAC).
 * `rustdesk_id` é opcional, cadastrado manualmente por `admin`/`analyst` via `PATCH /api/v1/machines/{id}/rustdesk` (EPIC 19, ADR-027). Não é coletado pelo agente. Referencia o ID do RustDesk já instalado na máquina; não é uma credencial.
 
@@ -156,9 +168,10 @@ updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 * Relacionada com a máquina.
 * No MVP, representa o estado atual conhecido dos programas instalados.
 * A cada inventário completo, a API deve substituir o conjunto de programas da máquina por um novo snapshot.
-* A data installed_at é opcional porque nem todo Windows informa essa data de forma confiável.
+* A coluna `installed_at` existe no schema mas hoje é sempre `NULL`: nem o payload de check-in do agente (`docs/agent/CHECKIN.md`) nem o schema de resposta da API (`MachineProgram`) expõem essa data, e o `INSERT INTO installed_programs` em `backend/app/repositories/machines.py` nunca a referencia. É uma coluna morta reservada para uso futuro, não uma informação coletada de forma inconsistente.
 * Será usada para detectar softwares monitorados conforme ASSET_POLICY.md e SOC_RULES.md.
 * Não deve existir duplicidade de name e version para a mesma máquina.
+* `updated_at` é preenchido pelo trigger `trg_installed_programs_updated_at` (ver "Coluna updated_at e o trigger set_updated_at()" acima), não pela aplicação.
 
 ---
 
@@ -269,7 +282,7 @@ ignored
 
 * severity deve aceitar apenas: low, medium, high, critical.
 * status deve aceitar apenas: open, investigating, resolved, ignored.
-* resolved_at só deve ser preenchido quando status for resolved ou ignored.
+* Constraint `alerts_resolved_at_check` (migration `001_initial_schema.sql`) é bidirecional: `resolved_at` deve ser `NOT NULL` quando status for `resolved` ou `ignored`, **e também** deve ser `NULL` quando status for `open` ou `investigating`. Não é permitido, por exemplo, um alerta `open` com `resolved_at` preenchido.
 
 ---
 
@@ -296,6 +309,7 @@ updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 * Cada máquina pode ter no máximo uma configuração ativa de agente.
 * checkin_interval_minutes deve ser maior que 0.
 * A API Key do agente não deve ser armazenada nesta tabela em texto plano.
+* `updated_at` é preenchido pelo trigger `trg_agent_configs_updated_at` (ver "Coluna updated_at e o trigger set_updated_at()" acima), não pela aplicação.
 
 ---
 
@@ -354,6 +368,14 @@ INDEX created_at
 INDEX status, severity
 ```
 
+## agent_configs
+
+```text
+UNIQUE machine_id
+CHECK checkin_interval_minutes > 0
+TRIGGER trg_agent_configs_updated_at BEFORE UPDATE -> set_updated_at()
+```
+
 ---
 
 # Tabela: users
@@ -386,6 +408,7 @@ last_login_at TIMESTAMPTZ NULL
 * status deve aceitar apenas: active, disabled, pending.
 * last_login_at pode ser nulo ate o primeiro login.
 * A tabela representa usuarios humanos administrativos, nao agentes.
+* `updated_at` e preenchido pelo trigger `trg_users_updated_at` (migration `002_users.sql`, reaproveitando `set_updated_at()` — ver "Coluna updated_at e o trigger set_updated_at()" acima), nao pela aplicacao.
 
 ---
 
@@ -405,7 +428,7 @@ CHECK status IN ('active', 'disabled', 'pending')
 
 Armazena logs de auditoria administrativa do dashboard e da API.
 
-A captura automatica de auditoria ja esta implementada (EPIC 12, ADR-022): login, falha de login, logout e resolucao de alerta registram uma linha em audit_logs.
+A captura automatica de auditoria ja esta implementada (EPIC 12, ADR-022): login, falha de login, logout, resolucao de alerta e atualizacao do RustDesk ID (`machine.rustdesk_update`) registram uma linha em audit_logs.
 
 ## Campos
 
@@ -549,8 +572,9 @@ Quando `POST /api/v1/agent/checkin` recebe payload válido:
 5. Insere uma nova coleta em metrics.
 6. Remove os programas anteriores da máquina em installed_programs.
 7. Insere o snapshot atual de installed_programs recebido no payload.
-8. Sincroniza machine_local_admins para detectar novos administradores locais.
-9. Gera security_events e alerts conforme SOC_RULES.md.
+8. Cria agent_configs padrão para a máquina quando ainda não existir (`INSERT ... ON CONFLICT (machine_id) DO NOTHING`).
+9. Sincroniza machine_local_admins para detectar novos administradores locais.
+10. Gera security_events e alerts conforme SOC_RULES.md.
 ```
 
 ## Consultas
@@ -590,7 +614,7 @@ Estado atual:
 ```text
 Ha endpoint de login: POST /api/v1/auth/login.
 Rotas administrativas exigem Bearer token e sao protegidas por RBAC (admin/analyst/viewer).
-Ha captura automatica de auditoria: login, falha de login, logout e resolucao de alerta.
+Ha captura automatica de auditoria: login, falha de login, logout, resolucao de alerta e atualizacao do RustDesk ID (`machine.rustdesk_update`).
 CRUD de usuarios (criacao/edicao de contas pelo proprio dashboard) continua fora do escopo do MVP.
 ```
 

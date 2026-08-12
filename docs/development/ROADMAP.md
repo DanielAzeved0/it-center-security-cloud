@@ -161,6 +161,16 @@ Politicas autorizadas -> EPIC 11
 ADR-013 -> mantém a integração direta FastAPI + PostgreSQL
 ADR-014 -> padroniza execução local integrada com Docker Compose
 ADR-015 -> padroniza gate de seguranca das imagens Docker
+ADR-016 -> topologia de producao em no unico `itcenter-edge-01` e dimensionamento da VCN (EPIC 7)
+ADR-017 -> arquitetura operacional em camadas (Edge/Infra/Platform/Application/Data) e rede Docker `itcenter-network` (EPIC 7)
+ADR-018 -> refatoracao da infraestrutura de producao (Dockerfiles, compose com healthchecks, scripts de preflight/deploy/rollback/backup/restore) (EPIC 7)
+ADR-019 -> contratos operacionais minimos de producao (preflight obrigatorio, scripts versionados, logs em stdout/stderr) (EPIC 7)
+ADR-020 -> GitHub Actions para CI automatico e deploy manual de producao via SSH (EPIC 13)
+ADR-021 -> RBAC administrativo inicial com papeis admin/analyst/viewer, separado da autenticacao do agente (EPIC 12)
+ADR-022 -> login administrativo com Bearer token HMAC SHA-256 e senha em PBKDF2-SHA256 (EPIC 12)
+ADR-023 -> isencao das rotas `/api/backend/` do Basic Auth do Nginx para nao quebrar o Bearer token da aplicacao (EPIC 13)
+ADR-024 -> Terraform via import para a camada de infraestrutura abaixo do SO (EPIC 15)
+ADR-025 -> mantem o agente Windows em PowerShell, Go como candidata condicional a reescrita futura (EPIC 16)
 ADR-026 -> orquestracao de agentes de IA com recursos nativos do Claude Code
 ADR-027 -> RustDesk como acesso remoto integrado (EPIC 19)
 ADR-028 -> integracao com Snipe-IT como fonte de ITAM (EPIC 19) - revertida, ver ADR-033

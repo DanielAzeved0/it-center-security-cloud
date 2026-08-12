@@ -119,11 +119,17 @@ Exemplo de envio:
       "Administrator",
       "Daniel"
     ],
-    "usb_devices": [],
+    "usb_devices": [
+      {
+        "name": "Kingston DataTraveler 3.0"
+      }
+    ],
     "failed_logins_last_hour": 0
   }
 }
 ```
+
+`usb_devices` é `list[dict]` sem schema fixo no Pydantic (`list[dict[str, Any]]`), mas a API só lê a chave `name` de cada item (`device.get("name")`, com fallback para `"USB device"` quando ausente) para compor a descrição do `security_event` `usb_detected`. Outras chaves enviadas pelo agente são aceitas mas ignoradas.
 
 `processes` é opcional e traz os nomes dos processos em execução no momento da coleta. Eles passam pelas mesmas listas de ferramentas monitoradas usadas em `installed_programs` (remoto autorizado/não autorizado, VPN, torrent, ferramentas dual-use e indicadores de malware/ransomware) — ver `malware_or_ransomware_indicator` e `suspicious_tool_detected` abaixo.
 
@@ -215,6 +221,25 @@ Resposta:
 }
 ```
 
+Erro quando o e-mail não existe, o usuário não está `active` ou a senha não confere:
+
+```json
+{
+  "detail": "Invalid credentials"
+}
+```
+
+Retornado com status `401 Unauthorized`. Nesse caso a API também registra `audit_logs` com `action = "auth.login_failed"` antes de responder.
+
+Validação do payload (Pydantic, `LoginRequest`):
+
+```text
+email: string, min_length=3, max_length=255
+password: string, min_length=1, max_length=1024
+```
+
+Payload fora desses limites (ou faltando campo obrigatório) retorna `422 Unprocessable Entity` com a lista de campos invalidados pelo FastAPI/Pydantic, antes mesmo de consultar o banco.
+
 Login bem-sucedido, falha de login e logout registram `audit_logs`.
 
 O primeiro usuario `admin` deve ser criado por `backend/create_admin.py`, conforme `docs/security/AUTH.md`.
@@ -224,6 +249,19 @@ O primeiro usuario `admin` deve ser criado por `backend/create_admin.py`, confor
 ```http
 GET /api/v1/auth/me
 Authorization: Bearer <access_token>
+```
+
+Resposta:
+
+```json
+{
+  "user": {
+    "id": 1,
+    "email": "admin@example.com",
+    "name": "Admin User",
+    "role": "admin"
+  }
+}
 ```
 
 ## Logout
@@ -308,6 +346,8 @@ Resposta:
 
 `rustdesk_id` é `null` quando ainda não cadastrado (EPIC 19, ADR-027).
 
+Quando a máquina não existir, a API retorna `404 Machine not found`.
+
 ---
 
 ## Cadastrar RustDesk ID
@@ -369,6 +409,8 @@ Resposta:
 ]
 ```
 
+Quando a máquina não existir, a API retorna `404 Machine not found`.
+
 ---
 
 # Installed Programs
@@ -392,6 +434,8 @@ Resposta:
   }
 ]
 ```
+
+Quando a máquina não existir, a API retorna `404 Machine not found`.
 
 ---
 
@@ -527,6 +571,8 @@ Resposta:
 }
 ```
 
+Registra `audit_logs` com `action = "alert.resolve"`.
+
 ---
 
 # Dashboard Executivo
@@ -620,7 +666,7 @@ Estado atual (EPIC 12/13):
 ```text
 Autenticação no dashboard: implementada (Bearer token HMAC SHA-256, ver docs/security/AUTH.md).
 HTTPS: implementado (Nginx em produção).
-Logs de auditoria: implementados (audit_logs — login, falha de login, logout, resolução de alerta).
+Logs de auditoria: implementados (audit_logs — login, falha de login, logout, resolução de alerta, atualização do RustDesk ID via `machine.rustdesk_update`).
 Rate limit implementado no check-in do agente (Nginx, `limit_req_zone ... zone=agent_checkins`, validado em produção); rate limit geral nas demais rotas ainda não implementado.
 ```
 
@@ -637,6 +683,8 @@ Se last_seen for menor que 10 minutos:
 Se last_seen for maior que 10 minutos:
     offline
 ```
+
+**Atenção — a transição para offline acontece dentro de uma leitura, não em um job de background.** `GET /api/v1/machines`, `GET /api/v1/machines/{machine_id}` e `GET /api/v1/dashboard/summary` chamam `mark_stale_machines_offline()` antes de responder. Essa função faz um `UPDATE` em `machines.status` para `offline` em qualquer máquina cujo `last_seen` esteja além de `OFFLINE_THRESHOLD_MINUTES` (10 minutos) e, para cada máquina que transicionar, insere um `security_events` do tipo `machine_offline`. Ou seja, consultar essas três rotas pode gravar dados como efeito colateral de uma requisição GET — não existe hoje um worker separado que marque máquinas como offline.
 
 ---
 
@@ -677,6 +725,7 @@ RustDesk
 Hamachi
 ZeroTier
 Radmin VPN
+Tailscale
 uTorrent
 BitTorrent
 qBittorrent

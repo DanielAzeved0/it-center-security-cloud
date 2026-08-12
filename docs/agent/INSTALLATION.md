@@ -28,6 +28,13 @@ No MVP, a execucao periodica usa Tarefa Agendada do Windows com usuario `SYSTEM`
 
 Servico Windows nativo fica reservado para evolucao futura.
 
+## Requisitos
+
+* Windows 10 ou Windows 11.
+* **Windows PowerShell 5.1** (o `powershell.exe` nativo do Windows) — o agente nao foi testado nem e suportado em PowerShell 7/`pwsh`. O script usa cmdlets exclusivos do Windows PowerShell (`Get-LocalGroupMember`, `Get-AppxPackage -AllUsers`, `Get-Counter`) que nao tem garantia de disponibilidade no PowerShell 7.
+* Privilegios de Administrador para rodar `install-agent.ps1` (a Tarefa Agendada resultante roda como `SYSTEM`).
+* Conectividade de rede com o endpoint da API (ver "Preflight de rede do instalador" abaixo).
+
 ## Fluxo de instalacao
 
 ```text
@@ -172,10 +179,12 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install-agent.ps1 `
 
 ## Configuracoes esperadas
 
+Nao sao variaveis de ambiente — sao parametros do instalador (`-ServerUrl`, `-AgentApiKey`, `-CheckinIntervalMinutes`), passados na linha de comando e persistidos por `install-agent.ps1` em `config.json` com chaves em snake_case:
+
 ```text
-SERVER_URL=https://itcenter-daniel.chickenkiller.com
-AGENT_API_KEY=<valor seguro>
-CHECKIN_INTERVAL_MINUTES=5
+-ServerUrl "https://itcenter-daniel.chickenkiller.com"
+-AgentApiKey "<valor seguro>"
+-CheckinIntervalMinutes 5
 ```
 
 Arquivo gerado:
@@ -355,12 +364,12 @@ Confirmar maquina no dashboard publicado:
 
 Validado:
 
-* o agente for instalado em uma maquina Windows sem passos manuais soltos;
-* o agente executar periodicamente e manter a maquina visivel no dashboard;
-* o agente enviar check-in real para producao;
-* a maquina aparecer no dashboard publicado;
-* logs e cache offline ficarem em locais previsiveis;
-* a instalacao e a remocao estiverem documentadas.
+* o agente foi instalado em uma maquina Windows sem passos manuais soltos;
+* o agente executa periodicamente e mantem a maquina visivel no dashboard;
+* o agente envia check-in real para producao;
+* a maquina aparece no dashboard publicado;
+* logs e cache offline ficam em locais previsiveis;
+* a instalacao e a remocao estao documentadas.
 
 Documentacao complementar:
 

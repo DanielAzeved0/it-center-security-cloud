@@ -335,26 +335,7 @@ O deploy automatico em todo push nao esta habilitado neste momento. A politica a
 
 ### Registro do rollout do GitHub Actions
 
-Status em 2026-06-30:
-
-* secrets de SSH de producao cadastrados em `Settings > Secrets and variables > Actions`;
-* workflow `CI` executado com sucesso no GitHub Actions, cobrindo backend tests, frontend build e compose validation;
-* erro de sintaxe no heredoc do `deploy-production.yml` corrigido antes do primeiro deploy;
-* dependencia `httpx` adicionada ao backend para suportar `fastapi.testclient.TestClient` no ambiente do CI.
-* deploy ajustado para buscar o codigo via HTTPS com `GITHUB_TOKEN` temporario, evitando dependencia de chave SSH da VM para o GitHub.
-* workflow `Deploy Production` executado manualmente com sucesso;
-* backup PostgreSQL criado antes do deploy;
-* build das imagens `infra-backend` e `infra-frontend` concluido;
-* containers `postgres`, `backend`, `frontend` e `nginx` validados como saudaveis;
-* smoke tests de producao aprovados;
-* dashboard publicado validado no navegador sem bug visual reportado.
-
-Evidencia registrada em:
-
-```text
-docs/deployment/DEPLOYMENT_HISTORY.md
-docs/development/TASKS.md
-```
+O primeiro deploy via `Deploy Production` (2026-06-30) esta registrado em `docs/deployment/DEPLOYMENT_HISTORY.md` ("2026-06-30 - Deploy manual via GitHub Actions"), fonte de verdade dessa linha do tempo.
 
 ## Rollback
 

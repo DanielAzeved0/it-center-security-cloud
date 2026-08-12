@@ -79,31 +79,22 @@ docker compose --env-file .env.production -f infra/docker-compose.production.yml
 curl -I https://itcenter-daniel.chickenkiller.com
 ```
 
-## Documentos principais
+## Documentos mais consultados
+
+Esta tabela nao tenta listar os 45 arquivos de `docs/` — isso ja provou decair rapido. E so um atalho para o que e consultado com mais frequencia no dia a dia:
 
 | Documento | Finalidade |
 | --- | --- |
-| `architecture/ARCHITECTURE.md` | Arquitetura oficial do sistema. |
-| `architecture/DATA_FLOW.md` | Fluxos principais de comunicacao. |
-| `architecture/FUTURE_ARCHITECTURE.md` | Plano de evolucao arquitetural futura. |
-| `architecture/IAC.md` | Provisionamento via Terraform da infraestrutura Oracle Cloud (ADR-024). |
-| `deployment/SETUP.md` | Preparacao do ambiente. |
 | `deployment/PRODUCTION.md` | Estrategia e operacao de producao. |
-| `deployment/TROUBLESHOOTING.md` | Diagnostico de falhas. |
-| `deployment/OPERATIONAL_HANDOFF_2026-06-28.md` | Snapshot historico do deploy/incidentes/validacoes ate 2026-06-28 — para o runbook atual, use `WEEKLY_OPERATIONS.md`. |
-| `security/SECURITY.md` | Politicas de seguranca. |
-| `security/AUTH.md` | Autenticacao do dashboard e do agente. |
-| `security/ASSET_POLICY.md` | Fonte de verdade sobre softwares/ferramentas autorizados. |
-| `security/SOC_RULES.md` | Regras de deteccao e alertas do SOC Light. |
+| `deployment/TROUBLESHOOTING.md` | Diagnostico de falhas em producao. |
+| `development/TASKS.md` | Backlog oficial, sempre atualizado. |
+| `development/DECISIONS.md` | Registro de decisoes arquiteturais (ADRs). |
 | `backend/API.md` | Contrato da API. |
 | `backend/DATABASE.md` | Modelo de dados. |
-| `agent/CHECKIN.md` | Contrato do check-in do agente. |
-| `agent/TROUBLESHOOTING.md` | Diagnostico operacional do agente Windows. |
-| `development/CONTRIBUTING.md` | Regras de contribuicao. |
-| `development/ROADMAP.md` | Roadmap do projeto. |
-| `development/DECISIONS.md` | Registro de decisoes arquiteturais (ADRs). |
-| `development/TASKS.md` | Backlog oficial, sempre atualizado. |
-| `development/AI_WORKFLOW.md` | Orquestracao de agentes de IA no Claude Code (ADR-026). |
+| `security/AUTH.md` | Autenticacao do dashboard e do agente. |
+| `security/ASSET_POLICY.md` | Fonte de verdade sobre softwares/ferramentas autorizados. |
+
+A lista completa e sempre atualizada de cada pasta fica no `README.md` de cada subpasta (`agent/`, `architecture/`, `assets/`, `backend/`, `deployment/`, `development/`, `security/`) — cada um indexa 100% dos arquivos-irmaos.
 
 ## Estado atual
 

@@ -107,6 +107,7 @@ Geram evento `suspicious_tool_detected`, severidade `medium`, com alerta aberto.
 * Cobalt Strike
 * Process Hacker
 * Netcat
+* nc.exe (alias de Netcat no código, entrada separada em `DUAL_USE_TOOLS`, `backend/app/services/agent.py`)
 * Rclone
 * MegaSync
 * Tor Browser

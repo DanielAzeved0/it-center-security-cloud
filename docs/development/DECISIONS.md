@@ -378,10 +378,6 @@ Repositório privado inicialmente.
 
 ---
 
-# Modelo para Novas Decisões
-
----
-
 # ADR-013
 
 ## Data
