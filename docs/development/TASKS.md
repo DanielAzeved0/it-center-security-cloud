@@ -1086,3 +1086,33 @@ Reduzir o tempo de carregamento percebido ao navegar entre as telas do dashboard
 Fora de escopo (registrado para o futuro, nao e bug): `MachineDetailView` ainda busca a lista inteira de `/api/v1/alerts` e `/api/v1/security-events` e filtra por `machine_id` no cliente — corrigir direito exige um parametro de filtro novo no backend (mudanca de contrato de API, fora do escopo de uma revisao de frontend); `cache: "no-store"` em `lib/api.ts` mantido sem alteracao (decisao consciente de sempre buscar dado fresco num dashboard de seguranca).
 
 Validacao em 2026-08-12: `npm run build` limpo (TypeScript OK, Turbopack) apos limpar `.next/` (cache antigo apontava para o caminho de rota anterior), as mesmas 8 rotas de antes compiladas sem erro (o route group nao muda nenhuma URL). **Nao verificado visualmente em navegador real** — mesma limitacao das EPICs 24/25 (sem ferramenta de automacao de browser conectada nesta sessao); recomendado `npm run dev` + abrir a aba Rede do navegador para confirmar que `GET /api/v1/auth/me` dispara so uma vez por sessao (nao mais a cada clique de navegacao) antes de considerar isso validado de ponta a ponta em producao. EPIC 26 encerrada.
+
+# EPIC 27 - Numero de Serie da Maquina (Coleta pelo Agente)
+
+Objetivo:
+
+Coletar o numero de serie (service tag) do notebook/computador via agente Windows para uso em inventario de ativos, eliminando digitacao manual quando o hardware expuser o dado via WMI/CIM. Mesma filosofia de resiliencia ja aplicada as demais integracoes do agente (RustDesk/EPIC 23, MAC Address/EPIC 4): falha na leitura nunca bloqueia o check-in, e o dado so complementa - nunca substitui - outras formas de cadastro de ativo.
+
+### Tarefas
+
+[ ] Testar `Get-CimInstance Win32_BIOS` (campo `SerialNumber`) contra maquinas fisicas reais do ambiente de testes
+
+[ ] Testar o mesmo campo contra maquina(s) virtual(is), documentando os valores placeholder observados (ex.: vazio, "System Serial Number", "None", "0")
+
+[ ] Testar `Get-CimInstance Win32_ComputerSystemProduct` (campo `IdentifyingNumber`) como fallback quando `Win32_BIOS.SerialNumber` vier vazio ou for um placeholder conhecido
+
+[ ] Com base no resultado real dos testes acima, decidir a lista de valores placeholder a descartar e a ordem de tentativa entre os dois metodos
+
+[ ] Adicionar coluna `machines.serial_number` (nullable) via migration
+
+[ ] Criar `Get-AgentSerialNumber` no agente (mesmo padrao das demais funcoes `Get-Agent*`) com try/catch proprio - erro ao consultar CIM deve ser logado e seguir sem `serial_number`, nunca interromper o check-in
+
+[ ] Persistir `serial_number` a cada check-in (mesmo padrao ja usado para `mac_address`, EPIC 4)
+
+[ ] Expor `serial_number` em `GET /api/v1/machines` e `GET /api/v1/machines/{id}`
+
+[ ] Exibir numero de serie no detalhe da maquina no dashboard (`MachineDetailView`)
+
+[ ] Atualizar `docs/agent/CHECKIN.md`, `docs/backend/API.md` e `docs/backend/DATABASE.md`
+
+[ ] Atualizar testes do agente (`agent-windows/tests/`) e do backend (`backend/tests/test_agent_checkin.py`) cobrindo o novo campo
