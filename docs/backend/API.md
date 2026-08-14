@@ -94,6 +94,7 @@ Exemplo de envio:
   "username": "daniel",
   "ip_address": "192.168.15.25",
   "mac_address": "AA:BB:CC:DD:EE:FF",
+  "serial_number": "5M56TH4",
   "operating_system": "Windows 11 Pro",
   "os_version": "23H2",
   "cpu_usage": 22.5,
@@ -302,6 +303,7 @@ Resposta:
     "username": "daniel",
     "ip_address": "192.168.15.25",
     "mac_address": "AA:BB:CC:DD:EE:FF",
+    "serial_number": "5M56TH4",
     "status": "online",
     "last_seen": "2026-06-24T20:00:00",
     "rustdesk_id": "123456789"
@@ -309,7 +311,7 @@ Resposta:
 ]
 ```
 
-`rustdesk_id` é `null` quando a máquina ainda não teve o ID cadastrado (EPIC 19, ADR-027).
+`rustdesk_id` é `null` quando a máquina ainda não teve o ID cadastrado (EPIC 19, ADR-027). `serial_number` é `null` quando o agente não conseguiu ler o número de série da máquina (EPIC 27) — nunca bloqueia o check-in.
 
 Origem dos dados:
 
@@ -336,6 +338,7 @@ Resposta:
   "username": "daniel",
   "ip_address": "192.168.15.25",
   "mac_address": "AA:BB:CC:DD:EE:FF",
+  "serial_number": "5M56TH4",
   "operating_system": "Windows 11 Pro",
   "os_version": "23H2",
   "status": "online",

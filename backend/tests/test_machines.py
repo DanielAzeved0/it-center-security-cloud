@@ -35,6 +35,7 @@ def test_list_machines_returns_checked_in_machine(monkeypatch, auth_headers):
     assert machines[0]["username"] == "daniel"
     assert machines[0]["ip_address"] == "192.168.15.25"
     assert machines[0]["mac_address"] == "AA:BB:CC:DD:EE:FF"
+    assert machines[0]["serial_number"] == "5M56TH4"
     assert machines[0]["status"] == "online"
     assert machines[0]["last_seen"]
 
@@ -57,6 +58,7 @@ def test_get_machine_returns_checked_in_machine_details(monkeypatch, auth_header
     assert machine["username"] == "daniel"
     assert machine["ip_address"] == "192.168.15.25"
     assert machine["mac_address"] == "AA:BB:CC:DD:EE:FF"
+    assert machine["serial_number"] == "5M56TH4"
     assert machine["operating_system"] == "Windows 11 Pro"
     assert machine["os_version"] == "23H2"
     assert machine["status"] == "online"

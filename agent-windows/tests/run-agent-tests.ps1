@@ -324,6 +324,7 @@ Assert-True -Condition ($jsonPayload.PSObject.Properties.Name -contains "cpu_usa
 Assert-True -Condition ($jsonPayload.PSObject.Properties.Name -contains "ram_usage") -Message "JSON must contain ram_usage."
 Assert-True -Condition ($jsonPayload.PSObject.Properties.Name -contains "disk_usage") -Message "JSON must contain disk_usage."
 Assert-True -Condition ($jsonPayload.PSObject.Properties.Name -contains "uptime_seconds") -Message "JSON must contain uptime_seconds."
+Assert-True -Condition ($jsonPayload.PSObject.Properties.Name -contains "serial_number") -Message "JSON must contain serial_number."
 Assert-True -Condition ($jsonPayload.PSObject.Properties.Name -contains "installed_programs") -Message "JSON must contain installed_programs."
 Assert-True -Condition ($jsonPayload.PSObject.Properties.Name -contains "security") -Message "JSON must contain security."
 Assert-True -Condition ([double]$jsonPayload.cpu_usage -eq [double]$payload.cpu_usage) -Message "JSON CPU usage must match payload CPU usage."
@@ -416,6 +417,43 @@ function Invoke-MockCpuFallbackProcessors {
 
 $cpuFromFallback = Get-AgentCpuUsage -CounterReader ${function:Invoke-FailingCpuCounter} -ProcessorReader ${function:Invoke-MockCpuFallbackProcessors}
 Assert-True -Condition ($cpuFromFallback -eq 30) -Message "CPU usage must fall back to WMI average when the counter is unavailable."
+
+Assert-True -Condition (Test-AgentSerialNumberPlaceholder -Value $null) -Message "Null serial number must be treated as placeholder."
+Assert-True -Condition (Test-AgentSerialNumberPlaceholder -Value "") -Message "Empty serial number must be treated as placeholder."
+Assert-True -Condition (Test-AgentSerialNumberPlaceholder -Value "System Serial Number") -Message "Known BIOS placeholder must be detected regardless of casing."
+Assert-True -Condition (-not (Test-AgentSerialNumberPlaceholder -Value "5M56TH4")) -Message "A real-looking serial number must not be treated as placeholder."
+
+function Invoke-MockBiosValidSerial {
+    [pscustomobject]@{ SerialNumber = "5M56TH4" }
+}
+
+function Invoke-MockBiosPlaceholderSerial {
+    [pscustomobject]@{ SerialNumber = "System Serial Number" }
+}
+
+function Invoke-MockComputerSystemProductSerial {
+    [pscustomobject]@{ IdentifyingNumber = "PRODUCT-SERIAL-123" }
+}
+
+function Invoke-MockComputerSystemProductPlaceholder {
+    [pscustomobject]@{ IdentifyingNumber = "None" }
+}
+
+function Invoke-FailingBiosReader {
+    throw "WMI unavailable in this environment."
+}
+
+$serialFromBios = Get-AgentSerialNumber -BiosReader ${function:Invoke-MockBiosValidSerial} -ComputerSystemProductReader ${function:Invoke-MockComputerSystemProductSerial}
+Assert-True -Condition ($serialFromBios -eq "5M56TH4") -Message "Serial number must come from Win32_BIOS when it is not a placeholder."
+
+$serialFromFallback = Get-AgentSerialNumber -BiosReader ${function:Invoke-MockBiosPlaceholderSerial} -ComputerSystemProductReader ${function:Invoke-MockComputerSystemProductSerial}
+Assert-True -Condition ($serialFromFallback -eq "PRODUCT-SERIAL-123") -Message "Serial number must fall back to Win32_ComputerSystemProduct when BIOS returns a known placeholder."
+
+$serialWhenBothPlaceholder = Get-AgentSerialNumber -BiosReader ${function:Invoke-MockBiosPlaceholderSerial} -ComputerSystemProductReader ${function:Invoke-MockComputerSystemProductPlaceholder}
+Assert-True -Condition ($null -eq $serialWhenBothPlaceholder) -Message "Serial number must be null when both BIOS and ComputerSystemProduct return only placeholders."
+
+$serialWhenReaderThrows = Get-AgentSerialNumber -BiosReader ${function:Invoke-FailingBiosReader} -ComputerSystemProductReader ${function:Invoke-MockComputerSystemProductSerial}
+Assert-True -Condition ($null -eq $serialWhenReaderThrows) -Message "Get-AgentSerialNumber must never throw and must return null when the BIOS reader fails."
 
 $failedLogins = Get-AgentFailedLoginsLastHour -FailedLoginReader ${function:Invoke-MockFailedLogins}
 Assert-True -Condition ($failedLogins -eq 2) -Message "Failed login count must match mocked events."

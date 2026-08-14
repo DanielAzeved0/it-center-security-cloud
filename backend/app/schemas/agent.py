@@ -23,6 +23,7 @@ class AgentCheckinRequest(BaseModel):
     username: str | None = Field(default=None, max_length=255)
     ip_address: str | None = Field(default=None, max_length=45)
     mac_address: str | None = Field(default=None, max_length=17)
+    serial_number: str | None = Field(default=None, max_length=100)
     operating_system: str | None = Field(default=None, max_length=255)
     os_version: str | None = Field(default=None, max_length=100)
     cpu_usage: float = Field(..., ge=0, le=100)

@@ -1,0 +1,5 @@
+BEGIN;
+
+ALTER TABLE machines ADD COLUMN IF NOT EXISTS serial_number VARCHAR(100);
+
+COMMIT;

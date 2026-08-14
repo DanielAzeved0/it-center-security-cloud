@@ -1095,24 +1095,62 @@ Coletar o numero de serie (service tag) do notebook/computador via agente Window
 
 ### Tarefas
 
-[ ] Testar `Get-CimInstance Win32_BIOS` (campo `SerialNumber`) contra maquinas fisicas reais do ambiente de testes
+[x] Testar `Get-CimInstance Win32_BIOS` (campo `SerialNumber`) contra maquinas fisicas reais do ambiente de testes
+
+    Testado em 2026-08-14 num notebook fisico real (Dell Inspiron 15
+    3530): Win32_BIOS.SerialNumber retornou "5M56TH4".
 
 [ ] Testar o mesmo campo contra maquina(s) virtual(is), documentando os valores placeholder observados (ex.: vazio, "System Serial Number", "None", "0")
 
-[ ] Testar `Get-CimInstance Win32_ComputerSystemProduct` (campo `IdentifyingNumber`) como fallback quando `Win32_BIOS.SerialNumber` vier vazio ou for um placeholder conhecido
+    **Nao realizado nesta sessao** - nenhuma VM disponivel no ambiente
+    de testes. A lista de placeholders implementada (vazio, "System
+    Serial Number", "To Be Filled By O.E.M.", "None", "Not Specified",
+    "Default string", "0") e baseada em valores publicamente conhecidos
+    de fabricantes/hipervisores, nao em teste real - pendente antes de
+    considerar esta EPIC totalmente encerrada. Sem risco imediato: uma
+    leitura incorreta so resulta em serial_number com valor cosmetico
+    errado, nunca bloqueia o check-in (Get-AgentSerialNumber sempre
+    retorna string ou $null, testado com leitor que lanca excecao).
 
-[ ] Com base no resultado real dos testes acima, decidir a lista de valores placeholder a descartar e a ordem de tentativa entre os dois metodos
+[x] Testar `Get-CimInstance Win32_ComputerSystemProduct` (campo `IdentifyingNumber`) como fallback quando `Win32_BIOS.SerialNumber` vier vazio ou for um placeholder conhecido
 
-[ ] Adicionar coluna `machines.serial_number` (nullable) via migration
+    Testado em 2026-08-14 na mesma maquina fisica:
+    Win32_ComputerSystemProduct.IdentifyingNumber retornou o mesmo
+    serial ("5M56TH4"), confirmando consistencia entre os dois metodos
+    quando a BIOS tem serial real.
 
-[ ] Criar `Get-AgentSerialNumber` no agente (mesmo padrao das demais funcoes `Get-Agent*`) com try/catch proprio - erro ao consultar CIM deve ser logado e seguir sem `serial_number`, nunca interromper o check-in
+[x] Com base no resultado real dos testes acima, decidir a lista de valores placeholder a descartar e a ordem de tentativa entre os dois metodos
 
-[ ] Persistir `serial_number` a cada check-in (mesmo padrao ja usado para `mac_address`, EPIC 4)
+    Decisao: tentar Win32_BIOS primeiro (metodo mais direto), fallback
+    para Win32_ComputerSystemProduct quando o primeiro vier vazio ou
+    for um placeholder conhecido. Lista de placeholders sujeita a
+    revisao apos validacao em VM (ver item acima).
 
-[ ] Expor `serial_number` em `GET /api/v1/machines` e `GET /api/v1/machines/{id}`
+[x] Adicionar coluna `machines.serial_number` (nullable) via migration
 
-[ ] Exibir numero de serie no detalhe da maquina no dashboard (`MachineDetailView`)
+    backend/migrations/008_machines_serial_number.sql.
 
-[ ] Atualizar `docs/agent/CHECKIN.md`, `docs/backend/API.md` e `docs/backend/DATABASE.md`
+[x] Criar `Get-AgentSerialNumber` no agente (mesmo padrao das demais funcoes `Get-Agent*`) com try/catch proprio - erro ao consultar CIM deve ser logado e seguir sem `serial_number`, nunca interromper o check-in
 
-[ ] Atualizar testes do agente (`agent-windows/tests/`) e do backend (`backend/tests/test_agent_checkin.py`) cobrindo o novo campo
+[x] Persistir `serial_number` a cada check-in (mesmo padrao ja usado para `mac_address`, EPIC 4)
+
+[x] Expor `serial_number` em `GET /api/v1/machines` e `GET /api/v1/machines/{id}`
+
+[x] Exibir numero de serie no detalhe da maquina no dashboard (`MachineDetailView`)
+
+[x] Atualizar `docs/agent/CHECKIN.md`, `docs/backend/API.md` e `docs/backend/DATABASE.md`
+
+[x] Atualizar testes do agente (`agent-windows/tests/`) e do backend (`backend/tests/test_agent_checkin.py`) cobrindo o novo campo
+
+Validacao em 2026-08-14: `agent-windows/tests/run-agent-tests.ps1` passou
+(incluindo os novos casos de Get-AgentSerialNumber: valor real, fallback
+por placeholder, ambos placeholder, e leitor que lanca excecao). Suite
+completa do backend via `pytest` local com PostgreSQL via Docker Compose:
+89 passed. `npm run build` do frontend limpo (TypeScript OK, Turbopack).
+Teste end-to-end real: agente real (dot-source de
+`itcenter-agent.ps1`) gerou payload com `serial_number = "5M56TH4"`,
+enviado via HTTP para uma instancia local do backend, persistido em
+`machines.serial_number` no PostgreSQL e confirmado via query direta -
+depois removido (registro de smoke test, nao uma maquina real do
+inventario). **EPIC 27 nao encerrada**: falta a validacao contra VM
+(ver ressalva na tarefa acima) antes de fechar definitivamente.

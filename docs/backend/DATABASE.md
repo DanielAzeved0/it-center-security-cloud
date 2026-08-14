@@ -95,6 +95,7 @@ hostname VARCHAR(255) NOT NULL UNIQUE
 username VARCHAR(255) NULL
 ip_address INET NULL
 mac_address VARCHAR(17) NULL
+serial_number VARCHAR(100) NULL
 operating_system VARCHAR(255) NULL
 os_version VARCHAR(100) NULL
 status VARCHAR(20) NOT NULL DEFAULT 'offline'
@@ -114,6 +115,7 @@ updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 * Constraint `machines_hostname_not_blank` (`CHECK (btrim(hostname) <> '')`, migration `001_initial_schema.sql`) impede hostname vazio ou só com espaços.
 * `updated_at` é preenchido pelo trigger `trg_machines_updated_at` (ver "Coluna updated_at e o trigger set_updated_at()" acima), não pela aplicação.
 * `mac_address` é opcional, coletado pelo agente a cada check-in (migration `007_machines_mac_address.sql`) da mesma interface de rede escolhida para `ip_address`. Normalizado para o formato `AA:BB:CC:DD:EE:FF`; pode ser `null` se nenhuma interface valida for encontrada (ex.: resolução via DNS não carrega MAC).
+* `serial_number` é opcional, coletado pelo agente a cada check-in (migration `008_machines_serial_number.sql`, EPIC 27) via `Win32_BIOS.SerialNumber`, com fallback para `Win32_ComputerSystemProduct.IdentifyingNumber`. Pode ser `null` se a leitura falhar ou se ambos os métodos só retornarem placeholders conhecidos (ex.: "System Serial Number", "None") — a leitura nunca bloqueia o check-in.
 * `rustdesk_id` é opcional, cadastrado manualmente por `admin`/`analyst` via `PATCH /api/v1/machines/{id}/rustdesk` (EPIC 19, ADR-027). Não é coletado pelo agente. Referencia o ID do RustDesk já instalado na máquina; não é uma credencial.
 
 A coluna `snipeit_asset_id`, introduzida pela migration `005_machines_snipeit.sql` (integração Snipe-IT, ADR-028), foi removida pela migration `006_remove_machines_snipeit.sql` — a integração foi revertida em 2026-08-11 (ver ADR-033 em `docs/development/DECISIONS.md`) por nunca ter existido um Snipe-IT real conectado em produção.

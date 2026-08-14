@@ -9,6 +9,7 @@ class MachineSummary(BaseModel):
     username: str | None = Field(default=None, max_length=255)
     ip_address: str | None = Field(default=None, max_length=45)
     mac_address: str | None = Field(default=None, max_length=17)
+    serial_number: str | None = Field(default=None, max_length=100)
     status: str
     last_seen: datetime | None
     rustdesk_id: str | None = Field(default=None, max_length=50)

@@ -411,6 +411,60 @@ function Get-AgentNetworkInfo {
     }
 }
 
+function Test-AgentSerialNumberPlaceholder {
+    param(
+        [string]$Value
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Value)) {
+        return $true
+    }
+
+    # Valores conhecidos de placeholder de fabricantes/hipervisores quando o serial
+    # nao foi de fato programado na BIOS (nao e uma lista exaustiva - qualquer valor
+    # fora dela e aceito como serial real).
+    $knownPlaceholders = @(
+        "system serial number",
+        "to be filled by o.e.m.",
+        "none",
+        "not specified",
+        "default string",
+        "0"
+    )
+
+    $knownPlaceholders -contains $Value.Trim().ToLowerInvariant()
+}
+
+function Get-AgentSerialNumber {
+    param(
+        [scriptblock]$BiosReader = {
+            Get-CimInstance -ClassName Win32_BIOS -ErrorAction SilentlyContinue
+        },
+        [scriptblock]$ComputerSystemProductReader = {
+            Get-CimInstance -ClassName Win32_ComputerSystemProduct -ErrorAction SilentlyContinue
+        }
+    )
+
+    try {
+        $bios = & $BiosReader
+
+        if ($bios -and -not (Test-AgentSerialNumberPlaceholder -Value $bios.SerialNumber)) {
+            return [string]$bios.SerialNumber.Trim()
+        }
+
+        $product = & $ComputerSystemProductReader
+
+        if ($product -and -not (Test-AgentSerialNumberPlaceholder -Value $product.IdentifyingNumber)) {
+            return [string]$product.IdentifyingNumber.Trim()
+        }
+    }
+    catch {
+        Write-AgentLog -Message "Failed to read serial number: $($_.Exception.Message)" -Level "WARN"
+    }
+
+    $null
+}
+
 function Get-AgentCpuUsageFallback {
     param(
         [scriptblock]$ProcessorReader = {
@@ -840,6 +894,7 @@ function New-AgentCheckinPayload {
     $hostname = Get-AgentHostname
     $username = Get-AgentUsername
     $networkInfo = Get-AgentNetworkInfo
+    $serialNumber = Get-AgentSerialNumber
     $operatingSystem = Get-AgentOperatingSystem
     $cpuUsage = Get-AgentCpuUsage
     $ramUsage = Get-AgentRamUsage
@@ -853,6 +908,7 @@ function New-AgentCheckinPayload {
         username = $username
         ip_address = $networkInfo.IPAddress
         mac_address = $networkInfo.MacAddress
+        serial_number = $serialNumber
         operating_system = $operatingSystem.operating_system
         os_version = $operatingSystem.os_version
         cpu_usage = $cpuUsage
@@ -1209,6 +1265,13 @@ function Start-ItCenterAgent {
     }
     else {
         Write-AgentLog -Message "MAC address collected: $($payload.mac_address)"
+    }
+
+    if ([string]::IsNullOrWhiteSpace($payload.serial_number)) {
+        Write-AgentLog -Message "Serial number not found." -Level "WARN"
+    }
+    else {
+        Write-AgentLog -Message "Serial number collected: $($payload.serial_number)"
     }
 
     Write-AgentLog -Message "CPU usage collected: $($payload.cpu_usage)%"

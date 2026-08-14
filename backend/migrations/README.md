@@ -10,6 +10,7 @@ Migrations SQL do PostgreSQL, aplicadas em ordem:
 005_machines_snipeit.sql  tabela machines ganha snipeit_asset_id (integração Snipe-IT — EPIC 19, ADR-028)
 006_remove_machines_snipeit.sql  remove snipeit_asset_id (integração revertida — ADR-033)
 007_machines_mac_address.sql     tabela machines ganha mac_address (coleta no check-in do agente)
+008_machines_serial_number.sql   tabela machines ganha serial_number (coleta no check-in do agente — EPIC 27)
 ```
 
 Em execução normal (Docker Compose ou `python apply_migrations.py`), todas as migrations são aplicadas automaticamente antes da API iniciar.

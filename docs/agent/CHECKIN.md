@@ -36,6 +36,7 @@ O agente deve:
 * Usuário logado
 * Endereço IP
 * MAC Address
+* Número de Série (service tag, quando disponível)
 * Sistema Operacional
 * Versão do Windows
 * CPU
@@ -139,6 +140,7 @@ hostname
 username
 ip_address
 mac_address
+serial_number
 operating_system
 os_version
 cpu_usage
@@ -159,6 +161,7 @@ Observações:
 
 * `hostname` é normalizado para maiúsculas (`ToUpperInvariant()`) antes do envio — relevante para comparar com a allowlist de hostnames em `docs/security/ASSET_POLICY.md`, que deve considerar o mesmo padrão.
 * `mac_address` é obtido da mesma interface de rede escolhida para `ip_address` (mesma logica de fallback em cascata: `Get-NetIPAddress`+`Get-NetAdapter` -> `Win32_NetworkAdapterConfiguration` -> resolucao DNS, sem MAC neste ultimo nivel). Normalizado para o formato `AA:BB:CC:DD:EE:FF`. Pode ser `null` se nenhuma interface valida for encontrada.
+* `serial_number` (EPIC 27) vem de `Get-CimInstance Win32_BIOS` (`SerialNumber`), com fallback para `Get-CimInstance Win32_ComputerSystemProduct` (`IdentifyingNumber`) quando o primeiro vier vazio ou for um placeholder conhecido (`System Serial Number`, `To Be Filled By O.E.M.`, `None`, `Not Specified`, `Default string`, `0`). Validado em 2026-08-14 contra hardware fisico real (Dell Inspiron 15 3530): os dois metodos retornaram o mesmo serial (`5M56TH4`). **Nao validado contra uma maquina virtual nesta sessao** (nenhuma VM disponivel para teste) — se o ambiente real apresentar um placeholder de VM fora da lista acima, o campo simplesmente fica `null` (nunca bloqueia o check-in); revisar a lista de placeholders assim que houver validacao real em VM. Pode ser `null` se a leitura falhar ou se ambos os metodos so retornarem placeholders.
 * `processes` já é usado ativamente pelo backend para detecção SOC de ferramentas dual-use/malware em execução (ex.: `LockBit.exe`, `anydesk.exe`), mas o agente PowerShell não coleta lista de processos em execução. Se omitido, o backend trata como lista vazia.
 * `installed_programs` agora é preenchido com o snapshot local dos programas instalados.
 * O bloco `security` usa coletas reais do EPIC 6 para Firewall, Defender, RDP, administradores locais, USB e falhas de login.

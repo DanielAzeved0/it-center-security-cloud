@@ -9,6 +9,7 @@ VALID_PAYLOAD = {
     "username": "daniel",
     "ip_address": "192.168.15.25",
     "mac_address": "AA:BB:CC:DD:EE:FF",
+    "serial_number": "5M56TH4",
     "operating_system": "Windows 11 Pro",
     "os_version": "23H2",
     "cpu_usage": 22.5,
@@ -72,6 +73,7 @@ def test_agent_checkin_persists_full_operational_snapshot(monkeypatch, auth_head
                 username,
                 host(ip_address) AS ip_address,
                 mac_address,
+                serial_number,
                 operating_system,
                 os_version,
                 status,
@@ -128,6 +130,7 @@ def test_agent_checkin_persists_full_operational_snapshot(monkeypatch, auth_head
         "username": "daniel",
         "ip_address": "192.168.15.25",
         "mac_address": "AA:BB:CC:DD:EE:FF",
+        "serial_number": "5M56TH4",
         "operating_system": "Windows 11 Pro",
         "os_version": "23H2",
         "status": "online",
@@ -166,6 +169,7 @@ def test_agent_checkin_persists_full_operational_snapshot(monkeypatch, auth_head
     assert machine_response.status_code == 200
     assert machine_response.json()["hostname"] == "PC-FINANCEIRO-01"
     assert machine_response.json()["mac_address"] == "AA:BB:CC:DD:EE:FF"
+    assert machine_response.json()["serial_number"] == "5M56TH4"
     assert metrics_response.status_code == 200
     assert metrics_response.json()[0]["uptime_seconds"] == 86400
     assert programs_response.status_code == 200

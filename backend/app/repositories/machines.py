@@ -19,28 +19,31 @@ def save_machine_checkin(payload: AgentCheckinRequest) -> MachineSummary:
                     username,
                     ip_address,
                     mac_address,
+                    serial_number,
                     operating_system,
                     os_version,
                     status,
                     last_seen
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, 'online', now())
+                VALUES (%s, %s, %s, %s, %s, %s, %s, 'online', now())
                 ON CONFLICT (hostname)
                 DO UPDATE SET
                     username = EXCLUDED.username,
                     ip_address = EXCLUDED.ip_address,
                     mac_address = EXCLUDED.mac_address,
+                    serial_number = EXCLUDED.serial_number,
                     operating_system = EXCLUDED.operating_system,
                     os_version = EXCLUDED.os_version,
                     status = 'online',
                     last_seen = now()
-                RETURNING id, hostname, username, host(ip_address) AS ip_address, mac_address, status, last_seen
+                RETURNING id, hostname, username, host(ip_address) AS ip_address, mac_address, serial_number, status, last_seen
                 """,
                 (
                     hostname,
                     payload.username,
                     payload.ip_address,
                     payload.mac_address,
+                    payload.serial_number,
                     payload.operating_system,
                     payload.os_version,
                 ),
@@ -118,6 +121,7 @@ def list_machines() -> list[MachineSummary]:
                 username,
                 host(ip_address) AS ip_address,
                 mac_address,
+                serial_number,
                 status,
                 last_seen,
                 rustdesk_id
@@ -141,6 +145,7 @@ def get_machine(machine_id: int) -> MachineDetail | None:
                 username,
                 host(ip_address) AS ip_address,
                 mac_address,
+                serial_number,
                 operating_system,
                 os_version,
                 status,
