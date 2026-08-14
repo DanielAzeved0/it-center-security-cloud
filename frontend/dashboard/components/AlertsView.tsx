@@ -1,13 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Shell } from "@/components/Shell";
+import { useAuth } from "@/components/AuthProvider";
 import { EmptyState, ErrorState, LoadingBlock, Panel, SeverityBadge, StatCard, StatusBadge, ToolbarButton } from "@/components/Ui";
 import { formatDateTime, requestBackend } from "@/lib/api";
 import { useStaggerEntrance } from "@/lib/motion";
-import type { AlertSummary, AuthUser } from "@/lib/types";
+import type { AlertSummary } from "@/lib/types";
 
 export function AlertsView() {
+  const { user: currentUser } = useAuth();
   const [alerts, setAlerts] = useState<AlertSummary[]>([]);
   const [severityFilter, setSeverityFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
@@ -15,19 +16,14 @@ export function AlertsView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [resolvingId, setResolvingId] = useState<number | null>(null);
-  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
 
   const loadAlerts = useCallback(async () => {
     setLoading(true);
     setError(null);
 
     try {
-      const [alertsPayload, userPayload] = await Promise.all([
-        requestBackend<AlertSummary[]>("/api/v1/alerts"),
-        requestBackend<{ user: AuthUser }>("/api/v1/auth/me"),
-      ]);
+      const alertsPayload = await requestBackend<AlertSummary[]>("/api/v1/alerts");
       setAlerts(alertsPayload);
-      setCurrentUser(userPayload.user);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro inesperado");
     } finally {
@@ -91,11 +87,17 @@ export function AlertsView() {
   const scopeRef = useStaggerEntrance([loading]);
 
   return (
-    <Shell
-      title="Alertas"
-      subtitle="Fila de alertas gerados pelas regras de seguranca."
-      actions={<ToolbarButton onClick={loadAlerts}>Atualizar</ToolbarButton>}
-    >
+    <>
+      <header className="page-header">
+        <div>
+          <h1>Alertas</h1>
+          <p>Fila de alertas gerados pelas regras de seguranca.</p>
+        </div>
+        <div className="header-actions">
+          <ToolbarButton onClick={loadAlerts}>Atualizar</ToolbarButton>
+        </div>
+      </header>
+
       {loading ? <LoadingBlock /> : null}
       {error ? <ErrorState message={error} onRetry={loadAlerts} /> : null}
 
@@ -183,7 +185,7 @@ export function AlertsView() {
           </Panel>
         </div>
       ) : null}
-    </Shell>
+    </>
   );
 }
 

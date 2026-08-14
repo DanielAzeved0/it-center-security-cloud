@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Shell } from "@/components/Shell";
 import { EmptyState, ErrorState, LoadingBlock, Panel, SeverityBadge, StatCard, ToolbarButton } from "@/components/Ui";
 import { formatDateTime, requestBackend } from "@/lib/api";
 import { useStaggerEntrance } from "@/lib/motion";
@@ -71,11 +70,17 @@ export function SecurityView() {
   const scopeRef = useStaggerEntrance([loading]);
 
   return (
-    <Shell
-      title="Seguranca"
-      subtitle="Eventos SOC Light recebidos ou gerados pelo sistema."
-      actions={<ToolbarButton onClick={loadEvents}>Atualizar</ToolbarButton>}
-    >
+    <>
+      <header className="page-header">
+        <div>
+          <h1>Seguranca</h1>
+          <p>Eventos SOC Light recebidos ou gerados pelo sistema.</p>
+        </div>
+        <div className="header-actions">
+          <ToolbarButton onClick={loadEvents}>Atualizar</ToolbarButton>
+        </div>
+      </header>
+
       {loading ? <LoadingBlock /> : null}
       {error ? <ErrorState message={error} onRetry={loadEvents} /> : null}
 
@@ -166,7 +171,7 @@ export function SecurityView() {
           </Panel>
         </div>
       ) : null}
-    </Shell>
+    </>
   );
 }
 

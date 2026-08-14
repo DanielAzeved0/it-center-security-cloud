@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Shell } from "@/components/Shell";
 import { EmptyState, ErrorState, LoadingBlock, Panel, SeverityBadge, StatCard, ToolbarButton } from "@/components/Ui";
 import { downloadBackendFile, formatDateTime, requestBackend } from "@/lib/api";
 import { useStaggerEntrance } from "@/lib/motion";
@@ -49,18 +48,20 @@ export function ExecutiveDashboardView() {
   const scopeRef = useStaggerEntrance([loading]);
 
   return (
-    <Shell
-      title="Dashboard Executivo"
-      subtitle="Visao resumida de maquinas, alertas por severidade e eventos recentes."
-      actions={
-        <>
+    <>
+      <header className="page-header">
+        <div>
+          <h1>Dashboard Executivo</h1>
+          <p>Visao resumida de maquinas, alertas por severidade e eventos recentes.</p>
+        </div>
+        <div className="header-actions">
           <ToolbarButton onClick={loadSummary}>Atualizar</ToolbarButton>
           <button className="primary-button" type="button" disabled={exporting || !summary} onClick={exportPdf}>
             {exporting ? "Gerando PDF" : "Exportar PDF"}
           </button>
-        </>
-      }
-    >
+        </div>
+      </header>
+
       {loading ? <LoadingBlock /> : null}
       {error ? <ErrorState message={error} onRetry={loadSummary} /> : null}
       {exportError ? <div className="form-error" role="alert">{exportError}</div> : null}
@@ -114,6 +115,6 @@ export function ExecutiveDashboardView() {
           </Panel>
         </div>
       ) : null}
-    </Shell>
+    </>
   );
 }

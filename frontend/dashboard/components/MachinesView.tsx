@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useGSAP } from "@gsap/react";
-import { Shell } from "@/components/Shell";
 import { EmptyState, ErrorState, LoadingBlock, Panel, StatCard, StatusBadge, ToolbarButton } from "@/components/Ui";
 import { formatDateTime, formatRelativeMinutes, formatUptime, requestBackend } from "@/lib/api";
 import { animateProgressValue, useStaggerEntrance } from "@/lib/motion";
@@ -75,11 +74,17 @@ export function MachinesView() {
   const scopeRef = useStaggerEntrance([loadingList, selectedId, loadingSelection]);
 
   return (
-    <Shell
-      title="Maquinas"
-      subtitle="Inventario, metricas recentes e programas instalados."
-      actions={<ToolbarButton onClick={loadMachines}>Atualizar</ToolbarButton>}
-    >
+    <>
+      <header className="page-header">
+        <div>
+          <h1>Maquinas</h1>
+          <p>Inventario, metricas recentes e programas instalados.</p>
+        </div>
+        <div className="header-actions">
+          <ToolbarButton onClick={loadMachines}>Atualizar</ToolbarButton>
+        </div>
+      </header>
+
       {loadingList ? <LoadingBlock /> : null}
       {error ? <ErrorState message={error} onRetry={loadMachines} /> : null}
 
@@ -207,7 +212,7 @@ export function MachinesView() {
           </div>
         </section>
       ) : null}
-    </Shell>
+    </>
   );
 }
 

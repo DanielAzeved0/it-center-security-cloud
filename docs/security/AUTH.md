@@ -219,7 +219,7 @@ Motivo original (risco corrigido):
 * Token em `localStorage` e acessivel a qualquer script executando na pagina; se um vetor de XSS surgisse no futuro, o token poderia ser lido e exfiltrado por JavaScript. Cookie `httpOnly` elimina esse vetor especifico.
 * O frontend nao usa `dangerouslySetInnerHTML`, `eval` ou HTML nao sanitizado em nenhum componente (confirmado por revisao completa em 2026-07-29), o que ja reduzia a chance de um XSS aparecer — mas o cookie `httpOnly` remove a dependencia dessa garantia.
 
-Gate complementar: `frontend/dashboard/middleware.ts` bloqueia o acesso as paginas protegidas quando o cookie `itcenter_session` esta ausente, redirecionando para `/login` no edge (checagem de presenca, nao de validade — a validade continua sendo checada em `/api/v1/auth/me` pelo componente `Shell`).
+Gate complementar: `frontend/dashboard/middleware.ts` bloqueia o acesso as paginas protegidas (incluindo `/executive`, desde a EPIC 26) quando o cookie `itcenter_session` esta ausente, redirecionando para `/login` no edge (checagem de presenca, nao de validade — a validade continua sendo checada em `/api/v1/auth/me`, agora via `AuthProvider` em `app/(authenticated)/layout.tsx`, buscado uma unica vez por sessao em vez de a cada pagina — ver EPIC 26 em `docs/development/TASKS.md`).
 
 ## Auditoria
 

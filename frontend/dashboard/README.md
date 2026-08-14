@@ -77,6 +77,10 @@ http://127.0.0.1:3000
 
 Em `/executive` e no detalhe de maquina (`/machines/[id]`), o botao "Exportar PDF" baixa um relatorio gerado pelo backend (`reportlab`) via `GET /api/v1/reports/executive.pdf` e `GET /api/v1/machines/{id}/report.pdf`.
 
+## Layout e autenticacao (EPIC 26)
+
+As 6 telas autenticadas vivem em `app/(authenticated)/` (route group — nao afeta a URL), com `app/(authenticated)/layout.tsx` montando `AuthProvider` (`components/AuthProvider.tsx`, busca `GET /api/v1/auth/me` uma unica vez por sessao e expõe `useAuth()`) e `AppShell` (`components/AppShell.tsx`, sidebar/nav persistente + chip do usuario/"Sair"). Isso existe para navegacao entre telas nao remontar a sidebar nem repetir o fetch de autenticacao a cada clique (antes, cada `*View.tsx` chamava seu proprio `<Shell>`, que desmontava e refazia o auth-check em toda troca de rota). Cada `*View.tsx` renderiza seu proprio `<header className="page-header">` (titulo/subtitulo/acoes) e le `currentUser`/`role` via `useAuth()` em vez de buscar `/auth/me` de novo.
+
 ## Animacoes (GSAP)
 
 `gsap` e `@gsap/react` (hook `useGSAP`) sao usados para polimento visual (entrada de cards/listas, contadores animados, preenchimento das barras de metrica) em todas as telas. Toda animacao respeita `prefers-reduced-motion` via `gsap.matchMedia()` — ver `lib/motion.ts` (hook `useStaggerEntrance` e helpers `animateCountUp`/`animateProgressValue`, reaproveitados pelos componentes de tela). Instrucoes de uso corretas da API ficam na skill `.agents/skills/gsap-*` (ver `docs/development/AI_WORKFLOW.md`).

@@ -3,11 +3,11 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useGSAP } from "@gsap/react";
-import { Shell } from "@/components/Shell";
+import { useAuth } from "@/components/AuthProvider";
 import { EmptyState, ErrorState, LoadingBlock, Panel, SeverityBadge, StatusBadge, ToolbarButton } from "@/components/Ui";
 import { downloadBackendFile, formatDateTime, formatRelativeMinutes, formatUptime, requestBackend } from "@/lib/api";
 import { animateProgressValue, useStaggerEntrance } from "@/lib/motion";
-import type { AlertSummary, AuthUser, MachineDetail, MachineLocalAdmin, MachineMetric, MachineProgram, SecurityEvent } from "@/lib/types";
+import type { AlertSummary, MachineDetail, MachineLocalAdmin, MachineMetric, MachineProgram, SecurityEvent } from "@/lib/types";
 
 type SectionState<T> = {
   data: T;
@@ -49,6 +49,7 @@ export function MachineDetailView({ machineId }: { machineId: string }) {
   const parsedMachineId = Number(machineId);
   const validMachineId = Number.isInteger(parsedMachineId) && parsedMachineId > 0;
 
+  const { user: currentUser } = useAuth();
   const [detail, setDetail] = useState<MachineDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(true);
   const [detailError, setDetailError] = useState<string | null>(null);
@@ -57,7 +58,6 @@ export function MachineDetailView({ machineId }: { machineId: string }) {
   const [admins, setAdmins] = useState<SectionState<MachineLocalAdmin[]>>(emptyAdminsState);
   const [events, setEvents] = useState<SectionState<SecurityEvent[]>>(emptyEventsState);
   const [alerts, setAlerts] = useState<SectionState<AlertSummary[]>>(emptyAlertsState);
-  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [rustdeskInput, setRustdeskInput] = useState("");
   const [rustdeskSaving, setRustdeskSaving] = useState(false);
   const [rustdeskError, setRustdeskError] = useState<string | null>(null);
@@ -76,12 +76,8 @@ export function MachineDetailView({ machineId }: { machineId: string }) {
     setDetailError(null);
 
     try {
-      const [machineDetail, userPayload] = await Promise.all([
-        requestBackend<MachineDetail>(`/api/v1/machines/${parsedMachineId}`),
-        requestBackend<{ user: AuthUser }>("/api/v1/auth/me"),
-      ]);
+      const machineDetail = await requestBackend<MachineDetail>(`/api/v1/machines/${parsedMachineId}`);
       setDetail(machineDetail);
-      setCurrentUser(userPayload.user);
     } catch (err) {
       setDetail(null);
       setDetailError(err instanceof Error ? err.message : "Erro inesperado");
@@ -248,11 +244,13 @@ export function MachineDetailView({ machineId }: { machineId: string }) {
   const scopeRef = useStaggerEntrance([detailLoading]);
 
   return (
-    <Shell
-      title={detail?.hostname ?? "Detalhe da maquina"}
-      subtitle="Resumo operacional, metricas, administradores locais, eventos e alertas da maquina."
-      actions={
-        <>
+    <>
+      <header className="page-header">
+        <div>
+          <h1>{detail?.hostname ?? "Detalhe da maquina"}</h1>
+          <p>Resumo operacional, metricas, administradores locais, eventos e alertas da maquina.</p>
+        </div>
+        <div className="header-actions">
           <Link className="secondary-button" href="/machines">
             Voltar
           </Link>
@@ -260,9 +258,9 @@ export function MachineDetailView({ machineId }: { machineId: string }) {
           <button className="primary-button" type="button" disabled={exportingReport || !detail} onClick={exportReport}>
             {exportingReport ? "Gerando PDF" : "Exportar PDF"}
           </button>
-        </>
-      }
-    >
+        </div>
+      </header>
+
       {detailLoading ? <LoadingBlock label="Carregando maquina" /> : null}
       {detailError ? <ErrorState message={detailError} onRetry={loadDetail} /> : null}
       {reportError ? <div className="form-error" role="alert">{reportError}</div> : null}
@@ -525,7 +523,7 @@ export function MachineDetailView({ machineId }: { machineId: string }) {
           </Panel>
         </section>
       ) : null}
-    </Shell>
+    </>
   );
 }
 

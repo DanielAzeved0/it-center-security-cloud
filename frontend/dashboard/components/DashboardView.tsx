@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Shell } from "@/components/Shell";
 import { EmptyState, ErrorState, LoadingBlock, Panel, SeverityBadge, StatCard, StatusBadge, ToolbarButton } from "@/components/Ui";
 import { formatDateTime, formatRelativeMinutes, requestBackend } from "@/lib/api";
 import { useStaggerEntrance } from "@/lib/motion";
@@ -54,11 +53,17 @@ export function DashboardView() {
   const scopeRef = useStaggerEntrance([loading]);
 
   return (
-    <Shell
-      title="Dashboard"
-      subtitle="Visao operacional das maquinas, alertas e eventos recentes."
-      actions={<ToolbarButton onClick={loadData}>Atualizar</ToolbarButton>}
-    >
+    <>
+      <header className="page-header">
+        <div>
+          <h1>Dashboard</h1>
+          <p>Visao operacional das maquinas, alertas e eventos recentes.</p>
+        </div>
+        <div className="header-actions">
+          <ToolbarButton onClick={loadData}>Atualizar</ToolbarButton>
+        </div>
+      </header>
+
       {loading ? <LoadingBlock /> : null}
       {error ? <ErrorState message={error} onRetry={loadData} /> : null}
 
@@ -153,6 +158,6 @@ export function DashboardView() {
           </Panel>
         </div>
       ) : null}
-    </Shell>
+    </>
   );
 }

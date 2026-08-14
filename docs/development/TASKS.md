@@ -1058,3 +1058,31 @@ Harmonizar o visual das 7 telas do dashboard (design system consistente entre si
 [x] Nenhuma mudanca em `lib/motion.ts`: `Panel` renderiza a mesma classe `.panel` ja coberta por `ENTRANCE_SELECTOR`, entao a infraestrutura GSAP da EPIC 24 continua funcionando sem ajuste
 
 Validacao em 2026-08-12: `npm run build` limpo (TypeScript OK, Turbopack), as 8 rotas compiladas sem erro novo. **Nao verificado visualmente em navegador real** — sem ferramenta de automacao de browser conectada nesta sessao (usuario optou por nao instalar a extensao); recomendado `npm run dev` + revisao visual manual (luz/escuro, e com cada papel admin/analyst/viewer) antes de considerar isso validado de ponta a ponta em producao. EPIC 25 encerrada.
+
+# EPIC 26 - Layout Persistente de Autenticacao (Velocidade de Navegacao)
+
+Objetivo:
+
+Reduzir o tempo de carregamento percebido ao navegar entre as telas do dashboard, sem mudar nenhuma logica de dados/API/RBAC — so reestruturacao de frontend. Causa raiz identificada: `Shell.tsx` nao vivia em um layout compartilhado do Next.js App Router, entao a cada navegacao (`/`, `/machines`, `/alerts`, `/security`, `/executive`, `/machines/[id]`) o React desmontava e remontava a sidebar inteira, refazendo do zero o fetch `GET /api/v1/auth/me` e mostrando de novo "Validando sessao..." mesmo a identidade do usuario nao tendo mudado. `AlertsView` e `MachineDetailView` ainda faziam esse mesmo fetch **uma segunda vez** cada, so para saber a `role` do usuario.
+
+### Tarefas
+
+[x] Criar `components/AuthProvider.tsx`: Context que busca `/api/v1/auth/me` uma unica vez por sessao (nao mais a cada navegacao), expõe `useAuth()` com `{ user, loading, logout }` — sem biblioteca nova, e a propria API do React
+
+[x] Transformar `components/Shell.tsx` em `components/AppShell.tsx`: passa a ser so a sidebar/chrome persistente (nav, marca, e agora tambem o chip do usuario + botao "Sair", movidos para o rodape da sidebar); deixa de receber `title`/`subtitle`/`actions` como prop
+
+[x] Mover as 6 paginas autenticadas para o route group `app/(authenticated)/` (mesma URL final: `/`, `/machines`, `/machines/[id]`, `/alerts`, `/security`, `/executive`) com `app/(authenticated)/layout.tsx` novo montando `<AuthProvider><AppShell>{children}</AppShell></AuthProvider>` uma unica vez
+
+[x] Atualizar `DashboardView`, `ExecutiveDashboardView`, `MachinesView`, `AlertsView`, `SecurityView` e `MachineDetailView`: removido o wrapper `<Shell>`, cada um agora renderiza o proprio `<header className="page-header">` (mesmo titulo/subtitulo/acoes de antes)
+
+[x] Remover o fetch duplicado de `/api/v1/auth/me` em `AlertsView` e `MachineDetailView` — passam a usar `useAuth().user?.role` em vez de buscar de novo
+
+[x] `app/globals.css`: novas classes `.sidebar-footer`/`.sidebar-user-chip`/`.sidebar-logout` (sidebar virou `display: flex; flex-direction: column`) para o chip/botao ficarem legiveis no fundo escuro da sidebar
+
+[x] Bonus de baixo risco no mesmo arquivo: `middleware.ts` ganhou `/executive` no `matcher` — era a unica rota autenticada sem a protecao server-side de cookie (achado à parte, nao relacionado a velocidade)
+
+[x] Animacao de entrada do conteudo (GSAP, EPIC 24/25) preservada: continua em `AppShell`, disparada por `usePathname()`, mesmo o componente nao remontando mais a cada navegacao
+
+Fora de escopo (registrado para o futuro, nao e bug): `MachineDetailView` ainda busca a lista inteira de `/api/v1/alerts` e `/api/v1/security-events` e filtra por `machine_id` no cliente — corrigir direito exige um parametro de filtro novo no backend (mudanca de contrato de API, fora do escopo de uma revisao de frontend); `cache: "no-store"` em `lib/api.ts` mantido sem alteracao (decisao consciente de sempre buscar dado fresco num dashboard de seguranca).
+
+Validacao em 2026-08-12: `npm run build` limpo (TypeScript OK, Turbopack) apos limpar `.next/` (cache antigo apontava para o caminho de rota anterior), as mesmas 8 rotas de antes compiladas sem erro (o route group nao muda nenhuma URL). **Nao verificado visualmente em navegador real** — mesma limitacao das EPICs 24/25 (sem ferramenta de automacao de browser conectada nesta sessao); recomendado `npm run dev` + abrir a aba Rede do navegador para confirmar que `GET /api/v1/auth/me` dispara so uma vez por sessao (nao mais a cada clique de navegacao) antes de considerar isso validado de ponta a ponta em producao. EPIC 26 encerrada.
