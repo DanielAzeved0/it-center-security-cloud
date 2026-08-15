@@ -42,6 +42,8 @@ infra/terraform/**/*.tfstate
 infra/terraform/**/*.tfstate.*
 infra/terraform/**/terraform.tfvars
 infra/terraform/**/*.auto.tfvars
+infra/terraform/**/backend.hcl
+!infra/terraform/**/backend.hcl.example
 infra/terraform/**/crash.log
 infra/terraform/**/override.tf
 infra/terraform/**/override.tf.json

@@ -104,11 +104,34 @@ Fase inicial: local (terraform.tfstate, gitignored)
 Fase alvo:    backend remoto S3-compativel apontando para um bucket OCI Object Storage
 ```
 
-O bucket de state e criado manualmente uma unica vez fora do Terraform (problema do ovo e da galinha). Migracao com:
+O bucket de state e criado manualmente uma unica vez fora do Terraform (problema do ovo e da galinha). Runbook completo de migracao:
 
-```bash
-terraform init -migrate-state
-```
+1. Criar o bucket manualmente (uma unica vez, fora do Terraform), com versionamento habilitado:
+   ```bash
+   oci os bucket create --compartment-id <compartment-ocid> --name itcenter-terraform-state --versioning Enabled
+   ```
+2. Descobrir o namespace do tenancy (usado no endpoint S3-compativel):
+   ```bash
+   oci os ns get
+   ```
+3. Gerar uma Customer Secret Key (par access key/secret key, formato S3) para o usuario `terraform-provisioner` no Console OCI: Identity & Security > Domains > Users > `terraform-provisioner` > Customer Secret Keys > Generate Secret Key. O secret so e mostrado uma vez — guardar fora do repositorio.
+4. Copiar `backend.hcl.example` para `backend.hcl` (gitignored) dentro de `infra/terraform/environments/production/` e preencher `bucket`, `region` e o `endpoints.s3` com o namespace real descoberto no passo 2.
+5. Exportar as credenciais da Customer Secret Key como variaveis de ambiente (nunca dentro de `backend.hcl`):
+   ```bash
+   export AWS_ACCESS_KEY_ID="<access key>"
+   export AWS_SECRET_ACCESS_KEY="<secret key>"
+   ```
+6. Migrar o state local para o bucket:
+   ```bash
+   cd infra/terraform/environments/production
+   terraform init -migrate-state -backend-config=backend.hcl
+   ```
+7. Confirmar que o state remoto reflete exatamente o state local anterior:
+   ```bash
+   terraform plan
+   ```
+   Deve retornar `No changes.` — qualquer diff aqui indica migracao incompleta, nao um problema de infraestrutura real.
+8. So depois de confirmado o `plan` limpo, mover o `terraform.tfstate` local antigo para fora do diretorio do projeto (backup manual), nunca apagar sem essa confirmacao.
 
 ## Comandos usuais
 

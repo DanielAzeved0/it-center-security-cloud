@@ -1,0 +1,30 @@
+# Copiar para backend.hcl (nunca versionado, ver .gitignore) e preencher com
+# os valores reais do bucket de state em OCI Object Storage.
+#
+# Access key / secret key do backend NAO vao neste arquivo: exportar como
+# variaveis de ambiente antes do "terraform init -migrate-state" (o backend
+# "s3" do Terraform le AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY):
+#
+#   export AWS_ACCESS_KEY_ID="<customer secret key access key do terraform-provisioner>"
+#   export AWS_SECRET_ACCESS_KEY="<customer secret key secret do terraform-provisioner>"
+#
+# Ver infra/terraform/README.md, secao "State", para o runbook completo
+# (criacao do bucket, geracao da Customer Secret Key, migracao do state).
+
+bucket = "itcenter-terraform-state"
+key    = "production/terraform.tfstate"
+region = "sa-saopaulo-1"
+
+# Endpoint S3-compativel do OCI Object Storage: substituir <namespace> pelo
+# namespace real do tenancy (descoberto via "oci os ns get").
+endpoints = {
+  s3 = "https://<namespace>.compat.objectstorage.sa-saopaulo-1.oraclecloud.com"
+}
+
+# OCI nao e AWS: desativar validacoes/recursos especificos da AWS que o
+# Object Storage S3-compativel nao suporta.
+skip_region_validation      = true
+skip_credentials_validation = true
+skip_requesting_account_id  = true
+skip_s3_checksum             = true
+use_path_style               = true

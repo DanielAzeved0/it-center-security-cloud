@@ -94,9 +94,9 @@ Regra: apos importar cada recurso, `terraform plan` precisa mostrar zero diferen
 
 ## Bootstrap e cloud-init
 
-`docs/deployment/BOOTSTRAP.md` continua a fonte de verdade da preparacao do host (`01-system.sh` a `05-firewall.sh` e `bootstrap.sh`). O `user_data` da instancia **ja viva** nao e alterado durante a introducao do Terraform, pois isso quebraria o `plan` zero-diff e cloud-init nao reexecuta em instancia ja iniciada.
+`docs/deployment/BOOTSTRAP.md` continua a fonte de verdade da preparacao do host. Os scripts `infra/bootstrap/{01-system,02-packages,03-directories,04-docker,05-firewall,bootstrap}.sh` estao implementados conforme essa especificacao. O `user_data` da instancia **ja viva** nao e alterado durante a introducao do Terraform, pois isso quebraria o `plan` zero-diff e cloud-init nao reexecuta em instancia ja iniciada.
 
-O modulo `compute` expoe uma variavel opcional para ativar o bootstrap via `user_data`, desligada por padrao, reservada para uma futura VM nova ou cenario de recuperacao de desastre.
+O modulo `compute` expoe a variavel opcional `enable_bootstrap_user_data` (desligada por padrao, `bootstrap_user_data_base64` como conteudo) para ativar o bootstrap via `user_data`, reservada para uma futura VM nova ou cenario de recuperacao de desastre — nunca ativada em `environments/production` enquanto a instancia atual permanecer viva.
 
 ## State
 
@@ -105,7 +105,7 @@ Fase inicial: local (reduz variaveis durante o import)
 Fase alvo:    remoto, backend S3-compativel apontando para OCI Object Storage
 ```
 
-O bucket de Object Storage e criado manualmente uma unica vez (Terraform nao pode gerenciar o bucket que guarda o proprio state). Versionamento do bucket habilitado como rede de seguranca adicional para o state.
+O bucket de Object Storage e criado manualmente uma unica vez (Terraform nao pode gerenciar o bucket que guarda o proprio state). Versionamento do bucket habilitado como rede de seguranca adicional para o state. Configuracao do backend preparada como partial configuration (`backend "s3" {}` em `versions.tf` + `backend.hcl.example`, sem valores reais nem chaves versionados) — runbook completo de criacao do bucket, Customer Secret Key e `terraform init -migrate-state` em `infra/terraform/README.md`, secao "State".
 
 ## Secrets
 

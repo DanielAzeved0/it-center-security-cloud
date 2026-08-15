@@ -680,11 +680,38 @@ Provisionar e versionar a camada de infraestrutura Oracle Cloud (VCN, subnets, s
 
 [ ] Criar bucket OCI Object Storage para state remoto
 
+    Pendente de acao manual do mantenedor (fora do escopo do Terraform,
+    ver docs/architecture/IAC.md e infra/terraform/README.md, secao
+    "State"): requer credenciais OCI reais, indisponiveis no ambiente
+    de edicao deste repositorio. Runbook completo (comando oci CLI,
+    versionamento habilitado) ja documentado em 2026-08-15.
+
 [ ] Migrar state para backend remoto (terraform init -migrate-state)
 
-[ ] Implementar infra/bootstrap/{01-system,02-packages,03-directories,04-docker,05-firewall,bootstrap}.sh conforme docs/deployment/BOOTSTRAP.md
+    Preparado em 2026-08-15: backend "s3" {} (partial configuration) em
+    infra/terraform/environments/production/versions.tf, template
+    backend.hcl.example criado, .gitignore atualizado (backend.hcl real
+    nunca versionado). Falta rodar terraform init -migrate-state contra
+    o state real de producao apos o bucket existir (item anterior) -
+    mesma limitacao de credenciais, ver runbook em
+    infra/terraform/README.md, secao "State".
 
-[ ] Documentar variavel opcional de cloud-init/bootstrap no module compute (sem ativar em producao)
+[x] Implementar infra/bootstrap/{01-system,02-packages,03-directories,04-docker,05-firewall,bootstrap}.sh conforme docs/deployment/BOOTSTRAP.md
+
+    Implementado em 2026-08-15: 6 scripts POSIX sh (`set -eu`, validam
+    root/Ubuntu, falham cedo), sintaxe verificada com `sh -n`. Nao
+    executados contra a VM real (ver ressalva na proxia EPIC 15 abaixo)
+    - o bootstrap so tem efeito numa VM nova ou recuperacao de desastre,
+    nunca na instancia ja viva.
+
+[x] Documentar variavel opcional de cloud-init/bootstrap no module compute (sem ativar em producao)
+
+    A variavel `enable_bootstrap_user_data` (default false) e
+    `bootstrap_user_data_base64` ja existiam em
+    infra/terraform/modules/compute/variables.tf com descricao clara;
+    docs/architecture/IAC.md atualizado em 2026-08-15 cross-referenciando
+    os scripts de infra/bootstrap/ agora implementados. Environments/
+    production/main.tf continua com enable_bootstrap_user_data = false.
 
 ---
 
