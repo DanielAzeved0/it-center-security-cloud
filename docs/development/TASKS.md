@@ -1222,3 +1222,381 @@ enviado via HTTP para uma instancia local do backend, persistido em
 depois removido (registro de smoke test, nao uma maquina real do
 inventario). **EPIC 27 nao encerrada**: falta a validacao contra VM
 (ver ressalva na tarefa acima) antes de fechar definitivamente.
+
+---
+
+# EPIC 28 - Correcao de Achados de Seguranca (Auditoria Tecnica 2026-08-15)
+
+Objetivo:
+
+Corrigir os achados de seguranca de uma auditoria tecnica completa do app (2026-08-15), cobrindo backend, frontend e agente Windows, com verificacao adversarial 1:1 por achado (cada um confirmado contra o codigo real, nao especulativo). O achado mais grave (personificacao de maquina) vai alem de qualquer risco ja documentado em docs/security/AUTH.md ou SECURITY.md.
+
+### Tarefas
+
+[ ] Vincular a identidade da maquina a algo alem do hostname autorreportado (`backend/app/repositories/machines.py:10`, severidade alta)
+
+    O check-in identifica a maquina so pelo hostname; todos os agentes
+    compartilham a mesma AGENT_API_KEY, sem vinculo servidor-side entre
+    a chave usada e uma maquina especifica. Quem extrai a chave de UMA
+    maquina comprometida (config.json em texto puro, ADR-025) pode
+    forjar check-ins em nome de QUALQUER outra maquina ja cadastrada,
+    sobrescrevendo IP/MAC/serial/status reais, apagando o inventario
+    real de installed_programs, e rodando a deteccao SOC so sobre dados
+    forjados sem abrir alerta. Direcao: segredo por maquina emitido no
+    primeiro registro, ou machine_id assinado que o servidor valida
+    contra o hostname ja conhecido antes de aceitar sobrescrita.
+
+[ ] Corrigir bypass de path traversal via `%2f` no proxy do dashboard (`frontend/dashboard/app/api/backend/[...path]/route.ts:63`, severidade alta)
+
+    Confirmado ao vivo (build + request real): a checagem de allowlist
+    roda sobre o path ainda codificado, mas a URL efetiva e montada
+    depois com `new URL(...)`, que normaliza `..` nesse momento. Um
+    path como `api/v1/machines%2f..%2f..%2f..%2fdocs` passa na
+    allowlist e resolve para `/docs` no backend (sem `docs_url=None`,
+    sem auth) - expondo o schema completo da API interna sem login.
+    Direcao: rejeitar qualquer segmento com `%2f`/`..` antes de validar
+    contra a allowlist, e desligar `/docs`/`/redoc`/`/openapi.json` em
+    producao como segunda camada.
+
+[ ] Equalizar tempo de resposta do login para evitar enumeracao de e-mail (`backend/app/routes/auth.py:27`, severidade media)
+
+    O curto-circuito do `or` (`user is None or status != 'active' or
+    not verify_password(...)`) so roda o PBKDF2 de 210.000 iteracoes
+    quando o usuario existe e esta ativo - a diferenca de latencia
+    distingue conta real de inexistente apesar da mensagem de erro
+    generica. Direcao: sempre rodar verify_password contra um hash
+    dummy quando o usuario nao existir/estiver inativo.
+
+[ ] Ler `X-Real-IP` em vez do primeiro valor de `X-Forwarded-For` em `audit_logs` (`backend/app/services/auth.py:169`, severidade media)
+
+    O Nginx usa `$proxy_add_x_forwarded_for`, que ANEXA o IP real ao
+    valor ja enviado pelo cliente em vez de sobrescreve-lo; `request_ip()`
+    le o primeiro valor da lista, entao um `X-Forwarded-For` forjado pelo
+    cliente sobrevive intacto e fica gravado em auth.login/login_failed,
+    alert.resolve e machine.rustdesk_update. Direcao: usar `X-Real-IP`
+    (ja definido pelo Nginx como `$remote_addr`, nao anexavel pelo
+    cliente).
+
+[ ] Remover `'unsafe-inline'` de `script-src` na CSP do dashboard (`frontend/dashboard/next.config.mjs:3`, severidade media)
+
+    O cookie httpOnly protege o token contra leitura via JS, mas
+    `lib/api.ts` faz fetch same-origin sem credentials explicito - o
+    cookie de sessao e anexado automaticamente. Se surgir qualquer
+    ponto de injecao de script no futuro, `unsafe-inline` deixa esse
+    script rodar e chamar os mesmos endpoints autenticados como o
+    usuario logado (session riding), sem precisar ler o cookie -
+    contrariando a proposta da CSP. Direcao: migrar para nonces/hashes
+    por script, ou confirmar que nenhum script inline e necessario e
+    remover unsafe-inline.
+
+[ ] Restringir ACL de `logs\` e `cache\` do agente, nao so `config.json` (`agent-windows/install-agent.ps1:229`, severidade media)
+
+    O hardening da EPIC 16 protegeu so o config.json (agent_api_key);
+    logs\ e cache\ herdam a ACL padrao de Program Files (Users: Read &
+    Execute). Qualquer usuario local nao-administrador consegue ler
+    local_admins, status de firewall/Defender/RDP e o inventario
+    completo de software - reconhecimento direto para escalacao de
+    privilegio. Direcao: aplicar a mesma logica de Protect-AgentConfigFile
+    (SYSTEM/Administrators only) em logs\ e cache\.
+
+[ ] Adicionar bloco `permissions:` restrito em `ci.yml` (`.github/workflows/ci.yml:1`, severidade baixa)
+
+    Diferente de deploy-production.yml (ja restrito a `contents: read`),
+    ci.yml nao declara escopo e roda `npm ci`/`pip install` sobre
+    pull_request com o privilegio padrao do GITHUB_TOKEN. Direcao:
+    adicionar `permissions: contents: read` no topo do workflow.
+
+---
+
+# EPIC 29 - Correcao de Confiabilidade Operacional (Auditoria Tecnica 2026-08-15)
+
+Objetivo:
+
+Corrigir os dois achados mais graves da auditoria tecnica de 2026-08-15: backup e restore podem reportar sucesso mesmo tendo falhado, o que so seria descoberto durante um incidente real. Complementado por um gate de seguranca que existe mas nunca roda automaticamente.
+
+### Tarefas
+
+[ ] Corrigir falha silenciosa em `backup.sh` (`infra/scripts/backup.sh:29`, severidade alta)
+
+    O script roda em sh puro (set -eu, sem pipefail); o pipe
+    `pg_dump | gzip > arquivo` so propaga o exit code do gzip, que
+    sempre sucede mesmo com entrada vazia. Se o Postgres cair, a senha
+    for rotacionada sem atualizar o container, ou o disco encher no
+    meio do dump, o script ainda gera um .sql.gz "valido" (so o
+    cabecalho), roda a retencao de 7 dias apagando backups reais
+    antigos, e imprime "Backup criado" - ops-check.sh so confere a
+    IDADE do arquivo, nunca o conteudo. Direcao: checar o exit code do
+    pg_dump isoladamente (PIPESTATUS em bash, ou arquivo intermediario
+    antes do gzip) e validar tamanho/integridade antes de reportar
+    sucesso ou aplicar retencao.
+
+[ ] Corrigir falha silenciosa em `restore.sh` (`infra/scripts/restore.sh:42`, severidade alta)
+
+    Mesmo problema de pipefail do backup.sh, mais agravante: a linha
+    anterior ja rodou `DROP SCHEMA public CASCADE` (destrutivo,
+    incondicional) antes do restore em si. Sem `-v ON_ERROR_STOP=1` no
+    psql, erros de SQL sao ignorados por padrao; um backup truncado
+    restaura parcialmente e o script ainda imprime "Restore concluido" -
+    o operador, seguindo o proprio runbook de incidente, acredita que
+    os dados voltaram quando na verdade foram apagados e nao totalmente
+    recuperados. Direcao: adicionar `-v ON_ERROR_STOP=1` ao psql,
+    capturar o exit code de cada lado do pipe, e rodar uma query de
+    verificacao pos-restore (contagem de tabelas/linhas) antes de
+    declarar sucesso.
+
+[ ] Automatizar o gate de CVE do Docker Scout no deploy (`.github/workflows/deploy-production.yml:74`, severidade media)
+
+    docker-scout-gate.sh e chamado de "obrigatorio antes de publicar
+    uma imagem" em SECURITY.md, mas nem ci.yml nem
+    deploy-production.yml o invocam - a unica aplicacao real e um
+    humano lembrar de rodar manualmente na rotina semanal. Direcao:
+    chamar docker-scout-gate.sh dentro de deploy.sh (ou como step do
+    workflow) antes do `up -d`, tornando o gate real em vez de so
+    documentado.
+
+---
+
+# EPIC 30 - Correcao de Integridade de Dados do Backend (Auditoria Tecnica 2026-08-15)
+
+Objetivo:
+
+Corrigir achados de corretude/integridade de dados encontrados na auditoria tecnica de 2026-08-15: uma race condition que duplica alertas, um mismatch de constraint que pode derrubar o check-in inteiro, e consultas sem filtro/paginacao que crescem sem parar.
+
+### Tarefas
+
+[ ] Prevenir alertas abertos duplicados sob retry do agente (`backend/app/repositories/alerts.py:13`, severidade alta)
+
+    create_open_alert_once faz SELECT-entao-INSERT sem constraint UNIQUE
+    que sustente a garantia de "um alerta aberto por tipo" - so
+    isolamento a nivel de aplicacao sob READ COMMITTED. Um check-in com
+    muitos installed_programs pode passar dos 30s de proxy_read_timeout
+    do Nginx; o agente classifica qualquer 5xx como "temporary" e
+    reenvia o mesmo check-in - se a primeira requisicao ainda nao tiver
+    commitado, a segunda cria um alerta duplicado identico. Direcao:
+    indice parcial UNIQUE em (machine_id, alert_type) WHERE status IN
+    ('open','investigating'), ou SELECT ... FOR UPDATE na mesma
+    transacao.
+
+[ ] Alinhar constraint de `installed_programs` com a chave de dedup real do agente (`backend/app/repositories/machines.py:79`, severidade alta)
+
+    A constraint no banco e UNIQUE (machine_id, name, version) - sem
+    publisher. O agente deduplica com uma chave que INCLUI publisher
+    entre o registro nativo e o espelho WOW6432Node; duas entradas com
+    mesmo nome/versao mas publisher diferente sobrevivem ao dedup do
+    agente e quebram o executemany sem ON CONFLICT, derrubando a
+    transacao inteira do check-in (maquina, metrica, tudo). Como o
+    software instalado raramente muda, a mesma maquina falha em todo
+    check-in seguinte ate ser marcada offline, apesar de estar
+    alcancando a API normalmente. Direcao: adicionar publisher a
+    constraint UNIQUE do banco, ou usar ON CONFLICT ... DO UPDATE em
+    vez de INSERT puro.
+
+[ ] Filtrar por `machine_id` no SQL do relatorio PDF de maquina (`backend/app/routes/reports.py:56`, severidade media)
+
+    get_machine_report chama list_alerts()/list_security_events() sem
+    WHERE nem LIMIT e so filtra pelo machine_id pedido depois, em
+    Python - carregando o historico inteiro do parque monitorado so
+    para gerar o PDF de uma unica maquina. Direcao: adicionar
+    list_alerts(machine_id=...)/list_security_events(machine_id=...)
+    com WHERE machine_id = %s real no SQL.
+
+[ ] Adicionar paginacao a `/alerts`, `/security-events` e `/machines/{id}/metrics` (`backend/app/repositories/alerts.py:55`, severidade media)
+
+    As tres listagens rodam ORDER BY created_at DESC sem LIMIT/OFFSET,
+    e nenhuma rota aceita parametro de paginacao. metrics ganha uma
+    linha nova por maquina a cada check-in (~288/dia) sem rotina de
+    purge; apos meses de producao continua essas listas devolvem
+    dezenas de milhares de linhas a cada carregamento do dashboard, na
+    VM de 1GB ja apertada. Direcao: LIMIT/OFFSET (ou cursor) nas tres
+    rotas, com teto default razoavel.
+
+[ ] Adicionar indice para a query de existencia de alerta (`backend/app/repositories/alerts.py:18`, severidade media)
+
+    Todo check-in que casa uma condicao persistente roda WHERE
+    machine_id=%s AND alert_type=%s AND status IN (...), mas so existe
+    indice em machine_id isolado - nenhum cobre alert_type. Para uma
+    condicao cronica essa query roda a cada ciclo pra sempre, filtrando
+    um volume de linhas que so cresce (alertas nao sao purgados no
+    MVP). Direcao: indice composto (ou parcial, so status aberto) em
+    alerts(machine_id, alert_type, status).
+
+[ ] Tornar a identidade de admin local case-insensitive de ponta a ponta (`backend/app/repositories/local_admins.py:24`, severidade media)
+
+    machine_local_admins tem UNIQUE (machine_id, admin_name)
+    case-sensitive, mas sync_machine_local_admins decide "e novo?"
+    comparando em minusculas. Se o mesmo admin aparecer com
+    capitalizacao diferente entre check-ins, a checagem suprime
+    (corretamente, pela sua propria logica) o alerta de admin novo, mas
+    o ON CONFLICT nao bate com a linha existente e insere uma segunda
+    linha para a mesma conta logica - o mesmo problema que users ja
+    resolveu com indice lower(email), nao aplicado aqui. Direcao: mesmo
+    padrao de users, indice unico sobre lower(admin_name).
+
+[ ] Deduplicar deteccao de VPN/torrent dentro do mesmo check-in (`backend/app/services/agent.py:287`, severidade baixa)
+
+    Os loops de UNAUTHORIZED_VPN_TOOLS e TORRENT_TOOLS, diferente dos
+    loops irmaos de ferramentas remotas/malware/dual-use, nao usam o
+    seen_detections que evita duplicidade no mesmo check-in - duas
+    entradas de Add/Remove Programs que casam com a mesma ferramenta
+    geram dois security_events redundantes de severidade alta no mesmo
+    ciclo. Direcao: reaproveitar o mesmo seen_detections nesses dois
+    loops.
+
+[ ] Validar formato de `ip_address` no schema do check-in (`backend/app/schemas/agent.py:24`, severidade baixa)
+
+    O campo so valida comprimento (max 45 chars), nao formato; a coluna
+    e INET no Postgres. Um valor invalido quebra o INSERT com
+    InvalidTextRepresentation - sem exception handler global, isso sobe
+    como 500 generico em vez do 422 de validacao esperado. Direcao:
+    validar formato IPv4/IPv6 no schema Pydantic antes do INSERT.
+
+---
+
+# EPIC 31 - Correcao de Resiliencia do Agente Windows (Auditoria Tecnica 2026-08-15)
+
+Objetivo:
+
+Corrigir gaps de resiliencia do agente Windows encontrados na auditoria tecnica de 2026-08-15, mantendo a mesma filosofia de robustez ja aplicada no hardening da EPIC 16: falha em uma coleta nunca deve travar o check-in inteiro nem deixar a maquina sumir do dashboard sem motivo real.
+
+### Tarefas
+
+[ ] Envolver `Get-AgentLocalAdmins` em try/catch proprio (`agent-windows/itcenter-agent.ps1:774`, severidade alta)
+
+    Get-LocalGroupMember pode lancar excecao terminante quando um SID
+    do grupo Administradores nao resolve para nome (maquina removida do
+    dominio, conta de dominio apagada mas ainda listada) -
+    `-ErrorAction SilentlyContinue` nao suprime isso. Sem try/catch
+    proprio (diferente de todas as outras funcoes Get-Agent*), a
+    excecao sobe ate o unico catch de Start-ItCenterAgent, que loga e
+    RELANCA - terminando o script antes de chegar no codigo que salva o
+    payload em cache offline. A maquina some do dashboard a cada ciclo,
+    indistinguivel de estar genuinamente offline. Direcao: try/catch
+    proprio, igual as demais funcoes Get-Agent*, retornando lista vazia
+    e logando em vez de propagar.
+
+[ ] Consultar o usuario do console interativo em vez do processo (`agent-windows/itcenter-agent.ps1:317`, severidade media)
+
+    Get-AgentUsername le a identidade do PROCESSO, nao do usuario
+    logado interativamente; a Tarefa Agendada roda com principal
+    SYSTEM, entao todo check-in em producao reporta "NT
+    AUTHORITY\SYSTEM" - visivel no dashboard e nos relatorios PDF
+    executivos para toda maquina, sem nenhum fallback. Direcao:
+    consultar o usuario do console interativo (dono do processo
+    explorer.exe, ou Win32_ComputerSystem.UserName) como fonte
+    primaria.
+
+[ ] Adicionar lock ao redor do envio de cache pendente (`agent-windows/itcenter-agent.ps1:1225`, severidade media)
+
+    `-MultipleInstances IgnoreNew` so impede a Tarefa Agendada de rodar
+    duas instancias por trigger - nao impede uma execucao manual
+    (acao documentada no proprio TROUBLESHOOTING.md) enquanto o ciclo
+    agendado ainda roda. Sem lock no diretorio de cache, dois processos
+    podem reenviar o mesmo arquivo; quem perde a corrida do Remove-Item
+    sofre erro terminante capturado por um catch que faz break -
+    abandonando o resto da fila de cache pendente ate o proximo ciclo.
+    Direcao: lock file (mutex) simples ao redor de
+    Send-PendingAgentCheckins.
+
+[ ] Excluir adaptadores virtuais/VPN da selecao de IP (`agent-windows/itcenter-agent.ps1:343`, severidade baixa)
+
+    A escolha de IP ordena por InterfaceMetric sem checar tipo de
+    adaptador. Numa maquina com Docker Desktop, WSL2, Hyper-V ou um
+    cliente VPN (Hamachi, ZeroTier, Radmin, Tailscale - ja rastreados
+    em ASSET_POLICY.md), o adaptador virtual costuma ter metrica mais
+    baixa que a NIC fisica - o IP reportado pode ser o de uma rede
+    virtual, sem nenhum WARN logado. Direcao: excluir tipos de
+    adaptador virtual/tunel conhecidos antes de ordenar por metrica.
+
+---
+
+# EPIC 32 - Correcao de Aderencia Documentacao-Codigo (Auditoria Tecnica 2026-08-15)
+
+Objetivo:
+
+Corrigir divergencias entre documentacao e codigo real encontradas na auditoria tecnica de 2026-08-15. Nenhuma critica isoladamente, mas cada uma e fonte real de decisao errada para quem confiar so na documentacao.
+
+### Tarefas
+
+[ ] Resolver divergencia entre API.md e SOC_RULES.md sobre deteccao de VPN/torrent em processos (`backend/app/services/agent.py:309`, severidade media)
+
+    O loop de installed_programs checa contra UNAUTHORIZED_VPN_TOOLS/
+    TORRENT_TOOLS alem das listas comuns; o loop de processes so roda
+    as listas comuns. Um Hamachi portatil rodando de pendrive (nunca
+    aparece em installed_programs) nao gera nenhum evento - mas
+    API.md linha 135 afirma que processes "passam pelas mesmas
+    listas... VPN, torrent...". O proprio SOC_RULES.md ja e mais
+    preciso que API.md nesse ponto; o codigo segue SOC_RULES.md, nao
+    API.md. Direcao: decidir entre estender a checagem de processos
+    para cobrir VPN/torrent (fechando a lacuna real) ou corrigir API.md
+    para bater com SOC_RULES.md.
+
+[ ] Documentar que os endpoints de PDF tambem disparam `mark_stale_machines_offline` (`docs/backend/API.md:690`, severidade baixa)
+
+    A doc lista so 3 rotas JSON com esse efeito colateral de escrita
+    durante leitura. Os dois endpoints .pdf (relatorio de maquina e
+    executivo) reusam os mesmos services e disparam o mesmo UPDATE
+    machines SET status='offline' - baixar um PDF pode gravar no banco
+    sem que a doc avise. Direcao: adicionar os dois endpoints .pdf a
+    lista de API.md.
+
+[ ] Atualizar a allowlist documentada do proxy em SECURITY.md (`docs/security/SECURITY.md:132`, severidade baixa)
+
+    SECURITY.md lista 5 prefixos permitidos no proxy; o codigo real tem
+    9, incluindo api/v1/dashboard e api/v1/reports (adicionados na
+    EPIC 20). Quem ler so a doc concluiria - errado - que chamadas ao
+    executivo/relatorios PDF seriam bloqueadas pelo proxy. Direcao:
+    atualizar a lista em SECURITY.md para os 9 prefixos reais de
+    ALLOWED_PATH_PREFIXES.
+
+---
+
+# EPIC 33 - Cobertura de Testes (Auditoria Tecnica 2026-08-15)
+
+Objetivo:
+
+Fechar lacunas de cobertura de teste encontradas na auditoria tecnica de 2026-08-15: uma regra SOC sem nenhum teste, e duas garantias de comportamento de seguranca (revogacao de sessao, idempotencia de migration) nunca exercitadas.
+
+### Tarefas
+
+[ ] Testar a regra SOC "failed_login" (>5 falhas/hora) (`backend/app/services/agent.py:158`, severidade alta)
+
+    Das 14 regras SOC implementadas, e a unica sem teste dedicado -
+    nenhum caso envia failed_logins_last_hour diferente de zero, nem
+    testa o limite exato (5 nao deve alertar, 6 deve). Um refactor
+    futuro que trocasse > 5 por >= 5, ou removesse a chamada da
+    funcao, passaria pelo CI sem acusar nada. Direcao: teste de
+    fronteira (5 nao gera evento, 6 gera), mesmo padrao ja usado nas
+    outras 13 regras.
+
+[ ] Testar idempotencia de `apply_migrations()` (`backend/apply_migrations.py:9`, severidade media)
+
+    Toda inicializacao do backend reaplica TODOS os arquivos .sql de
+    migrations - sem tabela de controle do que ja rodou, so convencao
+    manual de IF NOT EXISTS. Uma migration futura que esqueca essa
+    guarda derruba o container em producao no proximo restart/redeploy,
+    e isso so apareceria na VM real, nunca no CI. Direcao: teste que
+    aplica o conjunto completo de migrations duas vezes seguidas contra
+    um banco limpo.
+
+[ ] Testar revogacao de sessao em tempo real com um token ja emitido (`backend/app/services/auth.py:143`, severidade media)
+
+    get_current_user() rebusca o status do usuario a cada requisicao -
+    implementando revogacao real quando um admin desabilita uma conta.
+    O unico teste de status cobre rejeicao no LOGIN, nunca emite um
+    token valido e depois desabilita o usuario para confirmar que
+    requisicoes seguintes com esse token passam a ser rejeitadas.
+    Direcao: teste que emite token, desabilita o usuario, confirma 401
+    na proxima requisicao com o mesmo token.
+
+[ ] Incluir e testar o campo usuario no evento de USB (`backend/app/services/agent.py:146`, severidade media)
+
+    SOC_RULES.md (Regra 6) exige registrar Usuario/Maquina/Horario/
+    Fabricante/Serial no evento usb_detected. process_usb_devices nunca
+    referencia payload.username em raw_data nem na descricao - so o
+    hostname. O teste existente confere apenas contagem de
+    eventos/alertas, nunca o conteudo, entao essa lacuna de auditoria
+    nunca foi pega. Direcao: incluir payload.username no
+    raw_data/descricao do evento, e adicionar teste que confira o
+    conteudo, nao so a contagem.
+
+Origem: auditoria tecnica completa do app em 2026-08-15 (8 dimensoes revisadas, 38 achados candidatos, 29 confirmados apos verificacao adversarial 1:1 - nenhum descartado foi por falso-positivo generico, todos os confirmados citam arquivo/linha real). Relatorio completo publicado como artifact privado na mesma sessao.
