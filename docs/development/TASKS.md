@@ -680,21 +680,29 @@ Provisionar e versionar a camada de infraestrutura Oracle Cloud (VCN, subnets, s
 
 [ ] Criar bucket OCI Object Storage para state remoto
 
-    Pendente de acao manual do mantenedor (fora do escopo do Terraform,
-    ver docs/architecture/IAC.md e infra/terraform/README.md, secao
-    "State"): requer credenciais OCI reais, indisponiveis no ambiente
-    de edicao deste repositorio. Runbook completo (comando oci CLI,
-    versionamento habilitado) ja documentado em 2026-08-15.
+    **BLOQUEADO em 2026-08-15** (ver docs/deployment/KNOWN_ISSUES.md,
+    "Acesso ao Console Oracle Cloud bloqueado"): o unico usuario
+    administrador da tenancy perdeu o MFA (celular antigo), sem fator de
+    backup nem segundo administrador. Nenhuma acao de Console/oci CLI e
+    possivel ate a conta ser recuperada. Runbook do bucket (comando oci
+    CLI, versionamento habilitado) ja documentado em
+    infra/terraform/README.md, secao "State", pronto para quando o
+    acesso voltar.
 
 [ ] Migrar state para backend remoto (terraform init -migrate-state)
 
     Preparado em 2026-08-15: backend "s3" {} (partial configuration) em
     infra/terraform/environments/production/versions.tf, template
     backend.hcl.example criado, .gitignore atualizado (backend.hcl real
-    nunca versionado). Falta rodar terraform init -migrate-state contra
-    o state real de producao apos o bucket existir (item anterior) -
-    mesma limitacao de credenciais, ver runbook em
-    infra/terraform/README.md, secao "State".
+    nunca versionado). **BLOQUEADO por 2 motivos** (ver
+    docs/deployment/KNOWN_ISSUES.md): (1) mesmo bloqueio de acesso ao
+    Console Oracle do item anterior; (2) o terraform.tfvars e o
+    terraform.tfstate reais do import de 2026-08-04 nao foram
+    localizados (nao estao em itcenter-edge-01), e a API key do usuario
+    terraform-provisioner tambem foi dada como perdida - vai ser
+    necessario gerar uma API key nova e refazer a descoberta/import do
+    zero (infra/terraform/README.md) antes de qualquer migracao de
+    state.
 
 [x] Implementar infra/bootstrap/{01-system,02-packages,03-directories,04-docker,05-firewall,bootstrap}.sh conforme docs/deployment/BOOTSTRAP.md
 

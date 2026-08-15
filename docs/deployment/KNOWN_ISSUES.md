@@ -53,16 +53,39 @@ Acesso administrativo a `itcenter-edge-01` depende de uma unica chave SSH pessoa
 
 Risco:
 
-* Perda da chave bloqueia todo acesso administrativo (backup/restore/rollback/TLS, credenciais do dashboard) ate uma recuperacao de emergencia. Ja aconteceu em producao (INCIDENTE 018 em `POSTMORTEMS.md`), inclusive com exposicao acidental de uma chave privada durante a recuperacao via workflow temporario.
+* Perda da chave bloqueia todo acesso administrativo (backup/restore/rollback/TLS, credenciais do dashboard) ate uma recuperacao de emergencia. Ja aconteceu em producao **duas vezes**: INCIDENTE 018 (`POSTMORTEMS.md`, 2026-07-28, com exposicao acidental de uma chave privada durante a recuperacao), e novamente em 2026-08-15 durante a tentativa de retomar a EPIC 15 (state remoto do Terraform) — mesmo workflow de recuperacao reaplicado com sucesso, sem repetir o erro anterior (so a chave publica nova foi compartilhada).
 
 Mitigacao atual:
 
-* Workflow `workflow_dispatch` reaproveitando o secret `PROD_SSH_PRIVATE_KEY` ja usado pelo deploy, como recuperacao de ultimo recurso — removido do repositorio logo apos o uso.
+* Workflow `workflow_dispatch` reaproveitando o secret `PROD_SSH_PRIVATE_KEY` ja usado pelo deploy, como recuperacao de ultimo recurso — removido do repositorio logo apos o uso (repetido em ambas as ocorrencias).
 
 Evolucao esperada:
 
-* Guardar uma copia de recuperacao da chave SSH pessoal em um cofre de senhas.
+* Guardar uma copia de recuperacao da chave SSH pessoal em um cofre de senhas — ainda nao feito, mesma lacuna das duas ocorrencias.
 * Documentar acesso alternativo via OCI Console/Serial Console como plano B.
+
+## Acesso ao Console Oracle Cloud bloqueado (MFA do administrador perdido)
+
+Descoberto em 2026-08-15 ao tentar retomar a EPIC 15 (migracao do state do Terraform para backend remoto): o unico usuario administrador da tenancy Oracle Cloud perdeu o segundo fator de autenticacao (MFA vinculado a um celular antigo), sem fator de backup configurado e sem um segundo usuario administrador na conta.
+
+Contexto adicional descoberto na mesma investigacao: o `terraform.tfvars` e o `terraform.tfstate` reais do import de 2026-08-04 (EPIC 15) tambem nao foram localizados — nao estao em `itcenter-edge-01` nem em copia conhecida. A API key do usuario IAM `terraform-provisioner` (criada na mesma epoca) tambem foi dada como perdida.
+
+Risco:
+
+* **Nenhuma acao no Console ou via `oci` CLI e possivel** ate a conta ser recuperada: criar/rotacionar API keys, criar o bucket de Object Storage para o state remoto, ou qualquer recriacao de emergencia da VM ou da rede (cenario de disaster recovery da EPIC 15/IAC.md).
+* A aplicacao em si (dashboard, backend, agente, Nginx) continua funcionando normalmente — o bloqueio e apenas para operacoes administrativas de infraestrutura na nuvem.
+* Combinado com o item acima (chave SSH), a operacao do projeto hoje depende inteiramente do acesso SSH continuo a VM — sem plano B caso a VM precise ser recriada do zero.
+
+Mitigacao atual:
+
+* Nenhuma — bloqueio em aberto.
+
+Evolucao esperada (bloqueante para fechar a EPIC 15):
+
+* Recuperar o acesso ao Console OCI (fator de backup na tela de login, um segundo administrador existente, ou Service Request com o suporte Oracle provando titularidade da tenancy).
+* Apos recuperado: cadastrar um segundo usuario administrador e um fator de MFA de backup, para nao repetir esse bloqueio.
+* Gerar uma API key nova para `terraform-provisioner` e refazer a descoberta/import do Terraform do zero (`infra/terraform/README.md`), ja que o state de 2026-08-04 nao foi localizado.
+* So depois disso retomar os itens pendentes da EPIC 15 (bucket de state remoto e `terraform init -migrate-state`).
 
 ## Rollback e migrations
 
