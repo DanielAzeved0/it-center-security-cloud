@@ -992,7 +992,9 @@ Implementacao concluida em 2026-08-15: os 4 servicos existem em `infra/docker-co
     Achado baixo (rede plana entre observabilidade e dados/app) aceito sem
     acao nesta rodada, ja documentado como risco conhecido.
 
-[ ] **Pendente de validacao manual na VM real** (nao simulado nesta rodada): rodar `infra/scripts/ops-check.sh` e observar `free -h`/disco com o profile `observability` ativado (`docker compose --profile observability up -d`) em `itcenter-edge-01` antes de considerar a ativacao segura em producao continua. `docker compose ... config -q` (com e sem `--profile observability`) foi validado localmente apos as correcoes de seguranca acima, mas isso so confirma sintaxe, nao impacto real de RAM/disco na VM de 1GB.
+[x] Validacao manual na VM real (2026-08-15): `docker compose --profile observability up -d` em `itcenter-edge-01` - os 4 containers subiram healthy/running. `ops-check.sh` reportou `WARN Memoria disponivel MB em 424` (`free -h`: 448MB em uso no swap de 1GB) - risco aceito conscientemente, ver `docs/deployment/KNOWN_ISSUES.md` ("Observabilidade (EPIC 21): memoria em alerta com o profile ativo"). Mantendo os 4 servicos ativos continuamente por ora; candidatos ja identificados se a situacao piorar: remover `cadvisor` do profile ou ativar `observability` so sob demanda.
+
+[ ] Corrigir `GRAFANA_ADMIN_PASSWORD`: `ops-check.sh` tambem reportou `FAIL GRAFANA_ADMIN_PASSWORD nao configurado` na mesma validacao - Grafana subiu com o fallback placeholder por falta da variavel em `.env.production`. Pendente: definir uma senha forte e recriar o container (`docker compose ... --profile observability up -d grafana`) antes de considerar a EPIC 21 encerrada.
 
 ---
 

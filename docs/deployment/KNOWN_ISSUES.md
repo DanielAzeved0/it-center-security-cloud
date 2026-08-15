@@ -34,6 +34,18 @@ Acao:
 * Corrigir DNS no roteador/DHCP para evitar editar `hosts` em cada maquina.
 * Avaliar dominio proprio em Cloudflare para o endpoint dos agentes.
 
+## Observabilidade (EPIC 21): memoria em alerta com o profile ativo
+
+Validado em 2026-08-15 na VM real (`itcenter-edge-01`) com `docker compose --profile observability up -d`: `infra/scripts/ops-check.sh` reportou `WARN Memoria disponivel MB em 424` (abaixo do `MEM_WARN_MB=512`, mas acima do `MEM_FAIL_MB=256`) e `free -h` mostrou 448MB em uso no swap de 1GB — pressao real de memoria, nao so um limite teorico.
+
+Decisao:
+
+* Manter os 4 servicos (`node_exporter`, `cadvisor`, `prometheus`, `grafana`) ativos continuamente por ora. 424MB ainda esta acima do limite critico.
+
+Risco aceito:
+
+* Uso de swap ja presente pode degradar latencia de Postgres/backend sob carga. Monitorar ao longo do tempo; se piorar ou os 4 servicos principais comecarem a degradar, revisitar (candidatos ja identificados: remover `cadvisor` do profile, ou ativar `observability` so sob demanda em vez de continuamente).
+
 ## VM com pouca memoria
 
 Oracle Free Tier pode ter pouca memoria disponivel para build e containers.
