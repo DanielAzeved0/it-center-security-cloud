@@ -499,6 +499,18 @@ Scripts oficiais de producao:
 
 ---
 
+# Observabilidade de Infraestrutura (EPIC 21, ADR-030)
+
+`infra/docker-compose.production.yml` inclui quatro servicos adicionais — `node_exporter`, `cadvisor`, `prometheus` e `grafana` — sob `profiles: ["observability"]`, seguindo o mesmo padrao ja usado pelo `certbot` (`profiles: ["maintenance"]`): eles **nao** sobem com um `docker compose up` comum, exigindo `--profile observability` explicito do operador.
+
+Escopo: saude do Edge Node (CPU/RAM/disco/rede da VM via `node_exporter`) e dos containers Docker (`cadvisor`) — nao substitui nem duplica a coleta de metricas por maquina Windows feita pelo agente (`metrics`, EPIC 3). Prometheus faz scrape dessas duas fontes com `scrape_interval: 30s` e retencao curta (`--storage.tsdb.retention.time=5d`, `--storage.tsdb.retention.size=200MB`); Grafana consome o Prometheus via datasource provisionado automaticamente e exibe um dashboard pre-configurado (`infra/observability/grafana/dashboards/edge-node-overview.json`).
+
+Motivo do profile opt-in: a VM e Oracle Free Tier `VM.Standard.E2.1.Micro` com 1GB de RAM total, ja rodando justa com os 4 servicos atuais (ver `MEM_WARN_MB`/`MEM_FAIL_MB` em `infra/scripts/ops-check.sh`). Cada um dos 4 novos servicos tem `mem_limit` conservador (`node_exporter` ~30M, `cadvisor` ~100M, `prometheus` ~200M, `grafana` ~150M) para que nenhum sozinho derrube a VM por OOM, mas a soma ainda exige validacao manual de memoria/disco disponiveis antes de ativar em producao (ver `docs/deployment/PRODUCTION.md`).
+
+Nenhum dos quatro publica porta no host: Nginx continua o unico ponto de entrada publico. Acesso operacional e via `docker exec` ou tunel SSH direto ao IP do container na rede `itcenter-network` — nunca por uma nova `location` no `nginx.conf.template` (ver `docs/architecture/NETWORK.md` e `docs/security/SECURITY.md`).
+
+---
+
 # Containers
 
 ## Backend
@@ -569,7 +581,7 @@ Em produção, o Nginx executa no `itcenter-edge-01` e é o único container com
 
 # Roadmap Técnico
 
-O roadmap detalhado (fases e EPICs) vive em `docs/development/ROADMAP.md` e `docs/development/TASKS.md` — não duplicado aqui. Resumo histórico: a base do MVP (infraestrutura, primeira API, agente, banco, dashboard, SOC Light) corresponde às EPICs 1-6; produção, governança/autenticação e hardening vieram nas EPICs 7-18; a integração RustDesk (EPIC 19, ADR-027), os relatórios/dashboard executivo (EPIC 20, ADR-029) e o polimento visual do dashboard com GSAP (EPIC 24, ADR-035) já estão concluídos; a integração com Snipe-IT feita na mesma EPIC 19 (ADR-028) foi revertida em 2026-08-11 (ADR-033) por falta de necessidade concreta de ITAM. Observabilidade de infraestrutura via Prometheus/Grafana (EPIC 21, ADR-030), auto-atualização do agente Windows (EPIC 22, ADR-032) e auto-detecção do ID do RustDesk (EPIC 23, ADR-034) estão apenas planejadas, sem código ainda.
+O roadmap detalhado (fases e EPICs) vive em `docs/development/ROADMAP.md` e `docs/development/TASKS.md` — não duplicado aqui. Resumo histórico: a base do MVP (infraestrutura, primeira API, agente, banco, dashboard, SOC Light) corresponde às EPICs 1-6; produção, governança/autenticação e hardening vieram nas EPICs 7-18; a integração RustDesk (EPIC 19, ADR-027), os relatórios/dashboard executivo (EPIC 20, ADR-029) e o polimento visual do dashboard com GSAP (EPIC 24, ADR-035) já estão concluídos; a integração com Snipe-IT feita na mesma EPIC 19 (ADR-028) foi revertida em 2026-08-11 (ADR-033) por falta de necessidade concreta de ITAM. Observabilidade de infraestrutura via Prometheus/Grafana (EPIC 21, ADR-030) tem código implementado sob `profiles: ["observability"]` em `infra/docker-compose.production.yml` (opt-in, ainda não ativado em produção — validação real de RAM/disco na VM segue pendente, ver `docs/development/TASKS.md`); auto-atualização do agente Windows (EPIC 22, ADR-032) e auto-detecção do ID do RustDesk (EPIC 23, ADR-034) permanecem apenas planejadas, sem código ainda.
 
 ---
 

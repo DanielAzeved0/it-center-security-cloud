@@ -105,6 +105,18 @@ for container in itcenter-postgres itcenter-backend itcenter-frontend itcenter-n
   esac
 done
 
+# Observabilidade (EPIC 21) e opt-in via --profile observability: so checar
+# a senha do Grafana se o container estiver de fato rodando.
+GRAFANA_FALLBACK_PASSWORD="changeme-configure-GRAFANA_ADMIN_PASSWORD-before-observability"
+if docker inspect itcenter-grafana >/dev/null 2>&1; then
+  grafana_password=$(docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' itcenter-grafana 2>/dev/null | grep '^GF_SECURITY_ADMIN_PASSWORD=' | cut -d= -f2-)
+  if [ "$grafana_password" = "$GRAFANA_FALLBACK_PASSWORD" ] || [ -z "$grafana_password" ]; then
+    fail "GRAFANA_ADMIN_PASSWORD nao configurado (Grafana rodando com senha padrao/fallback)"
+  else
+    ok "GRAFANA_ADMIN_PASSWORD configurado"
+  fi
+fi
+
 cert_file="/etc/letsencrypt/live/$domain/fullchain.pem"
 if [ -f "$cert_file" ]; then
   if command -v openssl >/dev/null 2>&1; then

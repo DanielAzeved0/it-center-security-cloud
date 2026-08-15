@@ -63,6 +63,27 @@ Objetivo:
 | Frontend | 3000 | N/A | Nao |
 | Backend | 8000 | N/A | Nao |
 | PostgreSQL | 5432 | N/A | Nao |
+| node_exporter (profile `observability`) | 9100 | N/A | Nao |
+| cAdvisor (profile `observability`) | 8080 | N/A | Nao |
+| Prometheus (profile `observability`) | 9090 | N/A | Nao |
+| Grafana (profile `observability`) | 3000 | N/A | Nao |
+
+## Acesso a Prometheus/Grafana (EPIC 21, ADR-030)
+
+Os 4 servicos de observabilidade (`node_exporter`, `cadvisor`, `prometheus`, `grafana`) nunca publicam porta no host — nenhum `-p`/`ports:` no Compose e nenhuma `location` nova no `nginx.conf.template`. Acesso operacional exclusivamente por:
+
+```bash
+# 1. Descobrir o IP do container na rede itcenter-network
+docker inspect itcenter-grafana --format '{{(index .NetworkSettings.Networks "itcenter-network").IPAddress}}'
+
+# 2. Tunel SSH direto para esse IP:porta, sem publicar nada no host
+ssh -L 3001:<IP_DO_CONTAINER>:3000 <usuario>@itcenter-edge-01
+
+# 3. Acessar localmente
+# http://127.0.0.1:3001
+```
+
+O mesmo padrao vale para Prometheus (porta 9090). `docker exec -it itcenter-prometheus sh` ou `docker exec -it itcenter-grafana sh` tambem servem para checagens rapidas sem precisar do tunel. Essa restricao e deliberada: a VM Oracle Free Tier tem 1GB de RAM e o Nginx deve continuar sendo o unico ponto de entrada publico do Edge Node.
 
 ## Security Lists / Firewall
 

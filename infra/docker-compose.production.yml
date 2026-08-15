@@ -105,9 +105,127 @@ services:
     networks:
       - internal
 
+  # --- Observabilidade de infraestrutura (EPIC 21, ADR-030) ---
+  # Escopo: saude do Edge Node e dos containers Docker, NAO das maquinas
+  # Windows monitoradas pelo agente (essas ja tem coleta propria em `metrics`).
+  #
+  # Os 4 servicos abaixo ficam sob profiles: ["observability"] de proposito:
+  # a VM e Oracle Free Tier (1GB RAM total, ver ops-check.sh MEM_WARN_MB/
+  # MEM_FAIL_MB) e ja roda justa com postgres/backend/frontend/nginx. Eles
+  # NAO sobem com `docker compose up` normal; o operador ativa manualmente
+  # com `--profile observability` somente depois de validar memoria/disco
+  # disponiveis (ver docs/deployment/PRODUCTION.md e ops-check.sh).
+  #
+  # Nenhum publica porta no host: Nginx continua o unico ponto de entrada
+  # publico. Acesso operacional e via `docker exec` ou tunel SSH direto para
+  # o IP do container na rede itcenter-network (ver docs/architecture/
+  # NETWORK.md e docs/security/SECURITY.md) - nunca via nginx.conf.template.
+  node_exporter:
+    image: prom/node-exporter:v1.8.2
+    container_name: itcenter-node-exporter
+    restart: unless-stopped
+    profiles: ["observability"]
+    command:
+      - "--path.procfs=/host/proc"
+      - "--path.sysfs=/host/sys"
+      - "--path.rootfs=/host/root"
+      - "--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)"
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/host/root:ro
+    mem_limit: 30m
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - internal
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    container_name: itcenter-cadvisor
+    restart: unless-stopped
+    profiles: ["observability"]
+    volumes:
+      - /:/rootfs:ro
+      - /sys:/sys:ro
+      - /var/lib/docker:/var/lib/docker:ro
+    mem_limit: 100m
+    # Deliberadamente sem privileged: true e sem montar /var/run (docker.sock):
+    # revisao de seguranca de 2026-08-15 apontou que um mount de /var/run,
+    # mesmo :ro, ainda permite falar com o socket do Docker por baixo (a flag
+    # :ro so restringe operacoes no diretorio, nao chamadas no socket ja
+    # existente ali) - um RCE no cAdvisor viraria root no host via API do
+    # Docker. Sem docker.sock, o cAdvisor perde enriquecimento de nome/labels
+    # do container (mostra o ID/caminho de cgroup em vez do nome amigavel),
+    # mas mantem CPU/memoria/IO por container via /sys e /var/lib/docker, que
+    # e o suficiente para o objetivo desta EPIC.
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - internal
+
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    container_name: itcenter-prometheus
+    restart: unless-stopped
+    profiles: ["observability"]
+    depends_on:
+      - node_exporter
+      - cadvisor
+    volumes:
+      - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      # Retencao curta de proposito (VM de 1GB de RAM/disco limitado).
+      - "--storage.tsdb.retention.time=5d"
+      - "--storage.tsdb.retention.size=200MB"
+    mem_limit: 200m
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - internal
+
+  grafana:
+    image: grafana/grafana-oss:11.1.0
+    container_name: itcenter-grafana
+    restart: unless-stopped
+    profiles: ["observability"]
+    env_file:
+      - ../.env.production
+    environment:
+      # Docker Compose interpola variaveis de TODOS os servicos ao ler o
+      # arquivo, mesmo os que ficam fora do profile ativo no momento (ex.:
+      # rodar sem --profile observability) - por isso este valor usa um
+      # fallback obviamente-placeholder em vez de `:?` (que quebraria
+      # `docker compose config`/`up` mesmo para quem nunca ativa o profile).
+      # Defina GRAFANA_ADMIN_PASSWORD em .env.production ANTES de ativar
+      # `--profile observability`; nunca deixe o fallback abaixo em producao.
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-changeme-configure-GRAFANA_ADMIN_PASSWORD-before-observability}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+    depends_on:
+      - prometheus
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    mem_limit: 150m
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - internal
+
 volumes:
   postgres_data:
     name: postgres_data
+  prometheus_data:
+    name: itcenter_prometheus_data
+  grafana_data:
+    name: itcenter_grafana_data
 
 networks:
   internal:

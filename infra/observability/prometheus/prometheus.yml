@@ -1,0 +1,25 @@
+# Prometheus - observabilidade de infraestrutura do Edge Node (EPIC 21, ADR-030).
+#
+# Escopo: saude da VM (node_exporter) e dos containers Docker (cAdvisor).
+# NAO coleta metricas por maquina Windows monitorada pelo agente - isso
+# continua na tabela `metrics` (EPIC 3), pipeline separado.
+#
+# Intervalo e retencao propositalmente conservadores por rodar numa VM
+# Oracle Free Tier de 1GB de RAM (ver docs/deployment/PRODUCTION.md).
+
+global:
+  scrape_interval: 30s
+  evaluation_interval: 30s
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  - job_name: node_exporter
+    static_configs:
+      - targets: ["node_exporter:9100"]
+
+  - job_name: cadvisor
+    static_configs:
+      - targets: ["cadvisor:8080"]

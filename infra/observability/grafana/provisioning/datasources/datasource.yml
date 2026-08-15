@@ -1,0 +1,13 @@
+# Datasource provisionado automaticamente no startup do Grafana.
+# Prometheus so existe na rede Docker interna (itcenter-network); Grafana
+# fala com ele por DNS interno, nunca pela internet.
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    uid: prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false

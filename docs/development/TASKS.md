@@ -947,23 +947,52 @@ EPIC 20 encerrada.
 
 Objetivo:
 
-Monitorar o Edge Node e os containers — nao as maquinas Windows monitoradas pelo agente, que ja tem metricas proprias (`metrics`, EPIC 3) e plano de retencao proprio (Fase E de `docs/architecture/FUTURE_ARCHITECTURE.md`). Escopo corrigido em 2026-08-03: a ideia original de "Prometheus + Grafana" na EPIC 14 arriscava duplicar o pipeline de metricas do agente; aqui o alvo e a infraestrutura (ADR-030, Fase F de `docs/architecture/FUTURE_ARCHITECTURE.md`). Somente planejamento/documentacao nesta rodada.
+Monitorar o Edge Node e os containers — nao as maquinas Windows monitoradas pelo agente, que ja tem metricas proprias (`metrics`, EPIC 3) e plano de retencao proprio (Fase E de `docs/architecture/FUTURE_ARCHITECTURE.md`). Escopo corrigido em 2026-08-03: a ideia original de "Prometheus + Grafana" na EPIC 14 arriscava duplicar o pipeline de metricas do agente; aqui o alvo e a infraestrutura (ADR-030, Fase F de `docs/architecture/FUTURE_ARCHITECTURE.md`).
+
+Implementacao concluida em 2026-08-15: os 4 servicos existem em `infra/docker-compose.production.yml` sob `profiles: ["observability"]` (opt-in, mesmo padrao do `certbot`/`maintenance`), com `mem_limit` conservador em cada um e configuracao versionada em `infra/observability/`.
 
 ### Tarefas
 
-[ ] Adicionar `node_exporter` (metricas de host: CPU/RAM/disco/rede da VM) ao `infra/docker-compose.production.yml`
+[x] Adicionar `node_exporter` (metricas de host: CPU/RAM/disco/rede da VM) ao `infra/docker-compose.production.yml`
 
-[ ] Adicionar cAdvisor ou metricas nativas do Docker para saude dos containers
+[x] Adicionar cAdvisor para saude dos containers (sem `privileged: true`, ver `docs/architecture/CONTAINERS.md`)
 
-[ ] Adicionar Prometheus com scrape config apontando para `node_exporter`/cAdvisor
+[x] Adicionar Prometheus com scrape config apontando para `node_exporter`/cAdvisor (`infra/observability/prometheus/prometheus.yml`, scrape/evaluation interval 30s, retencao `5d`/`200MB`)
 
-[ ] Adicionar Grafana com dashboard(s) pre-configurado(s) para saude do Edge Node
+[x] Adicionar Grafana com dashboard pre-configurado para saude do Edge Node (`infra/observability/grafana/dashboards/edge-node-overview.json`, provisionado automaticamente)
 
-[ ] Garantir que Prometheus/Grafana NAO sejam expostos publicamente (Nginx continua unico ponto de entrada; acesso via tunel SSH ou rota autenticada)
+[x] Garantir que Prometheus/Grafana NAO sejam expostos publicamente: nenhum dos 4 servicos publica porta no host nem tem `location` no `nginx.conf.template`; acesso documentado via `docker exec`/tunel SSH direto ao IP do container em `docs/architecture/NETWORK.md`
 
-[ ] Validar impacto de recursos (RAM/disco) no free tier antes de ativar em producao (ver `infra/scripts/ops-check.sh`)
+[x] Atualizar `docs/architecture/ARCHITECTURE.md`, `docs/architecture/CONTAINERS.md`, `docs/architecture/NETWORK.md` e `docs/security/SECURITY.md`
 
-[ ] Atualizar `docs/architecture/ARCHITECTURE.md`, `docs/architecture/CONTAINERS.md`, `docs/architecture/NETWORK.md` e `docs/security/SECURITY.md` no momento da implementacao
+[x] Revisao de seguranca da implementacao (2026-08-15): encontrou 2 achados altos e 2 medios, corrigidos na mesma rodada:
+
+    (1) Alto: `cadvisor` montava `/var/run:/var/run:ro` (acesso ao
+    docker.sock) - um mount `:ro` do diretorio nao impede chamadas sobre o
+    socket ja existente ali, entao um RCE no cAdvisor poderia usar a API do
+    Docker para virar root no host. Corrigido: mount removido, cAdvisor
+    perde so enriquecimento de nome/labels do container.
+
+    (2) Alto: `node_exporter`/`cadvisor` montam `/` inteiro (`/host/root`,
+    `/rootfs`) - padrao oficial dessas ferramentas para metricas de disco
+    corretas, mas expoe `.env.production` e as chaves TLS em leitura numa
+    RCE. Aceito como risco residual, documentado explicitamente em
+    docs/security/SECURITY.md (nao removido - quebraria a metrica de
+    disco), mitigado por manter as imagens no gate de CVE (item 3).
+
+    (3) Medio: as 4 imagens novas nao entravam no gate de CVE do Docker
+    Scout. Corrigido: adicionadas a ITCENTER_SCOUT_IMAGES em
+    infra/scripts/docker-scout-gate.sh.
+
+    (4) Medio: nao havia checagem contra o fallback obvio de
+    GRAFANA_ADMIN_PASSWORD chegar ativo em producao. Corrigido:
+    infra/scripts/ops-check.sh agora falha (FAIL) se o container
+    itcenter-grafana estiver rodando com esse fallback.
+
+    Achado baixo (rede plana entre observabilidade e dados/app) aceito sem
+    acao nesta rodada, ja documentado como risco conhecido.
+
+[ ] **Pendente de validacao manual na VM real** (nao simulado nesta rodada): rodar `infra/scripts/ops-check.sh` e observar `free -h`/disco com o profile `observability` ativado (`docker compose --profile observability up -d`) em `itcenter-edge-01` antes de considerar a ativacao segura em producao continua. `docker compose ... config -q` (com e sem `--profile observability`) foi validado localmente apos as correcoes de seguranca acima, mas isso so confirma sintaxe, nao impacto real de RAM/disco na VM de 1GB.
 
 ---
 

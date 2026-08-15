@@ -36,6 +36,16 @@ frontend  Next.js
 
 O backend aplica as migrations automaticamente antes de iniciar a API.
 
+## Observabilidade de infraestrutura (EPIC 21, ADR-030, opt-in)
+
+`infra/docker-compose.production.yml` tem `node_exporter`, `cadvisor`, `prometheus` e `grafana` sob `profiles: ["observability"]` — nao sobem com `docker compose up` normal. Configuracao versionada em `infra/observability/`. Ativar somente apos validar memoria/disco disponiveis (`sh infra/scripts/ops-check.sh`) na VM de 1GB:
+
+```bash
+docker compose --env-file .env.production -f infra/docker-compose.production.yml --profile observability up -d
+```
+
+Nenhum dos 4 servicos publica porta no host; acesso via `docker exec` ou tunel SSH direto ao container na rede `itcenter-network` (procedimento em `docs/architecture/NETWORK.md`). Detalhes completos em `docs/architecture/ARCHITECTURE.md`, `docs/architecture/CONTAINERS.md` e `docs/security/SECURITY.md`.
+
 ## Scripts de producao
 
 Os scripts oficiais ficam em `infra/scripts/`:

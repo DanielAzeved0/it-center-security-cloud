@@ -169,7 +169,7 @@ Resultado esperado:
 
 Banco previsivel, menor risco de crescimento descontrolado e operacao mais simples.
 
-### Fase F - Observabilidade — em planejamento real (ADR-030, EPIC 21)
+### Fase F - Observabilidade — implementada (ADR-030, EPIC 21, 2026-08-15), ativacao em producao pendente
 
 Meta:
 
@@ -178,15 +178,15 @@ Adicionar visibilidade operacional da **infraestrutura** (Edge Node e containers
 Entregas recomendadas:
 
 * Manter logs em `stdout` e `stderr`.
-* `node_exporter` para metricas de host (CPU/RAM/disco/rede da VM) e cAdvisor (ou metricas nativas do Docker) para saude dos containers.
-* Prometheus com scrape config apontando para essas duas fontes; Grafana com dashboard(s) pre-configurado(s) para saude do Edge Node — nenhum dos dois exposto publicamente (Nginx continua unico ponto de entrada).
-* Adicionar Loki ou Promtail para logs centralizados.
-* Criar alertas para containers unhealthy.
-* Criar alertas para disco baixo e memoria baixa.
-* Criar alerta para certificado perto do vencimento.
-* Criar alerta para falha de backup.
-* Registrar metricas de latencia da API e volume de check-ins/eventos (comportamento da plataforma, nao substitui `metrics` por maquina).
-* Validar impacto de recursos no free tier (`infra/scripts/ops-check.sh`) antes de ativar em producao.
+* [x] `node_exporter` para metricas de host (CPU/RAM/disco/rede da VM) e cAdvisor para saude dos containers — implementados em `infra/docker-compose.production.yml` sob `profiles: ["observability"]`.
+* [x] Prometheus com scrape config apontando para essas duas fontes; Grafana com dashboard pre-configurado para saude do Edge Node (`infra/observability/`) — nenhum dos dois exposto publicamente (Nginx continua unico ponto de entrada; acesso via `docker exec`/tunel SSH, ver `docs/architecture/NETWORK.md`).
+* [ ] Adicionar Loki ou Promtail para logs centralizados — nao implementado nesta rodada.
+* [ ] Criar alertas para containers unhealthy — nao implementado nesta rodada.
+* [ ] Criar alertas para disco baixo e memoria baixa — nao implementado nesta rodada.
+* [ ] Criar alerta para certificado perto do vencimento — nao implementado nesta rodada.
+* [ ] Criar alerta para falha de backup — nao implementado nesta rodada.
+* [ ] Registrar metricas de latencia da API e volume de check-ins/eventos (comportamento da plataforma, nao substitui `metrics` por maquina) — nao implementado nesta rodada.
+* [ ] Validar impacto de recursos no free tier (`infra/scripts/ops-check.sh`) antes de ativar em producao — pendente de execucao manual em `itcenter-edge-01`, deliberadamente nao simulada (ver `docs/development/TASKS.md` e `docs/deployment/DEPLOYMENT_HISTORY.md`, 2026-08-15).
 
 Resultado esperado:
 

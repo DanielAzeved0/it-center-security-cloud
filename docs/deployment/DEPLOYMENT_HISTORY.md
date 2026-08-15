@@ -2,6 +2,23 @@
 
 Este documento registra o processo real de implantacao do IT Center Security Cloud na Oracle Cloud.
 
+## 2026-08-15 - Implementacao da observabilidade de infraestrutura (EPIC 21, ADR-030) - ainda nao ativada em producao
+
+Contexto: ADR-030 e a Fase F de `docs/architecture/FUTURE_ARCHITECTURE.md` ja definiam a decisao (Prometheus + Grafana para o Edge Node/containers, nunca para as maquinas Windows monitoradas pelo agente); esta sessao implementou o codigo.
+
+1. Adicionados `node_exporter` (`prom/node-exporter:v1.8.2`), `cadvisor` (`gcr.io/cadvisor/cadvisor:v0.49.1`), `prometheus` (`prom/prometheus:v2.55.1`) e `grafana` (`grafana/grafana-oss:11.1.0`) a `infra/docker-compose.production.yml`, todos sob `profiles: ["observability"]` (mesmo padrao ja usado por `certbot`/`maintenance`) — nao sobem com `docker compose up` padrao.
+2. `mem_limit` conservador em cada um (node_exporter ~30M, cadvisor ~100M, prometheus ~200M, grafana ~150M) e Prometheus com retencao curta (`--storage.tsdb.retention.time=5d`, `--storage.tsdb.retention.size=200MB`) e scrape/evaluation interval de 30s, por causa da VM Oracle Free Tier de 1GB de RAM (`itcenter-edge-01`).
+3. `cadvisor` roda deliberadamente sem `privileged: true` (menor privilegio), aceitando perder metricas de I/O em disco em troca de nao conceder acesso privilegiado ao host.
+4. Nenhum dos 4 servicos publica porta no host nem tem `location` nova em `infra/nginx/nginx.conf.template` — acesso operacional documentado via `docker exec` ou tunel SSH direto ao IP do container na rede `itcenter-network` (`docs/architecture/NETWORK.md`).
+5. Configuracao versionada em `infra/observability/` (scrape config do Prometheus, datasource e dashboard "Edge Node Overview" provisionados automaticamente no Grafana).
+6. `docker compose --env-file <.env de teste> -f infra/docker-compose.production.yml config -q` validado com sucesso, com e sem `--profile observability` (confirma apenas sintaxe do Compose, nao impacto real de recursos).
+7. `docs/architecture/ARCHITECTURE.md`, `docs/architecture/CONTAINERS.md`, `docs/architecture/NETWORK.md`, `docs/security/SECURITY.md`, `infra/README.md` e `docs/development/TASKS.md` atualizados.
+
+Resultado:
+
+* EPIC 21 tem o codigo implementado, mas o profile `observability` **nao foi ativado em producao** nesta sessao. Falta rodar `infra/scripts/ops-check.sh` e observar memoria/disco reais em `itcenter-edge-01` com `docker compose --profile observability up -d` antes de considerar isso seguro continuamente — validacao manual pendente, deliberadamente nao simulada aqui.
+* Nenhum dos 4 servicos existentes (`postgres`, `backend`, `frontend`, `nginx`) foi alterado; `docker-compose.yml` (dev local) nao foi tocado.
+
 ## 2026-08-11 - Reversao da integracao Snipe-IT (ADR-028 -> ADR-033)
 
 Contexto: revisao de uma tela de maquina em producao (`itcenter-daniel.chickenkiller.com/machines/23`) mostrou "Ativo ainda nao sincronizado com o Snipe-IT" numa maquina com semanas de check-in. Investigacao no codigo (`app/services/snipeit.py`) confirmou que a causa raiz e estrutural: `SNIPEIT_BASE_URL`/`SNIPEIT_API_TOKEN` nunca foram configurados em producao porque nunca existiu um Snipe-IT real para o backend apontar.
