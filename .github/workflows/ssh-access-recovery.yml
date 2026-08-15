@@ -1,0 +1,67 @@
+name: SSH Access Recovery (temporary)
+
+# Workflow temporario para recuperar acesso SSH manual a itcenter-edge-01,
+# seguindo o mesmo padrao do INCIDENTE 018 (docs/deployment/POSTMORTEMS.md):
+# reaproveita o secret PROD_SSH_PRIVATE_KEY ja usado pelo deploy automatico
+# para adicionar uma chave publica nova ao authorized_keys da VM. Remover
+# este arquivo do repositorio assim que o acesso novo for validado.
+
+on:
+  workflow_dispatch:
+    inputs:
+      new_public_key:
+        description: "Chave publica SSH (ssh-ed25519 AAAA...) a adicionar ao authorized_keys da VM"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  add-key:
+    name: Add public key to VM
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Configure SSH
+        env:
+          PROD_SSH_HOST: ${{ secrets.PROD_SSH_HOST }}
+          PROD_SSH_PRIVATE_KEY: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
+          PROD_SSH_PORT: ${{ secrets.PROD_SSH_PORT }}
+        run: |
+          test -n "$PROD_SSH_HOST"
+          test -n "$PROD_SSH_PRIVATE_KEY"
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$PROD_SSH_PRIVATE_KEY" > ~/.ssh/production_key
+          chmod 600 ~/.ssh/production_key
+          ssh-keyscan -p "${PROD_SSH_PORT:-22}" "$PROD_SSH_HOST" >> ~/.ssh/known_hosts
+
+      - name: Add new public key to authorized_keys
+        env:
+          PROD_SSH_HOST: ${{ secrets.PROD_SSH_HOST }}
+          PROD_SSH_PORT: ${{ secrets.PROD_SSH_PORT }}
+          PROD_SSH_USER: ${{ secrets.PROD_SSH_USER }}
+          NEW_PUBLIC_KEY: ${{ inputs.new_public_key }}
+        run: |
+          test -n "$PROD_SSH_HOST"
+          test -n "$PROD_SSH_USER"
+          test -n "$NEW_PUBLIC_KEY"
+
+          ssh -i ~/.ssh/production_key -p "${PROD_SSH_PORT:-22}" "$PROD_SSH_USER@$PROD_SSH_HOST" \
+            "NEW_KEY='$NEW_PUBLIC_KEY' sh -s" <<'REMOTE'
+          set -eu
+
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          touch ~/.ssh/authorized_keys
+          chmod 600 ~/.ssh/authorized_keys
+
+          if ! grep -qF "$NEW_KEY" ~/.ssh/authorized_keys; then
+            printf '%s\n' "$NEW_KEY" >> ~/.ssh/authorized_keys
+            echo "Chave adicionada."
+          else
+            echo "Chave ja presente, nada a fazer."
+          fi
+          REMOTE
