@@ -1645,3 +1645,27 @@ Fechar lacunas de cobertura de teste encontradas na auditoria tecnica de 2026-08
     conteudo, nao so a contagem.
 
 Origem: auditoria tecnica completa do app em 2026-08-15 (8 dimensoes revisadas, 38 achados candidatos, 29 confirmados apos verificacao adversarial 1:1 - nenhum descartado foi por falso-positivo generico, todos os confirmados citam arquivo/linha real). Relatorio completo publicado como artifact privado na mesma sessao.
+
+---
+
+# EPIC 34 - Restaurar Lint do Frontend
+
+Objetivo:
+
+Corrigir a checagem estatica de codigo do dashboard, que hoje nao roda de fato em lugar nenhum.
+
+### Tarefas
+
+[ ] Substituir `next lint` por um lint funcional em `frontend/dashboard/` (severidade baixa)
+
+    Achado incidental durante a implementacao da EPIC 28-B (2026-08-17):
+    `npm run lint` esta quebrado - o Next.js 16.2.12 removeu o comando
+    `next lint` (nao existe mais `next-lint.js` em
+    `node_modules/next/dist/cli/`), e o projeto nao tem ESLint instalado
+    nem configurado (nenhum `.eslintrc*`/`eslint.config.*`).
+    `.github/workflows/ci.yml` tambem nao roda lint, entao a quebra
+    nunca apareceu no CI. Direcao: instalar e configurar ESLint (ou a
+    alternativa recomendada pela propria Next.js 16, se houver) e
+    adicionar o step correspondente ao `ci.yml`.
+
+Origem: achado incidental durante a implementacao da EPIC 28-B, nao fazia parte da auditoria tecnica de 2026-08-15.

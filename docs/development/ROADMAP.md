@@ -45,6 +45,7 @@ Este documento numera as fases detalhadas abaixo como "Fase N" (a partir de 0). 
 | Fase 28 | EPIC 31 |
 | Fase 29 | EPIC 32 |
 | Fase 30 | EPIC 33 |
+| Fase 31 | EPIC 34 |
 
 ---
 
@@ -90,6 +91,7 @@ EPIC 30 - Correcao de Integridade de Dados do Backend (Auditoria Tecnica 2026-08
 EPIC 31 - Correcao de Resiliencia do Agente Windows (Auditoria Tecnica 2026-08-15)
 EPIC 32 - Correcao de Aderencia Documentacao-Codigo (Auditoria Tecnica 2026-08-15)
 EPIC 33 - Cobertura de Testes (Auditoria Tecnica 2026-08-15)
+EPIC 34 - Restaurar Lint do Frontend
 ```
 
 ## Arquitetura
@@ -914,3 +916,22 @@ Entregas previstas:
 Resultado Esperado:
 
 Cobertura de teste que barra regressao nas garantias de seguranca ja implementadas, mas nunca verificadas por CI. Nenhuma tarefa iniciada ate o momento.
+
+---
+
+# Fase 31
+
+Restaurar Lint do Frontend — nao iniciada
+
+Meta:
+
+Corrigir a checagem estatica de codigo do dashboard, achado incidental durante a implementacao da EPIC 28-B em 2026-08-17 (nao fazia parte da auditoria tecnica de 2026-08-15). Detalhes completos em EPIC 34 de `docs/development/TASKS.md`.
+
+Entregas previstas:
+
+* Substituir `next lint` (removido pelo Next.js 16.2.12) por um lint funcional em `frontend/dashboard/` — instalar e configurar ESLint (ou a alternativa recomendada pela propria Next.js 16)
+* Adicionar o step de lint correspondente a `.github/workflows/ci.yml`, que hoje nao roda lint nenhum
+
+Resultado Esperado:
+
+`npm run lint` funcionando de verdade e rodando no CI, fechando a lacuna que permitiu a quebra passar despercebida.
