@@ -814,7 +814,7 @@ Fechar os achados de seguranca mais graves identificados na auditoria antes de q
 
 # Fase 26
 
-Correcao de Confiabilidade Operacional (Auditoria Tecnica 2026-08-15) — nao iniciada
+Correcao de Confiabilidade Operacional (Auditoria Tecnica 2026-08-15) — concluida em 2026-08-17
 
 Meta:
 
@@ -822,13 +822,13 @@ Corrigir os dois achados mais graves da auditoria tecnica de 2026-08-15: backup 
 
 Entregas previstas:
 
-* Corrigir falha silenciosa em `backup.sh` (pipe `pg_dump | gzip` nao propaga o exit code do `pg_dump`)
-* Corrigir falha silenciosa em `restore.sh` (mesmo problema, agravado por rodar apos um `DROP SCHEMA public CASCADE` destrutivo e sem `-v ON_ERROR_STOP=1` no `psql`)
-* Automatizar o gate de CVE do Docker Scout no deploy (hoje so documentado, nunca invocado por `ci.yml`/`deploy-production.yml`)
+* Corrigir falha silenciosa em `backup.sh` (pipe `pg_dump | gzip` nao propaga o exit code do `pg_dump`) — concluido em 2026-08-17
+* Corrigir falha silenciosa em `restore.sh` (mesmo problema, agravado por rodar apos um `DROP SCHEMA public CASCADE` destrutivo e sem `-v ON_ERROR_STOP=1` no `psql`) — concluido em 2026-08-17
+* Automatizar o gate de CVE do Docker Scout no deploy (hoje so documentado, nunca invocado por `ci.yml`/`deploy-production.yml`) — concluido em 2026-08-17
 
 Resultado Esperado:
 
-Backup/restore reportando sucesso somente quando de fato bem-sucedidos, e o gate de CVE deixando de depender de um humano lembrar de rodar manualmente. Nenhuma tarefa iniciada ate o momento.
+Backup/restore reportando sucesso somente quando de fato bem-sucedidos, e o gate de CVE deixando de depender de um humano lembrar de rodar manualmente. Alcancado: os 3 itens implementados com arquivo intermediario (sem pipe) em vez de `PIPESTATUS` (inexistente em `sh`/`dash`), `-v ON_ERROR_STOP=1` e verificacao pos-restore no `restore.sh`, e `docker-scout-gate.sh` chamado dentro de `deploy.sh` entre `build` e `up -d`. Testado manualmente contra o Postgres local (`infra/docker-compose.yml`), nunca contra producao — detalhes e evidencias em EPIC 29 de `docs/development/TASKS.md`.
 
 ---
 

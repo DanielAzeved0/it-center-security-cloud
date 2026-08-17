@@ -35,6 +35,9 @@ sh infra/scripts/preflight-production.sh
 
 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" config -q
 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" build
+
+sh infra/scripts/docker-scout-gate.sh
+
 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" up -d
 
 wait_for_healthy postgres itcenter-postgres 120

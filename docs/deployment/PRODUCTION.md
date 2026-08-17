@@ -260,7 +260,7 @@ sh infra/scripts/deploy.sh
 curl --fail --user admin:SENHA_FORTE_AQUI https://SEU_DOMINIO/
 ```
 
-O `deploy.sh` executa preflight, valida o Compose, faz build das imagens, sobe os containers, aguarda healthchecks e executa smoke tests internos. O preflight falha se Docker/Compose estiverem ausentes, se o host tiver pouco recurso, se segredos ainda forem placeholders, se a credencial administrativa não existir, se o certificado estiver ausente, se o Compose for inválido ou se portas essenciais estiverem ocupadas por outro processo.
+O `deploy.sh` executa preflight, valida o Compose, faz build das imagens, roda o gate de CVE do Docker Scout (`infra/scripts/docker-scout-gate.sh`), sobe os containers, aguarda healthchecks e executa smoke tests internos. O preflight falha se Docker/Compose estiverem ausentes, se o host tiver pouco recurso, se segredos ainda forem placeholders, se a credencial administrativa não existir, se o certificado estiver ausente, se o Compose for inválido ou se portas essenciais estiverem ocupadas por outro processo. O gate de CVE roda entre o `build` e o `up -d`: como o script usa `set -eu`, uma falha do gate (CVE critical/high nas imagens configuradas) aborta o deploy automaticamente antes de qualquer container novo subir — os containers antigos continuam rodando sem interrupção (EPIC 29, 2026-08-17).
 
 Em instancias Oracle Free Tier com pouca RAM, crie swap antes do deploy. O preflight mede `MemAvailable` e nao soma swap; quando a VM ja tiver swap ativo e os containers estiverem saudaveis, o limite pode ser reduzido explicitamente:
 
@@ -375,11 +375,33 @@ Customizacao:
 sudo BACKUP_HOUR=3 BACKUP_MINUTE=0 RETENTION_DAYS=14 sh infra/scripts/install-backup-cron.sh
 ```
 
+### Comportamento interno do backup (EPIC 29, 2026-08-17)
+
+`infra/scripts/backup.sh` roda em `sh` puro (`set -eu`, sem `pipefail`/`PIPESTATUS`), então o `pg_dump` nunca é ligado por pipe direto ao `gzip`: o dump vai primeiro para um arquivo intermediário oculto (`$BACKUP_DIR/.itcenter-postgres-<timestamp>.sql`) via redirecionamento simples, o que permite capturar o exit code real do `pg_dump`/`docker exec`. Sequência de validação, na ordem:
+
+1. Se o `pg_dump` falhar (Postgres fora do ar, credencial errada, disco cheio) ou o dump intermediário ficar vazio, o script remove o arquivo intermediário, imprime um erro claro em `stderr` e sai com código diferente de zero — **sem gerar `.sql.gz` e sem rodar a retenção**.
+2. Só com o dump validado o script comprime para o `.sql.gz` final, remove o intermediário e aplica `chmod 600`.
+3. O `.sql.gz` final passa por `gzip -t`; se falhar, o arquivo é removido e o script sai com erro, também sem rodar a retenção.
+4. A retenção (`find ... -delete`) só roda depois que as duas validações acima passarem.
+
+Na prática: se `sh infra/scripts/backup.sh` sair com código diferente de zero, nenhum backup novo foi criado e nenhum backup antigo foi apagado — o operador pode tentar de novo com segurança depois de corrigir a causa raiz (ver mensagem em `stderr`).
+
 Restore exige confirmação explícita para evitar sobrescrita acidental:
 
 ```bash
 ITCENTER_RESTORE_CONFIRM=YES sh infra/scripts/restore.sh /opt/itcenter/backups/itcenter-postgres-YYYYMMDDTHHMMSSZ.sql.gz
 ```
+
+### Comportamento interno do restore (EPIC 29, 2026-08-17)
+
+`infra/scripts/restore.sh` valida o backup **antes** de tocar no schema do banco, na ordem:
+
+1. `gzip -t` no arquivo de backup informado. Se falhar (arquivo truncado/corrompido), o script aborta com erro em `stderr` sem rodar `DROP SCHEMA` — o banco atual permanece intacto.
+2. Descompressão para um arquivo intermediário oculto (`.itcenter-restore-<pid>.sql`, no mesmo diretório do backup) via redirecionamento simples (não mais pipe), com checagem do exit code do `gzip` e do tamanho do arquivo resultante. Se falhar, o intermediário é removido e o script aborta — de novo, sem tocar no schema.
+3. Só depois dessas duas validações o script roda `DROP SCHEMA public CASCADE; CREATE SCHEMA public;` e restaura a partir do arquivo intermediário (`psql ... < arquivo`, não mais pipe). As duas chamadas de `psql` usam `-v ON_ERROR_STOP=1`, então qualquer erro de SQL durante o restore aborta o script imediatamente em vez de ser silenciosamente ignorado.
+4. Verificação pós-restore: o script conta quantas das 5 tabelas centrais (`machines`, `users`, `audit_logs`, `alerts`, `security_events`) existem em `information_schema.tables` no schema `public`. Se o resultado for menor que 5, o script imprime um erro claro em `stderr` e sai com código diferente de zero — a mensagem "Restore concluido" só aparece quando as 5 tabelas são confirmadas, e a mensagem inclui a contagem (`Restore concluido: 5 das 5 tabelas centrais confirmadas em information_schema.tables.`).
+
+Se o restore reportar erro em qualquer uma dessas etapas, trate como restore não confiável: não assuma que os dados voltaram só porque o comando terminou — confira a mensagem em `stderr` antes de liberar o ambiente.
 
 ## Renovação de certificado e rollback
 
@@ -527,7 +549,9 @@ Monitorar:
 
 # Gate de Seguranca das Imagens
 
-Antes de publicar ou considerar um build pronto para ambiente externo, executar o gate Docker Scout:
+`infra/scripts/deploy.sh` chama `docker-scout-gate.sh` automaticamente entre o `build` e o `up -d` (EPIC 29, 2026-08-17) — deixou de depender de um humano lembrar de rodar manualmente antes de publicar. Uma falha do gate (CVE critical/high em alguma imagem de `ITCENTER_SCOUT_IMAGES`) aborta o deploy antes de qualquer container novo subir, graças ao `set -eu` já ativo no script.
+
+Para rodar o gate isoladamente (fora de um deploy, por exemplo durante desenvolvimento local ou investigação de CVE):
 
 ```bash
 sh infra/scripts/docker-scout-gate.sh

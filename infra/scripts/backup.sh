@@ -25,9 +25,30 @@ POSTGRES_USER=$(get_env POSTGRES_USER)
 mkdir -p "$BACKUP_DIR"
 timestamp=$(date -u +%Y%m%dT%H%M%SZ)
 backup_file="$BACKUP_DIR/itcenter-postgres-$timestamp.sql.gz"
+raw_dump="$BACKUP_DIR/.itcenter-postgres-$timestamp.sql"
 
-docker exec itcenter-postgres pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" | gzip > "$backup_file"
+# Dump para arquivo intermediario (nao pipe) para capturar o exit code real
+# do pg_dump/docker exec. Em sh puro (sem pipefail/PIPESTATUS), um pipe
+# `pg_dump | gzip > arquivo` so propaga o exit code do gzip, que sempre
+# sucede mesmo com entrada vazia.
+dump_status=0
+docker exec itcenter-postgres pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" > "$raw_dump" || dump_status=$?
+
+if [ "$dump_status" -ne 0 ] || [ ! -s "$raw_dump" ]; then
+  rm -f "$raw_dump"
+  printf 'Falha ao gerar dump do PostgreSQL (exit code %s ou arquivo vazio). Nenhum backup foi criado e a retencao nao foi executada.\n' "$dump_status" >&2
+  exit 1
+fi
+
+gzip -c "$raw_dump" > "$backup_file"
+rm -f "$raw_dump"
 chmod 600 "$backup_file"
+
+if ! gzip -t "$backup_file"; then
+  rm -f "$backup_file"
+  printf 'Backup gerado esta corrompido (falhou em gzip -t): %s. Arquivo removido e a retencao nao foi executada.\n' "$backup_file" >&2
+  exit 1
+fi
 
 find "$BACKUP_DIR" -type f -name 'itcenter-postgres-*.sql.gz' -mtime +"$RETENTION_DAYS" -delete
 

@@ -99,30 +99,6 @@ Evolucao esperada (bloqueante para fechar a EPIC 15):
 * Gerar uma API key nova para `terraform-provisioner` e refazer a descoberta/import do Terraform do zero (`infra/terraform/README.md`), ja que o state de 2026-08-04 nao foi localizado.
 * So depois disso retomar os itens pendentes da EPIC 15 (bucket de state remoto e `terraform init -migrate-state`).
 
-## Falhas silenciosas em backup/restore e gate de CVE nao automatizado (EPIC 29)
-
-Auditoria tecnica de 2026-08-15 encontrou tres falhas de confiabilidade operacional, detalhadas em `docs/development/TASKS.md` (EPIC 29), ainda nao corrigidas.
-
-Achados:
-
-* `infra/scripts/backup.sh` roda em `sh` puro (`set -eu`, sem `pipefail`): o pipe `pg_dump | gzip > arquivo` so propaga o exit code do `gzip`, que sempre sucede mesmo com entrada vazia. Se o Postgres cair, a senha for rotacionada sem atualizar o container, ou o disco encher no meio do dump, o script ainda gera um `.sql.gz` "valido" (so o cabecalho), roda a retencao de 7 dias apagando backups reais antigos, e imprime "Backup criado" — `ops-check.sh` so confere a idade do arquivo, nunca o conteudo.
-* `infra/scripts/restore.sh` tem o mesmo problema de pipe, agravado por rodar `DROP SCHEMA public CASCADE` (destrutivo, incondicional) antes do restore em si, sem `-v ON_ERROR_STOP=1` no `psql` — erros de SQL sao ignorados por padrao. Um backup truncado restaura parcialmente e o script ainda imprime "Restore concluido".
-* `infra/scripts/docker-scout-gate.sh` e chamado de "obrigatorio antes de publicar uma imagem" em `docs/security/SECURITY.md`, mas nem `ci.yml` nem `deploy-production.yml` o invocam automaticamente — a unica aplicacao real depende de um humano lembrar de rodar manualmente.
-
-Risco:
-
-* Um backup ou restore pode reportar sucesso mesmo tendo falhado, o que so seria descoberto durante um incidente real (quando ja for tarde para ter um backup valido). O gate de CVE existe mas nao protege nenhum deploy real por padrao.
-
-Mitigacao atual:
-
-* Nenhuma automatica — os scripts continuam sem checagem de exit code do `pg_dump`/`gzip` isolado nem `ON_ERROR_STOP`, e o gate de CVE continua manual.
-
-Evolucao esperada (EPIC 29):
-
-* `backup.sh`: checar o exit code do `pg_dump` isoladamente (`PIPESTATUS` ou arquivo intermediario antes do `gzip`) e validar tamanho/integridade antes de reportar sucesso ou aplicar retencao.
-* `restore.sh`: adicionar `-v ON_ERROR_STOP=1` ao `psql`, capturar o exit code de cada lado do pipe, e rodar uma query de verificacao pos-restore (contagem de tabelas/linhas) antes de declarar sucesso.
-* Chamar `docker-scout-gate.sh` dentro de `deploy.sh` (ou como step do workflow) antes do `up -d`, tornando o gate real em vez de so documentado.
-
 ## Rollback e migrations
 
 Rollback de aplicacao nao desfaz migrations automaticamente.

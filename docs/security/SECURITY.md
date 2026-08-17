@@ -174,7 +174,9 @@ Evitar que imagens Docker com vulnerabilidades criticas ou altas sejam promovida
 
 Docker Scout.
 
-Comandos obrigatorios antes de publicar uma nova imagem:
+`infra/scripts/docker-scout-gate.sh` deixou de ser apenas documentado como obrigatorio: desde a EPIC 29 (2026-08-17), `infra/scripts/deploy.sh` o invoca automaticamente entre o `build` e o `up -d` de todo deploy de producao. Como o script roda com `set -eu`, uma falha do gate (CVE `critical`/`high` em qualquer imagem de `ITCENTER_SCOUT_IMAGES`) aborta o deploy antes de qualquer container novo subir, sem depender de um humano lembrar de rodar manualmente.
+
+Comandos obrigatorios antes de publicar uma nova imagem (equivalente ao que o gate automatizado roda, util para investigacao pontual):
 
 ```powershell
 docker scout cves postgres:16-alpine --only-severity critical,high

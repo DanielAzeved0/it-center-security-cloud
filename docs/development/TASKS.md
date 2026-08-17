@@ -1396,7 +1396,7 @@ Corrigir os dois achados mais graves da auditoria tecnica de 2026-08-15: backup 
 
 ### Tarefas
 
-[ ] Corrigir falha silenciosa em `backup.sh` (`infra/scripts/backup.sh:29`, severidade alta)
+[x] Corrigir falha silenciosa em `backup.sh` (`infra/scripts/backup.sh:29`, severidade alta)
 
     O script roda em sh puro (set -eu, sem pipefail); o pipe
     `pg_dump | gzip > arquivo` so propaga o exit code do gzip, que
@@ -1410,7 +1410,25 @@ Corrigir os dois achados mais graves da auditoria tecnica de 2026-08-15: backup 
     antes do gzip) e validar tamanho/integridade antes de reportar
     sucesso ou aplicar retencao.
 
-[ ] Corrigir falha silenciosa em `restore.sh` (`infra/scripts/restore.sh:42`, severidade alta)
+    Implementado em 2026-08-17: `pg_dump` agora grava em um arquivo
+    intermediario oculto (`.itcenter-postgres-<timestamp>.sql`) via
+    redirecionamento simples em vez de pipe, capturando o exit code
+    real do `docker exec`/`pg_dump` em `dump_status=$?`. Se o exit code
+    for diferente de zero ou o arquivo intermediario estiver vazio
+    (`[ -s ]`), o intermediario e removido, um erro claro vai para
+    stderr e o script sai com codigo 1 sem rodar a retencao. Com o dump
+    valido, comprime para o `.sql.gz` final, remove o intermediario,
+    aplica `chmod 600` e valida o resultado com `gzip -t` (removendo o
+    arquivo e saindo com erro se falhar) antes de rodar a retencao
+    existente. Testado manualmente contra o Postgres local
+    (`infra/docker-compose.yml`): (1) credencial invalida simulando
+    falha do `pg_dump` -> script saiu com codigo 1, nenhum `.sql.gz`
+    novo criado, nenhum `.sql` intermediario residual, e um backup bom
+    anterior sobreviveu mesmo com `RETENTION_DAYS=0` (prova de que a
+    retencao nao rodou); (2) backup normal -> `.sql.gz` gerado passou
+    em `gzip -t`.
+
+[x] Corrigir falha silenciosa em `restore.sh` (`infra/scripts/restore.sh:42`, severidade alta)
 
     Mesmo problema de pipefail do backup.sh, mais agravante: a linha
     anterior ja rodou `DROP SCHEMA public CASCADE` (destrutivo,
@@ -1424,7 +1442,32 @@ Corrigir os dois achados mais graves da auditoria tecnica de 2026-08-15: backup 
     verificacao pos-restore (contagem de tabelas/linhas) antes de
     declarar sucesso.
 
-[ ] Automatizar o gate de CVE do Docker Scout no deploy (`.github/workflows/deploy-production.yml:74`, severidade media)
+    Implementado em 2026-08-17: o script agora valida o backup ANTES de
+    tocar no schema, em duas camadas - `gzip -t` no arquivo informado, e
+    descompressao para um arquivo intermediario oculto
+    (`.itcenter-restore-<pid>.sql`) via redirecionamento simples com
+    checagem do exit code do `gzip` e `[ -s ]`. Qualquer falha nessas
+    duas camadas aborta o script sem executar `DROP SCHEMA`. So depois
+    dessas validacoes o script roda o `DROP SCHEMA public CASCADE;
+    CREATE SCHEMA public;` existente e restaura a partir do arquivo
+    intermediario (`psql ... < arquivo`, sem pipe), removendo-o em
+    seguida. As duas chamadas de `psql` (drop/create e restore) usam
+    `-v ON_ERROR_STOP=1`. Verificacao pos-restore adicionada: conta
+    quantas das 5 tabelas centrais (`machines`, `users`, `audit_logs`,
+    `alerts`, `security_events`) existem em `information_schema.tables`
+    no schema `public`; se menor que 5, imprime erro em stderr e sai com
+    codigo diferente de zero sem imprimir "Restore concluido". Testado
+    manualmente contra o Postgres local: (1) backup truncado pela metade
+    (`head -c`) -> abortou no `gzip -t`, sem tocar no schema (9 tabelas
+    continuaram existindo depois da tentativa); (2) gzip valido porem
+    vazio -> abortou na segunda camada (descompressao vazia), tambem sem
+    tocar no schema, provando a defesa em profundidade das duas camadas;
+    (3) restore normal contra backup valido -> "Restore concluido: 5 das
+    5 tabelas centrais confirmadas em information_schema.tables.",
+    codigo de saida 0, sem arquivo intermediario residual em nenhum dos
+    tres casos.
+
+[x] Automatizar o gate de CVE do Docker Scout no deploy (`.github/workflows/deploy-production.yml:74`, severidade media)
 
     docker-scout-gate.sh e chamado de "obrigatorio antes de publicar
     uma imagem" em SECURITY.md, mas nem ci.yml nem
@@ -1433,6 +1476,27 @@ Corrigir os dois achados mais graves da auditoria tecnica de 2026-08-15: backup 
     chamar docker-scout-gate.sh dentro de deploy.sh (ou como step do
     workflow) antes do `up -d`, tornando o gate real em vez de so
     documentado.
+
+    Implementado em 2026-08-17: `sh infra/scripts/docker-scout-gate.sh`
+    adicionado a `deploy.sh` entre o `docker compose ... build` e o
+    `docker compose ... up -d`, no mesmo padrao de invocacao ja usado
+    para `preflight-production.sh`. Como `set -eu` ja esta ativo no
+    script, nenhum tratamento extra de erro foi necessario - uma falha
+    do gate aborta o deploy automaticamente. Validado com um harness que
+    reproduz a mesma sequencia (`build` simulado -> gate -> `up -d`
+    simulado): com uma imagem inexistente e com `postgres:16-alpine`
+    (CVE critical/high residual real e conhecido, ver SECURITY.md P1) o
+    gate falhou e o passo seguinte nunca imprimiu; com uma imagem sem
+    CVE conhecida (`hello-world:latest`) o gate passou e o passo
+    seguinte rodou normalmente, confirmando que `set -eu` interrompe o
+    deploy exatamente entre build e up -d quando o gate falha.
+
+EPIC 29 encerrada em 2026-08-17: os 3 achados da auditoria tecnica de
+2026-08-15 foram corrigidos e testados manualmente contra o Postgres local
+(`infra/docker-compose.yml`), nunca contra producao. `docs/deployment/
+KNOWN_ISSUES.md` teve a entrada correspondente removida, `docs/deployment/
+PRODUCTION.md` e `docs/security/SECURITY.md` atualizados com o novo
+comportamento.
 
 ---
 
