@@ -141,6 +141,12 @@ $validatedRetryConfig = ConvertTo-AgentValidatedConfig -RawConfig ([pscustomobje
     retry_max_delay_seconds = 8
 })
 
+$validatedSecretConfig = ConvertTo-AgentValidatedConfig -RawConfig ([pscustomobject]@{
+    server_url = "https://itcenter-daniel.chickenkiller.com"
+    agent_api_key = "secret-key"
+    agent_secret = "already-adopted-secret"
+})
+
 function Invoke-TestRequest {
     param($RequestParams)
 
@@ -284,6 +290,26 @@ Assert-True -Condition ($validatedRetryConfig.retry_max_delay_seconds -eq 8) -Me
 Assert-True -Condition ($validatedNewConfig.log_max_size_kb -eq 5120) -Message "Default log max size must be 5120 KB."
 Assert-True -Condition ($validatedNewConfig.log_max_backups -eq 3) -Message "Default log max backups must be 3."
 Assert-True -Condition ($validatedNewConfig.cache_retention_days -eq 30) -Message "Default cache retention days must be 30."
+Assert-True -Condition ($null -eq $validatedNewConfig.agent_secret) -Message "agent_secret must be null when not yet adopted (ADR-036)."
+Assert-True -Condition ($validatedSecretConfig.agent_secret -eq "already-adopted-secret") -Message "agent_secret must be preserved when already configured (ADR-036)."
+
+$secretTestDir = Join-Path ([System.IO.Path]::GetTempPath()) "itcenter-agent-secret-test-$([guid]::NewGuid().ToString('N'))"
+New-Item -ItemType Directory -Path $secretTestDir -Force | Out-Null
+try {
+    $secretConfigPath = Join-Path $secretTestDir "config.json"
+    [ordered]@{ server_url = "https://itcenter-daniel.chickenkiller.com"; agent_api_key = "k" } | ConvertTo-Json | Set-Content -LiteralPath $secretConfigPath -Encoding UTF8
+
+    Update-AgentConfigSecret -Path $secretConfigPath -Secret "issued-secret-1"
+    $afterFirstAdoption = Get-Content -LiteralPath $secretConfigPath -Raw | ConvertFrom-Json
+    Assert-True -Condition ($afterFirstAdoption.agent_secret -eq "issued-secret-1") -Message "Update-AgentConfigSecret must add agent_secret when absent."
+
+    Update-AgentConfigSecret -Path $secretConfigPath -Secret "issued-secret-2"
+    $afterOverwrite = Get-Content -LiteralPath $secretConfigPath -Raw | ConvertFrom-Json
+    Assert-True -Condition ($afterOverwrite.agent_secret -eq "issued-secret-2") -Message "Update-AgentConfigSecret must overwrite an existing agent_secret."
+}
+finally {
+    Remove-Item -LiteralPath $secretTestDir -Recurse -Force -ErrorAction SilentlyContinue
+}
 
 $validatedRotationConfig = ConvertTo-AgentValidatedConfig -RawConfig ([pscustomobject]@{
     server_url = "https://itcenter-daniel.chickenkiller.com"
@@ -327,6 +353,7 @@ Assert-True -Condition ($jsonPayload.PSObject.Properties.Name -contains "uptime_
 Assert-True -Condition ($jsonPayload.PSObject.Properties.Name -contains "serial_number") -Message "JSON must contain serial_number."
 Assert-True -Condition ($jsonPayload.PSObject.Properties.Name -contains "installed_programs") -Message "JSON must contain installed_programs."
 Assert-True -Condition ($jsonPayload.PSObject.Properties.Name -contains "security") -Message "JSON must contain security."
+Assert-True -Condition ($jsonPayload.PSObject.Properties.Name -contains "agent_secret") -Message "JSON must contain agent_secret (ADR-036)."
 Assert-True -Condition ([double]$jsonPayload.cpu_usage -eq [double]$payload.cpu_usage) -Message "JSON CPU usage must match payload CPU usage."
 Assert-True -Condition ([double]$jsonPayload.ram_usage -eq [double]$payload.ram_usage) -Message "JSON RAM usage must match payload RAM usage."
 Assert-True -Condition ([double]$jsonPayload.disk_usage -eq [double]$payload.disk_usage) -Message "JSON disk usage must match payload disk usage."

@@ -1,0 +1,5 @@
+BEGIN;
+
+ALTER TABLE machines ADD COLUMN IF NOT EXISTS agent_secret_hash VARCHAR(64);
+
+COMMIT;

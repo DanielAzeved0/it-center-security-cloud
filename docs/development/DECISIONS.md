@@ -1326,6 +1326,45 @@ Impactos:
 
 ---
 
+# ADR-036
+
+## Data
+
+2026-08-17
+
+## Decisão
+
+Adotar um segredo por máquina (trust-on-first-use) para o check-in do agente, além da `AGENT_API_KEY` global já existente (EPIC 28-A, achado mais grave da auditoria de 2026-08-15). No primeiro check-in de um hostname novo (ou de um hostname já cadastrado que ainda não tem segredo — máquinas migradas do modelo anterior), o backend gera um segredo aleatório de 256 bits, devolve-o em texto puro **só nessa resposta**, e passa a exigi-lo (comparado só pelo hash, `sha256`) em todo check-in seguinte para aquele hostname. Um check-in que não traga o segredo certo é rejeitado (não sobrescreve nenhum dado da máquina) e gera um evento SOC novo, `machine_identity_mismatch`, severidade alta.
+
+## Motivo
+
+Hoje o backend identifica a máquina só pelo `hostname` autorreportado no payload (`save_machine_checkin`, chave de conflito do `UPSERT` é `hostname`), e todos os agentes Windows compartilham a mesma `AGENT_API_KEY` (header, sem RBAC, sem vínculo por máquina). Isso significa que extrair a `AGENT_API_KEY` de uma única máquina comprometida é suficiente para forjar um check-in alegando ser qualquer outra máquina já cadastrada — sobrescrevendo IP, MAC, número de série e todo o inventário de programas dela, sem disparar `unknown_asset` (o hostname forjado já está na allowlist de `ASSET_POLICY.md`). Esse foi o achado de severidade mais alta entre os 7 da EPIC 28 (auditoria técnica de 2026-08-15).
+
+## Alternativas Avaliadas
+
+* **Rotacionar/segmentar a `AGENT_API_KEY` por máquina** — resolveria o compartilhamento, mas exigiria um passo de provisionamento manual por máquina (gerar e distribuir a chave antes da instalação), reintroduzindo a fricção operacional que o projeto tenta evitar no agente (`install-agent.ps1` hoje só pede a `AGENT_API_KEY` global, já compartilhada entre todas as máquinas instaladas via a mesma imagem/GPO). Também não resolveria sozinha o problema: mesmo com chave por máquina, ainda seria preciso vincular essa chave a um hostname específico no backend para impedir personificação — o segredo por máquina abaixo já cobre isso sem exigir troca de todo o mecanismo de autenticação do agente.
+* **Trust-on-first-use (TOFU) com segredo por máquina, mantendo a `AGENT_API_KEY` como está** — escolhida: não exige nenhum passo de provisionamento novo (o segredo nasce sozinho no primeiro check-in real, exatamente como o resto do cadastro da máquina já funciona hoje), reaproveita a mesma proteção de ACL do `config.json` já implementada no ADR-025 para persistir o segredo localmente, e fecha a janela de personificação para qualquer hostname que já tenha adotado um segredo.
+* **Certificado por máquina (mTLS)** — descartada por complexidade de infraestrutura desproporcional à escala do projeto (uma VM, poucos agentes): exigiria uma CA própria de máquina (distinta da CA de assinatura de código do ADR-031), distribuição de certificado por instalação e terminação TLS mútua no Nginx — nenhum problema concreto do projeto hoje justifica esse investimento.
+* **Não corrigir agora, só documentar como risco aceito** — descartada: é o achado de severidade mais alta da auditoria e tem exploração trivial (só precisa da `AGENT_API_KEY`, que já está em texto puro em `config.json` mesmo com ACL — qualquer processo rodando como SYSTEM/Administrator na máquina comprometida already a lê).
+
+## Resultado
+
+* Migration `009_machines_agent_secret.sql`: coluna `machines.agent_secret_hash` (nullable — `NULL` decide o caminho de adoção).
+* `AgentCheckinRequest`/`AgentCheckinResponse` ganham o campo opcional `agent_secret` (só populado pelo backend na resposta quando um segredo é emitido/adotado).
+* `save_machine_checkin()` passa a fazer `SELECT ... FOR UPDATE` por hostname antes do `UPSERT`: hostname novo ou com `agent_secret_hash IS NULL` → gera e adota um segredo agora; hostname com segredo já adotado → exige o segredo correto (`hmac.compare_digest` sobre o hash) antes de prosseguir, levantando `MachineIdentityMismatch` em caso de divergência.
+* Novo evento/alerta SOC `machine_identity_mismatch` (severidade alta), registrado em `docs/security/SOC_RULES.md`, disparado a partir do `machine_id` já existente (a rejeição nunca cria uma máquina nova nem atualiza dados da existente).
+* Agente Windows (`itcenter-agent.ps1`) passa a enviar `agent_secret` (lido do `config.json`, propriedade nova, ausente = primeiro check-in) em todo payload, e persiste de volta em `config.json` o segredo devolvido pelo backend na primeira adoção.
+* **Janela de transição aceita conscientemente:** máquinas já cadastradas antes desta ADR não têm segredo (`agent_secret_hash IS NULL`) e vão *adotar* um no primeiro check-in pós-deploy — nesse curto intervalo (até o primeiro check-in real de cada máquina já cadastrada), um atacante que já tivesse a `AGENT_API_KEY` ainda poderia ser o primeiro a "adotar" o segredo de um hostname legítimo que ainda não tenha rodado. Não há como eliminar essa janela sem um passo de provisionamento manual (alternativa descartada acima); o risco é aceito por ser único, curto (fecha assim que cada máquina legítima faz seu primeiro check-in real após o deploy) e sensivelmente menor que o risco permanente que ele substitui.
+* Sem quarentena automática de check-ins presos em cache local com segredo desatualizado (ex.: backend restaurado de um backup anterior à adoção) — cada tentativa de reenvio malsucedida já gera um alerta `machine_identity_mismatch` (visível), fica para uma EPIC de resiliência futura se isso se mostrar um problema real na prática.
+
+Impactos:
+
+* Mudança de contrato de check-in (`docs/agent/CHECKIN.md`, `docs/backend/API.md`) e schema (`docs/backend/DATABASE.md`) — documentada nesta ADR e nos três arquivos antes/junto da implementação, conforme a regra do projeto.
+* Nenhuma tecnologia nova: `hashlib`/`secrets`/`hmac` já são stdlib do Python, sem dependência nova no backend; agente continua PowerShell puro.
+* `AGENT_API_KEY` global não é removida nem se torna redundante — continua sendo a primeira camada (autenticação do agente como classe), o segredo por máquina é a segunda camada (identidade da máquina individual dentro dessa classe).
+
+---
+
 # ADR-XXX
 
 ## Data

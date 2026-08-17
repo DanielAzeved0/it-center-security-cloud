@@ -1,3 +1,7 @@
+import hashlib
+import hmac
+import secrets
+
 from app.schemas.agent import AgentCheckinRequest
 from app.schemas.machine import MachineDetail, MachineLocalAdmin, MachineMetric, MachineProgram, MachineSummary
 from app.database import get_connection
@@ -7,11 +11,44 @@ from psycopg.types.json import Jsonb
 OFFLINE_THRESHOLD_MINUTES = 10
 
 
-def save_machine_checkin(payload: AgentCheckinRequest) -> MachineSummary:
+class MachineIdentityMismatch(Exception):
+    def __init__(self, machine_id: int, hostname: str) -> None:
+        super().__init__(f"Agent secret mismatch for machine {machine_id} ({hostname})")
+        self.machine_id = machine_id
+        self.hostname = hostname
+
+
+def _generate_agent_secret() -> str:
+    return secrets.token_urlsafe(32)
+
+
+def _hash_agent_secret(secret: str) -> str:
+    return hashlib.sha256(secret.encode("utf-8")).hexdigest()
+
+
+def save_machine_checkin(payload: AgentCheckinRequest) -> tuple[MachineSummary, str | None]:
     hostname = payload.hostname.strip().upper()
 
     with get_connection() as connection:
         with connection.transaction():
+            existing_machine = connection.execute(
+                "SELECT id, agent_secret_hash FROM machines WHERE hostname = %s FOR UPDATE",
+                (hostname,),
+            ).fetchone()
+
+            if existing_machine is None or existing_machine["agent_secret_hash"] is None:
+                issued_secret = _generate_agent_secret()
+                secret_hash_to_persist = _hash_agent_secret(issued_secret)
+            else:
+                provided_secret = payload.agent_secret or ""
+                provided_hash = _hash_agent_secret(provided_secret)
+
+                if not hmac.compare_digest(provided_hash, existing_machine["agent_secret_hash"]):
+                    raise MachineIdentityMismatch(machine_id=existing_machine["id"], hostname=hostname)
+
+                issued_secret = None
+                secret_hash_to_persist = existing_machine["agent_secret_hash"]
+
             machine_row = connection.execute(
                 """
                 INSERT INTO machines (
@@ -23,9 +60,10 @@ def save_machine_checkin(payload: AgentCheckinRequest) -> MachineSummary:
                     operating_system,
                     os_version,
                     status,
-                    last_seen
+                    last_seen,
+                    agent_secret_hash
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, 'online', now())
+                VALUES (%s, %s, %s, %s, %s, %s, %s, 'online', now(), %s)
                 ON CONFLICT (hostname)
                 DO UPDATE SET
                     username = EXCLUDED.username,
@@ -35,7 +73,8 @@ def save_machine_checkin(payload: AgentCheckinRequest) -> MachineSummary:
                     operating_system = EXCLUDED.operating_system,
                     os_version = EXCLUDED.os_version,
                     status = 'online',
-                    last_seen = now()
+                    last_seen = now(),
+                    agent_secret_hash = EXCLUDED.agent_secret_hash
                 RETURNING id, hostname, username, host(ip_address) AS ip_address, mac_address, serial_number, status, last_seen
                 """,
                 (
@@ -46,6 +85,7 @@ def save_machine_checkin(payload: AgentCheckinRequest) -> MachineSummary:
                     payload.serial_number,
                     payload.operating_system,
                     payload.os_version,
+                    secret_hash_to_persist,
                 ),
             ).fetchone()
 
@@ -106,7 +146,7 @@ def save_machine_checkin(payload: AgentCheckinRequest) -> MachineSummary:
                 (machine_row["id"],),
             )
 
-            return MachineSummary(**machine_row)
+            return MachineSummary(**machine_row), issued_secret
 
 
 def list_machines() -> list[MachineSummary]:

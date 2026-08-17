@@ -1,7 +1,9 @@
+from fastapi import HTTPException, status
+
 from app.schemas.agent import AgentCheckinRequest, AgentCheckinResponse
 from app.repositories.alerts import create_open_alert_once
 from app.repositories.local_admins import sync_machine_local_admins
-from app.repositories.machines import save_machine_checkin
+from app.repositories.machines import MachineIdentityMismatch, save_machine_checkin
 from app.repositories.security_events import create_security_event
 
 # Espelhos temporarios de ASSET_POLICY.md ate existir politica em banco/dashboard.
@@ -368,11 +370,27 @@ def process_security_posture(payload: AgentCheckinRequest, machine_id: int) -> N
 
 
 def process_agent_checkin(payload: AgentCheckinRequest) -> AgentCheckinResponse:
-    machine = save_machine_checkin(payload)
+    try:
+        machine, issued_secret = save_machine_checkin(payload)
+    except MachineIdentityMismatch as exc:
+        _record_security_detection(
+            machine_id=exc.machine_id,
+            event_type="machine_identity_mismatch",
+            severity="high",
+            title="Identidade de máquina não confere",
+            description=f"Check-in rejeitado para {exc.hostname}: segredo de agente ausente ou incorreto.",
+            raw_data={"hostname": exc.hostname},
+        )
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or missing machine identity secret",
+        )
+
     process_security_posture(payload, machine.id)
 
     return AgentCheckinResponse(
         status="success",
         message="Check-in received",
         machine_id=machine.id,
+        agent_secret=issued_secret,
     )

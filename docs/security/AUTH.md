@@ -316,11 +316,15 @@ Estado atual:
 AGENT_API_KEY unica por ambiente.
 ```
 
-### Risco conhecido e aceito hoje: personificacao de maquina
+### Personificacao de maquina — corrigido em 2026-08-17 (ADR-036, EPIC 28-A)
 
-Isto nao e apenas uma melhoria futura — e um risco concreto ja explorável com o codigo atual. O backend valida somente essa chave global e identifica a maquina exclusivamente pelo `hostname` autorreportado no payload de check-in; nao ha vinculo servidor-side entre a chave usada e uma maquina especifica. Quem extrai `AGENT_API_KEY` de uma unica maquina comprometida (`config.json` em texto puro na maquina, ver ADR-025) pode forjar um check-in em nome de qualquer outro hostname ja cadastrado/autorizado em `ASSET_POLICY.md`, sobrescrevendo IP/MAC/numero de serie e inventario de programas dessa outra maquina com dados forjados — sem disparar a regra `unknown_asset` (que so reage a hostname fora da allowlist, nao a uso indevido da chave por um hostname ja conhecido). Correcao prevista na EPIC 28 (`docs/development/TASKS.md`): vincular a identidade da maquina a algo alem do hostname autorreportado (segredo por maquina emitido no primeiro registro, ou `machine_id` assinado validado contra o hostname ja conhecido antes de aceitar sobrescrita).
+Ate 2026-08-17 este era um risco concreto ja explorável, nao so uma melhoria futura: o backend validava somente a `AGENT_API_KEY` global e identificava a maquina exclusivamente pelo `hostname` autorreportado, sem vinculo servidor-side entre a chave usada e uma maquina especifica.
 
-Planejamento futuro (evolucao completa do modelo de credencial, alem da correcao minima acima):
+Corrigido com um segredo por maquina em modelo trust-on-first-use: no primeiro check-in de um hostname novo (ou de um hostname ja cadastrado que ainda nao tinha segredo — janela de transicao unica, ver ADR-036), o backend gera um segredo aleatorio de 256 bits, devolve-o em texto puro so nessa resposta (`AgentCheckinResponse.agent_secret`), e passa a exigi-lo (comparado so pelo hash SHA-256, `machines.agent_secret_hash`) em todo check-in seguinte daquele hostname. Um check-in sem o segredo certo e rejeitado com 401 — **sem sobrescrever nenhum dado da maquina** — e gera o evento/alerta SOC `machine_identity_mismatch` (severidade alta, ver `docs/security/SOC_RULES.md`). O agente Windows (`itcenter-agent.ps1`) persiste o segredo recebido em `config.json` (mesma ACL restrita do ADR-025) e o reenvia em todo check-in futuro. Testado: `pytest` (98 passed, incluindo 5 casos novos de identidade) e `run-agent-tests.ps1`.
+
+`AGENT_API_KEY` continua existindo como primeira camada (autenticacao do agente como classe); o segredo por maquina e a segunda camada (identidade da maquina individual dentro dessa classe) — nao sao a mesma coisa nem um substitui o outro.
+
+Planejamento futuro (evolucao completa do modelo de credencial, alem da correcao acima):
 
 * Criar tabela propria para credenciais de agentes.
 * Gerar uma chave por maquina/agente.

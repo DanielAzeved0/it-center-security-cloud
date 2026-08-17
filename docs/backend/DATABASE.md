@@ -101,6 +101,7 @@ os_version VARCHAR(100) NULL
 status VARCHAR(20) NOT NULL DEFAULT 'offline'
 last_seen TIMESTAMPTZ NULL
 rustdesk_id VARCHAR(50) NULL
+agent_secret_hash VARCHAR(64) NULL
 created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 ```
@@ -117,6 +118,7 @@ updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 * `mac_address` é opcional, coletado pelo agente a cada check-in (migration `007_machines_mac_address.sql`) da mesma interface de rede escolhida para `ip_address`. Normalizado para o formato `AA:BB:CC:DD:EE:FF`; pode ser `null` se nenhuma interface valida for encontrada (ex.: resolução via DNS não carrega MAC).
 * `serial_number` é opcional, coletado pelo agente a cada check-in (migration `008_machines_serial_number.sql`, EPIC 27) via `Win32_BIOS.SerialNumber`, com fallback para `Win32_ComputerSystemProduct.IdentifyingNumber`. Pode ser `null` se a leitura falhar ou se ambos os métodos só retornarem placeholders conhecidos (ex.: "System Serial Number", "None") — a leitura nunca bloqueia o check-in.
 * `rustdesk_id` é opcional, cadastrado manualmente por `admin`/`analyst` via `PATCH /api/v1/machines/{id}/rustdesk` (EPIC 19, ADR-027). Não é coletado pelo agente. Referencia o ID do RustDesk já instalado na máquina; não é uma credencial.
+* `agent_secret_hash` (migration `009_machines_agent_secret.sql`, EPIC 28-A, ADR-036) guarda o hash SHA-256 do segredo de identidade da máquina emitido em trust-on-first-use pelo check-in do agente. Nunca guarda o segredo em texto puro. `NULL` decide o caminho de adoção em `save_machine_checkin()`: hostname novo ou com `agent_secret_hash IS NULL` recebe um segredo novo (devolvido em texto puro só na resposta daquele check-in); hostname com segredo já adotado exige o segredo correto (comparado só pelo hash, `hmac.compare_digest`) em todo check-in seguinte, sob pena de rejeição (`machine_identity_mismatch`, ver `docs/security/SOC_RULES.md`) sem sobrescrever nenhum dado da máquina.
 
 A coluna `snipeit_asset_id`, introduzida pela migration `005_machines_snipeit.sql` (integração Snipe-IT, ADR-028), foi removida pela migration `006_remove_machines_snipeit.sql` — a integração foi revertida em 2026-08-11 (ver ADR-033 em `docs/development/DECISIONS.md`) por nunca ter existido um Snipe-IT real conectado em produção.
 
@@ -568,15 +570,16 @@ Quando `POST /api/v1/agent/checkin` recebe payload válido:
 
 ```text
 1. Normaliza hostname para caixa alta.
-2. Cria ou atualiza machines usando hostname como chave única.
-3. Define status como online.
-4. Atualiza last_seen com now().
-5. Insere uma nova coleta em metrics.
-6. Remove os programas anteriores da máquina em installed_programs.
-7. Insere o snapshot atual de installed_programs recebido no payload.
-8. Cria agent_configs padrão para a máquina quando ainda não existir (`INSERT ... ON CONFLICT (machine_id) DO NOTHING`).
-9. Sincroniza machine_local_admins para detectar novos administradores locais.
-10. Gera security_events e alerts conforme SOC_RULES.md.
+2. Verifica a identidade da máquina (EPIC 28-A, ADR-036): SELECT ... FOR UPDATE em machines por hostname; hostname novo ou com agent_secret_hash IS NULL adota um segredo novo; hostname com segredo já adotado exige o segredo correto (hash), rejeitando com MachineIdentityMismatch (401 + evento machine_identity_mismatch) sem alterar nenhum dado da máquina em caso de divergência.
+3. Cria ou atualiza machines usando hostname como chave única.
+4. Define status como online.
+5. Atualiza last_seen com now().
+6. Insere uma nova coleta em metrics.
+7. Remove os programas anteriores da máquina em installed_programs.
+8. Insere o snapshot atual de installed_programs recebido no payload.
+9. Cria agent_configs padrão para a máquina quando ainda não existir (`INSERT ... ON CONFLICT (machine_id) DO NOTHING`).
+10. Sincroniza machine_local_admins para detectar novos administradores locais.
+11. Gera security_events e alerts conforme SOC_RULES.md.
 ```
 
 ## Consultas

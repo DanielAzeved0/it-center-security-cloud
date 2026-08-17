@@ -33,9 +33,11 @@ class AgentCheckinRequest(BaseModel):
     installed_programs: list[InstalledProgram] = Field(default_factory=list)
     processes: list[str] = Field(default_factory=list)
     security: SecurityPayload
+    agent_secret: str | None = Field(default=None, max_length=128)
 
 
 class AgentCheckinResponse(BaseModel):
     status: str
     message: str
     machine_id: int
+    agent_secret: str | None = Field(default=None)

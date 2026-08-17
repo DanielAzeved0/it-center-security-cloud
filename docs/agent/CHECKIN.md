@@ -157,6 +157,8 @@ Campo suportado pelo contrato da API mas **não enviado pelo agente atual**:
 processes  (opcional, backend/app/schemas/agent.py)
 ```
 
+`agent_secret` (EPIC 28-A, ADR-036) já é enviado pelo agente: `New-AgentCheckinPayload` inclui `$script:AgentRuntimeConfig.agent_secret` (ausente/`null` até o primeiro check-in adotar um segredo) em todo payload, e `Start-ItCenterAgent` persiste de volta em `config.json` (via `Update-AgentConfigSecret`, que reescreve o arquivo em vez de recriá-lo, preservando a ACL restrita do ADR-025) o `agent_secret` devolvido pelo backend sempre que a resposta trouxer um valor não vazio. Falha ao persistir é registrada como `WARN` no log, sem interromper o check-in.
+
 Observações:
 
 * `hostname` é normalizado para maiúsculas (`ToUpperInvariant()`) antes do envio — relevante para comparar com a allowlist de hostnames em `docs/security/ASSET_POLICY.md`, que deve considerar o mesmo padrão.
@@ -179,6 +181,7 @@ Observações:
 * `server_url` pode apontar para a raiz do dominio publicado ou para a base local `/api/v1`.
 * `config.json` tem a ACL restrita a `SYSTEM`/`Administrators` pelo instalador, protegendo o `agent_api_key` em texto puro contra leitura por usuarios comuns (EPIC 16).
 * Falha de configuracao/inicializacao (`Start-ItCenterAgent`) e capturada no nivel mais alto e registrada com `Level = "ERROR"` antes de propagar o erro (EPIC 16).
+* `agent_secret` (EPIC 28-A, ADR-036) fica ausente/`null` em `config.json` ate o primeiro check-in adotar um segredo; a partir dai o agente reenvia o mesmo valor em todo check-in seguinte.
 
 ## Testes atuais
 
@@ -214,6 +217,8 @@ CPU via Get-Counter com fallback para Win32_Processor.LoadPercentage
 Inventario de apps UWP/Store via Get-AppxPackage combinado ao registro
 Deteccao de USB alem de armazenamento via Win32_PnPEntity
 Falha de configuracao/inicializacao logada como ERROR em Start-ItCenterAgent
+Preservacao/adocao de agent_secret em config.json (ADR-036)
+Envio de agent_secret no payload de check-in (ADR-036)
 ```
 
 ---

@@ -1243,7 +1243,7 @@ Corrigir os achados de seguranca de uma auditoria tecnica completa do app (2026-
 
 ### Tarefas
 
-[ ] Vincular a identidade da maquina a algo alem do hostname autorreportado (`backend/app/repositories/machines.py:10`, severidade alta)
+[x] Vincular a identidade da maquina a algo alem do hostname autorreportado (`backend/app/repositories/machines.py:10`, severidade alta)
 
     O check-in identifica a maquina so pelo hostname; todos os agentes
     compartilham a mesma AGENT_API_KEY, sem vinculo servidor-side entre
@@ -1256,7 +1256,25 @@ Corrigir os achados de seguranca de uma auditoria tecnica completa do app (2026-
     primeiro registro, ou machine_id assinado que o servidor valida
     contra o hostname ja conhecido antes de aceitar sobrescrita.
 
-[ ] Corrigir bypass de path traversal via `%2f` no proxy do dashboard (`frontend/dashboard/app/api/backend/[...path]/route.ts:63`, severidade alta)
+    Nota (2026-08-17): implementado nos dois lados (EPIC 28-A, ADR-036).
+    Backend: `agent_secret_hash` (migration
+    `009_machines_agent_secret.sql`), trust-on-first-use em
+    `save_machine_checkin()` com `SELECT ... FOR UPDATE`,
+    `MachineIdentityMismatch` (401 + evento/alerta
+    `machine_identity_mismatch`), campo `agent_secret` em
+    `AgentCheckinRequest`/`AgentCheckinResponse`; `pytest` com 98 passed
+    (93 anteriores + 5 novos). Agente Windows
+    (`itcenter-agent.ps1`): `New-AgentCheckinPayload` envia
+    `agent_secret` (ausente/`null` ate a primeira adocao) e
+    `Start-ItCenterAgent` persiste de volta em `config.json` via
+    `Update-AgentConfigSecret` (reescreve o arquivo em vez de
+    recria-lo, preservando a ACL do ADR-025) o segredo devolvido pelo
+    backend; `agent-windows/tests/run-agent-tests.ps1` passou (inclui
+    casos novos para `agent_secret`). Documentado em
+    `docs/backend/API.md`, `docs/backend/DATABASE.md`,
+    `docs/security/SOC_RULES.md` e `docs/agent/CHECKIN.md`.
+
+[x] Corrigir bypass de path traversal via `%2f` no proxy do dashboard (`frontend/dashboard/app/api/backend/[...path]/route.ts:63`, severidade alta)
 
     Confirmado ao vivo (build + request real): a checagem de allowlist
     roda sobre o path ainda codificado, mas a URL efetiva e montada
@@ -1268,15 +1286,15 @@ Corrigir os achados de seguranca de uma auditoria tecnica completa do app (2026-
     contra a allowlist, e desligar `/docs`/`/redoc`/`/openapi.json` em
     producao como segunda camada.
 
-    Nota (2026-08-17): a segunda camada (backend) foi implementada —
+    Implementado em 2026-08-17, nas duas camadas: `route.ts` ganhou
+    `toSafeSegments()`, que rejeita com 404 qualquer segmento vazio,
+    `.` ou `..` (ja decodificado pelo Next.js, incluindo `/`/`\` dentro
+    do proprio segmento) antes de checar a allowlist — validado ao vivo
+    com `curl` contra `%2f`, `%5c`, `..` literal e `%2e%2e` (todos 404);
     `backend/app/main.py` desativa `docs_url`/`redoc_url`/`openapi_url`
     quando `APP_ENV=production`, mesmo padrao dev/producao ja usado em
     `app/core/config.py` e `app/database.py` (testado em
-    `backend/tests/test_docs_production.py`, `pytest` 93 passed). A causa
-    raiz (allowlist do proxy `frontend/dashboard/app/api/backend/[...path]/route.ts`
-    aceitando `%2f`/`..`) e responsabilidade de outra tarefa/agente em
-    paralelo, sem sobreposicao com esta mudanca; este item so fecha
-    quando as duas partes estiverem confirmadas.
+    `backend/tests/test_docs_production.py`, `pytest` 98 passed).
 
 [x] Equalizar tempo de resposta do login para evitar enumeracao de e-mail (`backend/app/routes/auth.py:27`, severidade media)
 
@@ -1332,7 +1350,18 @@ Corrigir os achados de seguranca de uma auditoria tecnica completa do app (2026-
     por script, ou confirmar que nenhum script inline e necessario e
     remover unsafe-inline.
 
-[ ] Restringir ACL de `logs\` e `cache\` do agente, nao so `config.json` (`agent-windows/install-agent.ps1:229`, severidade media)
+    Tentativa feita em 2026-08-17: confirmado que nenhum codigo proprio
+    usa script inline, mas o Next.js App Router injeta scripts inline
+    sem nonce (`self.__next_f.push`, payload de hidratacao de React
+    Server Components) em toda pagina — removido `unsafe-inline` sem
+    uma CSP baseada em nonce quebra a hidratacao da aplicacao inteira
+    (confirmado com `npm run build` + inspecao do HTML servido).
+    Revertido. Correcao real exige migrar a CSP para `middleware.ts`
+    com nonce gerado por request — mudanca maior, fora do escopo de uma
+    correcao pontual, fica para uma spec propria. Documentado como
+    risco aceito e investigado em `docs/security/SECURITY.md`.
+
+[x] Restringir ACL de `logs\` e `cache\` do agente, nao so `config.json` (`agent-windows/install-agent.ps1:229`, severidade media)
 
     O hardening da EPIC 16 protegeu so o config.json (agent_api_key);
     logs\ e cache\ herdam a ACL padrao de Program Files (Users: Read &
@@ -1341,6 +1370,14 @@ Corrigir os achados de seguranca de uma auditoria tecnica completa do app (2026-
     completo de software - reconhecimento direto para escalacao de
     privilegio. Direcao: aplicar a mesma logica de Protect-AgentConfigFile
     (SYSTEM/Administrators only) em logs\ e cache\.
+
+    Implementado em 2026-08-17: `Protect-AgentConfigFile` generalizada
+    para `Protect-AgentPath`, aplicada tambem a `logs\` e `cache\`, com
+    `InheritanceFlags = ContainerInherit, ObjectInherit` para que
+    arquivos criados depois (ex.: `cache\checkin-*.json`) herdem a
+    restricao a SYSTEM/Administrators — sem essa flag a ACL so
+    protegeria o diretorio em si, nao o conteudo futuro.
+    `agent-windows/tests/run-install-agent-tests.ps1` passou.
 
 [x] Adicionar bloco `permissions:` restrito em `ci.yml` (`.github/workflows/ci.yml:1`, severidade baixa)
 

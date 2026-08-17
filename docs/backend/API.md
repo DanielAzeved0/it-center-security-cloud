@@ -126,9 +126,12 @@ Exemplo de envio:
       }
     ],
     "failed_logins_last_hour": 0
-  }
+  },
+  "agent_secret": "opcional-string-ate-128-caracteres"
 }
 ```
+
+`agent_secret` (EPIC 28-A, ADR-036) é opcional e implementa trust-on-first-use por máquina, além da `AGENT_API_KEY` global: no primeiro check-in de um hostname novo (ou de um hostname já cadastrado sem segredo ainda adotado), o backend ignora o valor enviado, gera um segredo aleatório de 256 bits e o devolve em texto puro só na resposta desse check-in — a partir daí, todo check-in seguinte para aquele hostname precisa enviar esse mesmo valor em `agent_secret` (comparado só pelo hash, `sha256`, nunca guardado em texto puro). Um check-in sem o segredo certo é rejeitado com `401` e não altera nenhum dado da máquina.
 
 `usb_devices` é `list[dict]` sem schema fixo no Pydantic (`list[dict[str, Any]]`), mas a API só lê a chave `name` de cada item (`device.get("name")`, com fallback para `"USB device"` quando ausente) para compor a descrição do `security_event` `usb_detected`. Outras chaves enviadas pelo agente são aceitas mas ignoradas.
 
@@ -150,6 +153,7 @@ installed_programs com Hamachi, ZeroTier, Radmin VPN ou Tailscale -> security_ev
 installed_programs com uTorrent, BitTorrent ou qBittorrent -> security_event torrent_software_detected + alerta high
 installed_programs ou processes com Mimikatz, WannaCry, WCry, LockBit, BlackCat, ALPHV, Conti, Ryuk, REvil ou DarkSide -> security_event malware_or_ransomware_indicator + alerta high
 installed_programs ou processes com Advanced IP Scanner, Angry IP Scanner, Nmap, Masscan, PsExec, PAExec, Metasploit, Cobalt Strike, Process Hacker, Netcat, Rclone, MegaSync ou Tor Browser -> security_event suspicious_tool_detected + alerta medium
+agent_secret ausente ou incorreto para um hostname que ja adotou um segredo (EPIC 28-A, ADR-036) -> rejeita o check-in (401) + security_event machine_identity_mismatch + alerta high; nao sobrescreve nenhum dado da maquina
 ```
 
 Alertas abertos nao sao duplicados para a mesma maquina e mesmo tipo. Novos eventos continuam sendo registrados a cada check-in que mantiver o estado de risco.
@@ -160,9 +164,12 @@ Resposta:
 {
   "status": "success",
   "message": "Check-in received",
-  "machine_id": 1
+  "machine_id": 1,
+  "agent_secret": "segredo-em-texto-puro-so-nesta-resposta"
 }
 ```
+
+`agent_secret` na resposta só vem preenchido quando o backend emite ou adota um segredo novo nesse check-in (primeiro check-in do hostname, ou hostname já cadastrado que ainda não tinha segredo); em qualquer outro check-in vem `null` (EPIC 28-A, ADR-036).
 
 Efeitos de persistência:
 
@@ -173,6 +180,7 @@ Substitui o snapshot atual de installed_programs da máquina.
 Cria agent_configs padrão para a máquina quando ainda não existir.
 Sincroniza machine_local_admins com o baseline recebido em security.local_admins, registrando novos administradores.
 Atualiza last_seen e status online da máquina.
+Emite ou adota agent_secret_hash (EPIC 28-A, ADR-036) quando aplicavel.
 ```
 
 Erros esperados:
@@ -182,6 +190,14 @@ Erros esperados:
   "detail": "Invalid or missing agent API key"
 }
 ```
+
+```json
+{
+  "detail": "Invalid or missing machine identity secret"
+}
+```
+
+O segundo erro (`401 Unauthorized`) ocorre quando o hostname já adotou um `agent_secret` e o check-in atual não envia o valor correto (EPIC 28-A, ADR-036) — nesse caso nenhum dado da máquina é sobrescrito e um `security_event`/`alert` `machine_identity_mismatch` é registrado.
 
 Payload invalido retorna `422 Unprocessable Entity` com a lista de campos invalidados pelo FastAPI/Pydantic.
 
@@ -714,6 +730,7 @@ Hostname fora da allowlist de ativos conhecidos (unknown_asset)
 Máquina sem check-in por mais de 10 minutos (machine_offline)
 Indicador de malware ou ransomware (malware_or_ransomware_indicator)
 Ferramenta sensível ou dual-use detectada (suspicious_tool_detected)
+Identidade de máquina não confere no check-in (machine_identity_mismatch)
 ```
 
 ---

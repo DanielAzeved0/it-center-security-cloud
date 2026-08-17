@@ -45,11 +45,14 @@ def test_agent_checkin_accepts_valid_payload(monkeypatch):
     )
 
     assert response.status_code == 200
-    assert response.json() == {
+    body = response.json()
+    agent_secret = body.pop("agent_secret", None)
+    assert body == {
         "status": "success",
         "message": "Check-in received",
         "machine_id": 1,
     }
+    assert agent_secret
 
 
 def test_agent_checkin_persists_full_operational_snapshot(monkeypatch, auth_headers):
@@ -330,6 +333,9 @@ def test_agent_checkin_does_not_duplicate_unknown_asset_open_alert(monkeypatch):
             headers={"X-Agent-Api-Key": "test-key"},
         )
         assert response.status_code == 200
+        agent_secret = response.json().get("agent_secret")
+        if agent_secret:
+            payload = {**payload, "agent_secret": agent_secret}
 
     with get_connection() as connection:
         event_count = connection.execute(
@@ -466,6 +472,9 @@ def test_agent_checkin_does_not_duplicate_unauthorized_rdp_open_alert(monkeypatc
             headers={"X-Agent-Api-Key": "test-key"},
         )
         assert response.status_code == 200
+        agent_secret = response.json().get("agent_secret")
+        if agent_secret:
+            payload = {**payload, "agent_secret": agent_secret}
 
     with get_connection() as connection:
         event_count = connection.execute(
@@ -564,6 +573,9 @@ def test_agent_checkin_does_not_duplicate_open_soc_alerts(monkeypatch):
             headers={"X-Agent-Api-Key": "test-key"},
         )
         assert response.status_code == 200
+        agent_secret = response.json().get("agent_secret")
+        if agent_secret:
+            payload = {**payload, "agent_secret": agent_secret}
 
     with get_connection() as connection:
         event_count = connection.execute("SELECT count(*) FROM security_events").fetchone()["count"]
@@ -590,9 +602,11 @@ def test_agent_checkin_uses_local_admin_baseline_before_alerting_new_admin(monke
         headers={"X-Agent-Api-Key": "test-key"},
     )
     assert response.status_code == 200
+    agent_secret = response.json().get("agent_secret")
 
     new_admin_payload = {
         **baseline_payload,
+        "agent_secret": agent_secret,
         "security": {
             **baseline_payload["security"],
             "local_admins": ["BUILTIN\\Administrators", "DOMAIN\\NewAdmin"],
@@ -961,3 +975,161 @@ def test_agent_checkin_rejects_invalid_payload(monkeypatch):
     )
 
     assert response.status_code == 422
+
+
+def test_agent_checkin_issues_agent_secret_on_first_checkin_of_new_hostname(monkeypatch):
+    monkeypatch.setenv("AGENT_API_KEY", "test-key")
+    client = TestClient(app)
+
+    response = client.post(
+        "/api/v1/agent/checkin",
+        json=VALID_PAYLOAD,
+        headers={"X-Agent-Api-Key": "test-key"},
+    )
+
+    assert response.status_code == 200
+    agent_secret = response.json()["agent_secret"]
+    assert agent_secret is not None
+    assert isinstance(agent_secret, str)
+    assert agent_secret != ""
+
+
+def test_agent_checkin_accepts_correct_agent_secret_without_reissuing(monkeypatch):
+    monkeypatch.setenv("AGENT_API_KEY", "test-key")
+    client = TestClient(app)
+
+    first_response = client.post(
+        "/api/v1/agent/checkin",
+        json=VALID_PAYLOAD,
+        headers={"X-Agent-Api-Key": "test-key"},
+    )
+    assert first_response.status_code == 200
+    agent_secret = first_response.json()["agent_secret"]
+    assert agent_secret
+
+    second_payload = {**VALID_PAYLOAD, "agent_secret": agent_secret}
+    second_response = client.post(
+        "/api/v1/agent/checkin",
+        json=second_payload,
+        headers={"X-Agent-Api-Key": "test-key"},
+    )
+
+    assert second_response.status_code == 200
+    assert second_response.json()["agent_secret"] is None
+
+
+def test_agent_checkin_rejects_wrong_or_missing_agent_secret_without_overwriting_machine(monkeypatch):
+    monkeypatch.setenv("AGENT_API_KEY", "test-key")
+    client = TestClient(app)
+
+    first_response = client.post(
+        "/api/v1/agent/checkin",
+        json=VALID_PAYLOAD,
+        headers={"X-Agent-Api-Key": "test-key"},
+    )
+    assert first_response.status_code == 200
+    machine_id = first_response.json()["machine_id"]
+
+    malicious_payload = {
+        **VALID_PAYLOAD,
+        "ip_address": "10.10.10.10",
+        "mac_address": "11:22:33:44:55:66",
+    }
+
+    response_without_secret = client.post(
+        "/api/v1/agent/checkin",
+        json=malicious_payload,
+        headers={"X-Agent-Api-Key": "test-key"},
+    )
+    assert response_without_secret.status_code == 401
+
+    response_with_wrong_secret = client.post(
+        "/api/v1/agent/checkin",
+        json={**malicious_payload, "agent_secret": "wrong-secret"},
+        headers={"X-Agent-Api-Key": "test-key"},
+    )
+    assert response_with_wrong_secret.status_code == 401
+
+    with get_connection() as connection:
+        machine = connection.execute(
+            """
+            SELECT host(ip_address) AS ip_address, mac_address
+            FROM machines
+            WHERE id = %s
+            """,
+            (machine_id,),
+        ).fetchone()
+
+    assert machine["ip_address"] == VALID_PAYLOAD["ip_address"]
+    assert machine["mac_address"] == VALID_PAYLOAD["mac_address"]
+
+
+def test_agent_checkin_rejected_identity_mismatch_generates_soc_event_and_alert(monkeypatch):
+    monkeypatch.setenv("AGENT_API_KEY", "test-key")
+    client = TestClient(app)
+
+    first_response = client.post(
+        "/api/v1/agent/checkin",
+        json=VALID_PAYLOAD,
+        headers={"X-Agent-Api-Key": "test-key"},
+    )
+    assert first_response.status_code == 200
+    machine_id = first_response.json()["machine_id"]
+
+    response = client.post(
+        "/api/v1/agent/checkin",
+        json={**VALID_PAYLOAD, "agent_secret": "wrong-secret"},
+        headers={"X-Agent-Api-Key": "test-key"},
+    )
+    assert response.status_code == 401
+
+    with get_connection() as connection:
+        events = connection.execute(
+            """
+            SELECT machine_id, event_type, severity, source
+            FROM security_events
+            WHERE event_type = 'machine_identity_mismatch'
+            """
+        ).fetchall()
+        alerts = connection.execute(
+            """
+            SELECT machine_id, alert_type, severity, status
+            FROM alerts
+            WHERE alert_type = 'machine_identity_mismatch'
+            """
+        ).fetchall()
+
+    assert len(events) == 1
+    assert events[0]["machine_id"] == machine_id
+    assert events[0]["severity"] == "high"
+    assert events[0]["source"] == "agent"
+    assert len(alerts) == 1
+    assert alerts[0]["machine_id"] == machine_id
+    assert alerts[0]["severity"] == "high"
+    assert alerts[0]["status"] == "open"
+
+
+def test_agent_checkin_adopts_secret_for_machine_registered_before_this_feature(monkeypatch):
+    monkeypatch.setenv("AGENT_API_KEY", "test-key")
+    client = TestClient(app)
+
+    with get_connection() as connection:
+        with connection.transaction():
+            connection.execute(
+                """
+                INSERT INTO machines (hostname, status, last_seen)
+                VALUES (%s, 'offline', NULL)
+                """,
+                (VALID_PAYLOAD["hostname"],),
+            )
+
+    response = client.post(
+        "/api/v1/agent/checkin",
+        json=VALID_PAYLOAD,
+        headers={"X-Agent-Api-Key": "test-key"},
+    )
+
+    assert response.status_code == 200
+    agent_secret = response.json()["agent_secret"]
+    assert agent_secret is not None
+    assert agent_secret != ""

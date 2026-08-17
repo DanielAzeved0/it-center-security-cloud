@@ -788,7 +788,7 @@ Numero de serie disponivel no inventario sem digitacao manual quando o hardware 
 
 # Fase 25
 
-Correcao de Achados de Seguranca (Auditoria Tecnica 2026-08-15) — em andamento
+Correcao de Achados de Seguranca (Auditoria Tecnica 2026-08-15) — quase encerrada (6 de 7 itens concluidos)
 
 Meta:
 
@@ -796,17 +796,17 @@ Corrigir os achados de seguranca da auditoria tecnica completa de 2026-08-15 (ba
 
 Entregas previstas:
 
-* Vincular a identidade da maquina a algo alem do hostname autorreportado (severidade alta — personificacao de maquina via `AGENT_API_KEY` compartilhada) — pendente
-* Corrigir bypass de path traversal via `%2f` no proxy do dashboard (severidade alta — expoe `/docs` da API sem autenticacao) — parcial: segunda camada no backend concluida (`docs_url`/`redoc_url`/`openapi_url` desativados quando `APP_ENV=production`); causa raiz no proxy do frontend segue pendente
+* Vincular a identidade da maquina a algo alem do hostname autorreportado (severidade alta — personificacao de maquina via `AGENT_API_KEY` compartilhada) — concluido em 2026-08-17 (ADR-036): segredo por maquina trust-on-first-use, `agent_secret_hash` (migration `009`), rejeicao com evento/alerta `machine_identity_mismatch`
+* Corrigir bypass de path traversal via `%2f` no proxy do dashboard (severidade alta — expoe `/docs` da API sem autenticacao) — concluido em 2026-08-17, nas duas camadas: `toSafeSegments()` no proxy (validado ao vivo com `curl`) e `docs_url`/`redoc_url`/`openapi_url` desativados quando `APP_ENV=production` no backend
 * Equalizar tempo de resposta do login (severidade media — enumeracao de e-mail) — concluido em 2026-08-17
 * Ler `X-Real-IP` em vez do primeiro valor de `X-Forwarded-For` em `audit_logs` (severidade media) — concluido em 2026-08-17
-* Remover `unsafe-inline` de `script-src` na CSP do dashboard (severidade media) — pendente
-* Restringir ACL de `logs\`/`cache\` do agente, nao so `config.json` (severidade media) — pendente
-* Bloco `permissions:` restrito em `ci.yml` (severidade baixa) — pendente
+* Remover `unsafe-inline` de `script-src` na CSP do dashboard (severidade media) — tentado e revertido em 2026-08-17: bloqueado por comportamento nativo do Next.js App Router (scripts inline de hidratacao RSC sem nonce); correcao real exige CSP com nonce via `middleware.ts`, fica para spec propria
+* Restringir ACL de `logs\`/`cache\` do agente, nao so `config.json` (severidade media) — concluido em 2026-08-17
+* Bloco `permissions:` restrito em `ci.yml` (severidade baixa) — concluido em 2026-08-17
 
 Resultado Esperado:
 
-Fechar os achados de seguranca mais graves identificados na auditoria antes de qualquer exposicao adicional do produto. Duas correcoes de backend concluidas e testadas (`pytest`, 93 passed); demais itens (personificacao de maquina, causa raiz do path traversal no proxy, CSP, ACL do agente, permissoes do CI) seguem pendentes.
+Fechar os achados de seguranca mais graves identificados na auditoria antes de qualquer exposicao adicional do produto. 6 dos 7 itens concluidos e testados (`pytest` backend 98 passed, `run-agent-tests.ps1`/`run-install-agent-tests.ps1` do agente passaram, path traversal validado ao vivo com `curl`); resta so o `unsafe-inline` da CSP, que fica como risco aceito e documentado ate uma spec propria de CSP com nonce.
 
 ---
 

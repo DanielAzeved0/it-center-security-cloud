@@ -54,6 +54,14 @@ function ConvertTo-AgentValidatedConfig {
         throw "Agent API key not configured."
     }
 
+    # Absent until the first check-in adopts one (ADR-036) - not a validation error.
+    $agentSecret = if (-not [string]::IsNullOrWhiteSpace($RawConfig.agent_secret)) {
+        [string]$RawConfig.agent_secret
+    }
+    else {
+        $null
+    }
+
     $interval = if ($null -ne $RawConfig.checkin_interval_minutes) {
         [int]$RawConfig.checkin_interval_minutes
     }
@@ -156,6 +164,7 @@ function ConvertTo-AgentValidatedConfig {
         server_url = $serverUrl.TrimEnd("/")
         api_key = $apiKey
         agent_api_key = $apiKey
+        agent_secret = $agentSecret
         checkin_interval_minutes = $interval
         interval_minutes = $interval
         retry_max_attempts = $retryMaxAttempts
@@ -183,6 +192,28 @@ function Get-AgentConfig {
 
     $rawConfig = Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json
     ConvertTo-AgentValidatedConfig -RawConfig $rawConfig
+}
+
+function Update-AgentConfigSecret {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path,
+        [Parameter(Mandatory = $true)]
+        [string]$Secret
+    )
+
+    # Set-Content rewrites content in place (no delete+recreate), so the restrictive ACL
+    # applied to config.json at install time (ADR-025) is preserved across this update.
+    $rawConfig = Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json
+
+    if ($rawConfig.PSObject.Properties.Match("agent_secret").Count -gt 0) {
+        $rawConfig.agent_secret = $Secret
+    }
+    else {
+        $rawConfig | Add-Member -NotePropertyName "agent_secret" -NotePropertyValue $Secret
+    }
+
+    $rawConfig | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $Path -Encoding UTF8
 }
 
 function Get-AgentLogDirectory {
@@ -917,6 +948,7 @@ function New-AgentCheckinPayload {
         uptime_seconds = $uptimeSeconds
         installed_programs = $installedPrograms
         security = $securityPayload
+        agent_secret = $script:AgentRuntimeConfig.agent_secret
     }
 }
 
@@ -1294,6 +1326,18 @@ function Start-ItCenterAgent {
     try {
         $response = Send-AgentCheckin -Config $config -Payload $payload
         Write-AgentLog -Message "Check-in sent successfully."
+
+        if (-not [string]::IsNullOrWhiteSpace($response.agent_secret)) {
+            try {
+                Update-AgentConfigSecret -Path $ConfigPath -Secret $response.agent_secret
+                $script:AgentRuntimeConfig.agent_secret = $response.agent_secret
+                Write-AgentLog -Message "Agent secret issued by server and persisted for future check-ins."
+            }
+            catch {
+                Write-AgentLog -Message "Failed to persist issued agent secret: $($_.Exception.Message)" -Level "WARN"
+            }
+        }
+
         Write-Output ($response | ConvertTo-Json -Depth 8)
     }
     catch {

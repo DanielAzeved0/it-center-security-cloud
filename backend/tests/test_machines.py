@@ -263,6 +263,7 @@ def test_offline_machine_returns_online_after_new_checkin(monkeypatch, auth_head
         headers={"X-Agent-Api-Key": "test-key"},
     )
     machine_id = checkin_response.json()["machine_id"]
+    agent_secret = checkin_response.json()["agent_secret"]
 
     with get_connection() as connection:
         connection.execute(
@@ -273,7 +274,7 @@ def test_offline_machine_returns_online_after_new_checkin(monkeypatch, auth_head
     offline_response = client.get(f"/api/v1/machines/{machine_id}", headers=auth_headers)
     new_checkin_response = client.post(
         "/api/v1/agent/checkin",
-        json=VALID_PAYLOAD,
+        json={**VALID_PAYLOAD, "agent_secret": agent_secret},
         headers={"X-Agent-Api-Key": "test-key"},
     )
     online_response = client.get(f"/api/v1/machines/{machine_id}", headers=auth_headers)
