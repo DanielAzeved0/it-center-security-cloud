@@ -46,6 +46,7 @@ Este documento numera as fases detalhadas abaixo como "Fase N" (a partir de 0). 
 | Fase 29 | EPIC 32 |
 | Fase 30 | EPIC 33 |
 | Fase 31 | EPIC 34 |
+| Fase 32 | EPIC 35 |
 
 ---
 
@@ -92,6 +93,7 @@ EPIC 31 - Correcao de Resiliencia do Agente Windows (Auditoria Tecnica 2026-08-1
 EPIC 32 - Correcao de Aderencia Documentacao-Codigo (Auditoria Tecnica 2026-08-15)
 EPIC 33 - Cobertura de Testes (Auditoria Tecnica 2026-08-15)
 EPIC 34 - Restaurar Lint do Frontend
+EPIC 35 - CSP com Nonce no Dashboard
 ```
 
 ## Arquitetura
@@ -935,3 +937,23 @@ Entregas previstas:
 Resultado Esperado:
 
 `npm run lint` funcionando de verdade e rodando no CI, fechando a lacuna que permitiu a quebra passar despercebida.
+
+---
+
+# Fase 32
+
+CSP com Nonce no Dashboard — nao iniciada
+
+Meta:
+
+Remover `'unsafe-inline'` de `script-src` na CSP do dashboard sem quebrar a hidratacao do Next.js, fechando o unico achado da EPIC 28 (auditoria tecnica de 2026-08-15) que nao pode ser corrigido como correcao pontual. Detalhes completos em EPIC 35 de `docs/development/TASKS.md`.
+
+Entregas previstas:
+
+* Gerar um nonce aleatorio por request em `frontend/dashboard/middleware.ts` (que ja existe e hoje so checa a sessao) e mover a definicao de `Content-Security-Policy` para la, aplicando `'nonce-{valor}'` no lugar de `'unsafe-inline'` em `script-src`
+* Remover o header de CSP equivalente de `next.config.mjs` (estatico, por build, incompativel com nonce por request)
+* Validar: build sem quebrar, nenhuma violacao de CSP no console nas 6 telas autenticadas, nonce muda a cada request
+
+Resultado Esperado:
+
+CSP efetiva contra injecao de script (nao so a mensagem "existe uma CSP" sem `'unsafe-inline'` de fato bloqueando nada), fechando a EPIC 28 com 7 dos 7 achados corrigidos.

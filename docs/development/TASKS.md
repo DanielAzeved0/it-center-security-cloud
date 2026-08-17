@@ -1706,3 +1706,41 @@ Corrigir a checagem estatica de codigo do dashboard, que hoje nao roda de fato e
     adicionar o step correspondente ao `ci.yml`.
 
 Origem: achado incidental durante a implementacao da EPIC 28-B, nao fazia parte da auditoria tecnica de 2026-08-15.
+
+---
+
+# EPIC 35 - CSP com Nonce no Dashboard
+
+Objetivo:
+
+Remover `'unsafe-inline'` de `script-src` na CSP do dashboard sem quebrar a hidratacao do Next.js, fechando o unico item da EPIC 28 que ficou sem correcao.
+
+### Tarefas
+
+[ ] Migrar a CSP de `next.config.mjs` (estatica, por build) para `middleware.ts` (por request) com nonce (severidade media)
+
+    Tentativa de remover `'unsafe-inline'` na EPIC 28-B (2026-08-17) foi
+    revertida: confirmado que nenhum codigo proprio usa script inline,
+    mas o Next.js App Router injeta scripts inline sem nonce
+    (`self.__next_f.push`, payload de streaming de React Server
+    Components) em toda pagina — sem `'unsafe-inline'` e sem CSP
+    baseada em nonce, o navegador bloqueia esses scripts e a aplicacao
+    nao hidrata (fica nao-interativa). O proprio Next.js documenta o
+    padrao oficial para isso: gerar um nonce aleatorio por request em
+    `middleware.ts`, expor via header (`x-nonce` ou equivalente), e
+    aplicar a CSP com `'nonce-{valor}'` no lugar de `'unsafe-inline'`
+    diretamente na resposta do middleware (nao mais em
+    `next.config.mjs`, que so roda uma vez no build, sem acesso a um
+    valor por request). O framework propaga esse nonce automaticamente
+    para os scripts que ele proprio injeta quando detecta o padrao.
+
+    Direcao: implementar a geracao de nonce em `frontend/dashboard/middleware.ts`
+    (que ja existe e hoje so checa a presenca do cookie de sessao — a
+    logica de nonce entra ao lado, sem alterar o comportamento de
+    autenticacao), mover a definicao de `Content-Security-Policy` para
+    la, e remover o header equivalente de `next.config.mjs`. Validar:
+    `npm run build` sem quebrar; nenhuma violacao de CSP no console do
+    navegador nas 6 telas autenticadas; nonce muda a cada request (nao
+    e reutilizado); `script-src` sem `'unsafe-inline'`.
+
+Origem: item da EPIC 28 (auditoria tecnica de 2026-08-15) que nao pode ser fechado como correcao pontual - registrado como EPIC propria em 2026-08-17 apos a investigacao confirmar a causa raiz e o caminho de correcao.
