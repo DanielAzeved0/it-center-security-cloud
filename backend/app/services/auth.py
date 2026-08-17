@@ -167,9 +167,16 @@ def require_roles(*roles: str):
 
 
 def request_ip(request: Request) -> str | None:
-    forwarded_for = request.headers.get("X-Forwarded-For")
-    if forwarded_for:
-        candidate = forwarded_for.split(",", 1)[0].strip()
+    # X-Real-IP e definido pelo proprio Nginx como $remote_addr
+    # (infra/nginx/nginx.conf.template) e nao pode ser forjado pelo cliente.
+    # X-Forwarded-For, ao contrario, usa $proxy_add_x_forwarded_for (ANEXA em
+    # vez de sobrescrever), entao o primeiro valor da lista pode ser forjado
+    # pelo cliente — por isso nao e mais usado aqui (EPIC 28). O fallback
+    # para request.client.host preserva o suporte a rodar sem Nginx na
+    # frente (dev/testes).
+    real_ip = request.headers.get("X-Real-IP")
+    if real_ip:
+        candidate = real_ip.strip()
     else:
         candidate = request.client.host if request.client else None
 

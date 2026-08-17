@@ -47,6 +47,8 @@ No Docker Compose, `DATABASE_URL` aponta para o servico interno `postgres`.
 
 Quando `APP_ENV=production`, o startup da API roda `validate_runtime_configuration` (`app/core/config.py`) e falha rapido (`RuntimeError`) se `AGENT_API_KEY`, `AUTH_TOKEN_SECRET` ou `DATABASE_URL` ainda estiverem com valor padrao/inseguro (`change-me`, vazio, etc.), evitando subir em produção com credenciais de exemplo.
 
+Tambem quando `APP_ENV=production`, `app/main.py` desativa `docs_url`/`redoc_url`/`openapi_url` (`/docs`, `/redoc`, `/openapi.json` respondem `404`) — defesa em profundidade contra qualquer bypass de path traversal no proxy do dashboard que consiga alcancar esses caminhos diretamente (EPIC 28).
+
 ## Execucao manual
 
 Use apenas quando precisar depurar fora do container.

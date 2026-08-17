@@ -22,6 +22,41 @@ function isAllowedPath(joinedPath: string): boolean {
   );
 }
 
+/**
+ * Next.js already runs decodeURIComponent() on each catch-all `[...path]`
+ * segment before this handler ever sees it. That means an encoded separator
+ * inside a single raw URL segment (e.g. "machines%2f..%2f..%2f..%2fdocs")
+ * arrives here as ONE array element containing literal "/" and ".."
+ * characters — `segments.join("/")` would then produce a path that still
+ * starts with an allowed prefix, even though it actually points somewhere
+ * else entirely once `new URL()` normalizes the ".." later in
+ * `fetchUpstream()`.
+ *
+ * To close that gap we re-split every decoded segment on its real
+ * separators BEFORE the allowlist check, and reject outright if any
+ * resulting logical component is empty, "." or "..". We split on both
+ * "/" and "\" because the WHATWG URL parser used by `new URL()` treats a
+ * backslash exactly like a forward slash for special schemes (http/https),
+ * so a backslash-smuggled ".." (from "%5c") would bypass a forward-slash-only
+ * check just the same.
+ *
+ * Returns null when the path must be rejected.
+ */
+function toSafeSegments(rawSegments: string[]): string[] | null {
+  const segments: string[] = [];
+
+  for (const rawSegment of rawSegments) {
+    for (const part of rawSegment.split(/[/\\]/)) {
+      if (part === "" || part === "." || part === "..") {
+        return null;
+      }
+      segments.push(part);
+    }
+  }
+
+  return segments;
+}
+
 function isSecureRequest(request: NextRequest): boolean {
   const forwardedProto = request.headers.get("x-forwarded-proto");
   return forwardedProto ? forwardedProto === "https" : request.nextUrl.protocol === "https:";
@@ -137,7 +172,13 @@ async function handleLogout(
   }
 }
 
-async function proxyRequest(request: NextRequest, segments: string[]): Promise<NextResponse> {
+async function proxyRequest(request: NextRequest, rawSegments: string[]): Promise<NextResponse> {
+  const segments = toSafeSegments(rawSegments);
+
+  if (!segments) {
+    return NextResponse.json({ detail: "Not found" }, { status: 404 });
+  }
+
   const joinedPath = segments.join("/");
 
   if (!isAllowedPath(joinedPath)) {

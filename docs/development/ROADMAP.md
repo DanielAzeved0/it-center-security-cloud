@@ -786,7 +786,7 @@ Numero de serie disponivel no inventario sem digitacao manual quando o hardware 
 
 # Fase 25
 
-Correcao de Achados de Seguranca (Auditoria Tecnica 2026-08-15) — nao iniciada
+Correcao de Achados de Seguranca (Auditoria Tecnica 2026-08-15) — em andamento
 
 Meta:
 
@@ -794,17 +794,17 @@ Corrigir os achados de seguranca da auditoria tecnica completa de 2026-08-15 (ba
 
 Entregas previstas:
 
-* Vincular a identidade da maquina a algo alem do hostname autorreportado (severidade alta — personificacao de maquina via `AGENT_API_KEY` compartilhada)
-* Corrigir bypass de path traversal via `%2f` no proxy do dashboard (severidade alta — expoe `/docs` da API sem autenticacao)
-* Equalizar tempo de resposta do login (severidade media — enumeracao de e-mail)
-* Ler `X-Real-IP` em vez do primeiro valor de `X-Forwarded-For` em `audit_logs` (severidade media)
-* Remover `unsafe-inline` de `script-src` na CSP do dashboard (severidade media)
-* Restringir ACL de `logs\`/`cache\` do agente, nao so `config.json` (severidade media)
-* Bloco `permissions:` restrito em `ci.yml` (severidade baixa)
+* Vincular a identidade da maquina a algo alem do hostname autorreportado (severidade alta — personificacao de maquina via `AGENT_API_KEY` compartilhada) — pendente
+* Corrigir bypass de path traversal via `%2f` no proxy do dashboard (severidade alta — expoe `/docs` da API sem autenticacao) — parcial: segunda camada no backend concluida (`docs_url`/`redoc_url`/`openapi_url` desativados quando `APP_ENV=production`); causa raiz no proxy do frontend segue pendente
+* Equalizar tempo de resposta do login (severidade media — enumeracao de e-mail) — concluido em 2026-08-17
+* Ler `X-Real-IP` em vez do primeiro valor de `X-Forwarded-For` em `audit_logs` (severidade media) — concluido em 2026-08-17
+* Remover `unsafe-inline` de `script-src` na CSP do dashboard (severidade media) — pendente
+* Restringir ACL de `logs\`/`cache\` do agente, nao so `config.json` (severidade media) — pendente
+* Bloco `permissions:` restrito em `ci.yml` (severidade baixa) — pendente
 
 Resultado Esperado:
 
-Fechar os achados de seguranca mais graves identificados na auditoria antes de qualquer exposicao adicional do produto. Nenhuma tarefa iniciada ate o momento.
+Fechar os achados de seguranca mais graves identificados na auditoria antes de qualquer exposicao adicional do produto. Duas correcoes de backend concluidas e testadas (`pytest`, 93 passed); demais itens (personificacao de maquina, causa raiz do path traversal no proxy, CSP, ACL do agente, permissoes do CI) seguem pendentes.
 
 ---
 

@@ -1268,7 +1268,17 @@ Corrigir os achados de seguranca de uma auditoria tecnica completa do app (2026-
     contra a allowlist, e desligar `/docs`/`/redoc`/`/openapi.json` em
     producao como segunda camada.
 
-[ ] Equalizar tempo de resposta do login para evitar enumeracao de e-mail (`backend/app/routes/auth.py:27`, severidade media)
+    Nota (2026-08-17): a segunda camada (backend) foi implementada —
+    `backend/app/main.py` desativa `docs_url`/`redoc_url`/`openapi_url`
+    quando `APP_ENV=production`, mesmo padrao dev/producao ja usado em
+    `app/core/config.py` e `app/database.py` (testado em
+    `backend/tests/test_docs_production.py`, `pytest` 93 passed). A causa
+    raiz (allowlist do proxy `frontend/dashboard/app/api/backend/[...path]/route.ts`
+    aceitando `%2f`/`..`) e responsabilidade de outra tarefa/agente em
+    paralelo, sem sobreposicao com esta mudanca; este item so fecha
+    quando as duas partes estiverem confirmadas.
+
+[x] Equalizar tempo de resposta do login para evitar enumeracao de e-mail (`backend/app/routes/auth.py:27`, severidade media)
 
     O curto-circuito do `or` (`user is None or status != 'active' or
     not verify_password(...)`) so roda o PBKDF2 de 210.000 iteracoes
@@ -1277,7 +1287,18 @@ Corrigir os achados de seguranca de uma auditoria tecnica completa do app (2026-
     generica. Direcao: sempre rodar verify_password contra um hash
     dummy quando o usuario nao existir/estiver inativo.
 
-[ ] Ler `X-Real-IP` em vez do primeiro valor de `X-Forwarded-For` em `audit_logs` (`backend/app/services/auth.py:169`, severidade media)
+    Implementado em 2026-08-17: `_DUMMY_PASSWORD_HASH` pre-computado uma
+    unica vez na importacao de `backend/app/routes/auth.py` (nao a cada
+    request); `login()` agora sempre chama `verify_password` — contra
+    `user["password_hash"]` quando o usuario existe (ativo ou nao) ou
+    contra o hash dummy quando o e-mail nao esta cadastrado — antes de
+    decidir se a requisicao falha. Resultado funcional inalterado (so
+    autentica usuario ativo com senha correta). Testado em
+    `backend/tests/test_auth.py::test_login_runs_password_verification_even_when_user_does_not_exist`
+    (spy em `verify_password` confirma que ele roda mesmo para e-mail
+    inexistente, contra o hash dummy).
+
+[x] Ler `X-Real-IP` em vez do primeiro valor de `X-Forwarded-For` em `audit_logs` (`backend/app/services/auth.py:169`, severidade media)
 
     O Nginx usa `$proxy_add_x_forwarded_for`, que ANEXA o IP real ao
     valor ja enviado pelo cliente em vez de sobrescreve-lo; `request_ip()`
@@ -1286,6 +1307,18 @@ Corrigir os achados de seguranca de uma auditoria tecnica completa do app (2026-
     alert.resolve e machine.rustdesk_update. Direcao: usar `X-Real-IP`
     (ja definido pelo Nginx como `$remote_addr`, nao anexavel pelo
     cliente).
+
+    Implementado em 2026-08-17: `request_ip()` (`backend/app/services/auth.py`)
+    agora le `X-Real-IP` primeiro (confirmado que o Nginx ja define esse
+    header como `$remote_addr` em todos os `location` de
+    `infra/nginx/nginx.conf.template`), com fallback para
+    `request.client.host` quando o header nao vier (suporte a rodar sem
+    Nginx na frente, dev/testes). `X-Forwarded-For` deixou de ser lido.
+    Testado em
+    `backend/tests/test_auth.py::test_login_records_x_real_ip_ignoring_forged_x_forwarded_for`
+    (X-Forwarded-For forjado e ignorado; audit_logs grava o valor de
+    X-Real-IP). `docs/security/AUTH.md` atualizado (ressalva sobre
+    `ip_address` removida).
 
 [ ] Remover `'unsafe-inline'` de `script-src` na CSP do dashboard (`frontend/dashboard/next.config.mjs:3`, severidade media)
 
@@ -1309,7 +1342,7 @@ Corrigir os achados de seguranca de uma auditoria tecnica completa do app (2026-
     privilegio. Direcao: aplicar a mesma logica de Protect-AgentConfigFile
     (SYSTEM/Administrators only) em logs\ e cache\.
 
-[ ] Adicionar bloco `permissions:` restrito em `ci.yml` (`.github/workflows/ci.yml:1`, severidade baixa)
+[x] Adicionar bloco `permissions:` restrito em `ci.yml` (`.github/workflows/ci.yml:1`, severidade baixa)
 
     Diferente de deploy-production.yml (ja restrito a `contents: read`),
     ci.yml nao declara escopo e roda `npm ci`/`pip install` sobre

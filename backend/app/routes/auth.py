@@ -4,9 +4,16 @@ from fastapi.exceptions import HTTPException
 from app.repositories.audit_logs import create_audit_log
 from app.repositories.users import get_user_by_email, mark_user_login
 from app.schemas.auth import AuthUser, CurrentUserResponse, LoginRequest, LoginResponse, LogoutResponse
-from app.services.auth import CurrentUser, create_access_token, get_current_user, request_ip, verify_password
+from app.services.auth import CurrentUser, create_access_token, get_current_user, hash_password, request_ip, verify_password
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
+
+# Hash dummy pre-computado uma unica vez na importacao do modulo (nao a cada
+# request) para que o login sempre rode o PBKDF2 (210.000 iteracoes), mesmo
+# quando o usuario nao existe. Sem isso, o curto-circuito do "or" abaixo
+# pulava verify_password para e-mails nao cadastrados, criando uma diferenca
+# de tempo de resposta que permitia enumerar e-mails validos (EPIC 28).
+_DUMMY_PASSWORD_HASH = hash_password("itcenter-dummy-password-for-timing-equalization")
 
 
 def _auth_user_from_current_user(user: CurrentUser) -> AuthUser:
@@ -24,7 +31,14 @@ def login(payload: LoginRequest, request: Request) -> LoginResponse:
     user_agent = request.headers.get("User-Agent")
     ip_address = request_ip(request)
 
-    if user is None or user["status"] != "active" or not verify_password(payload.password, user["password_hash"]):
+    # verify_password roda sempre, mesmo quando o usuario nao existe (contra
+    # o hash dummy), para que o tempo de resposta nao revele se o e-mail
+    # esta cadastrado. O resultado funcional nao muda: so autentica usuario
+    # ativo com senha correta.
+    password_hash = user["password_hash"] if user is not None else _DUMMY_PASSWORD_HASH
+    password_is_valid = verify_password(payload.password, password_hash)
+
+    if user is None or user["status"] != "active" or not password_is_valid:
         create_audit_log(
             actor_user_id=None,
             action="auth.login_failed",

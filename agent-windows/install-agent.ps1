@@ -160,7 +160,7 @@ function Install-AgentSigningCertificate {
     }
 }
 
-function Protect-AgentConfigFile {
+function Protect-AgentPath {
     param(
         [Parameter(Mandatory = $true)]
         [string]$Path
@@ -173,10 +173,22 @@ function Protect-AgentConfigFile {
         $acl.RemoveAccessRule($existingRule) | Out-Null
     }
 
+    # Directories need ContainerInherit+ObjectInherit so files written later (e.g. cache\checkin-*.json,
+    # rotated logs) inherit the same restricted ACL instead of falling back to the default DACL.
+    $isContainer = (Get-Item -LiteralPath $Path -Force).PSIsContainer
+    $inheritanceFlags = if ($isContainer) {
+        [System.Security.AccessControl.InheritanceFlags]"ContainerInherit, ObjectInherit"
+    }
+    else {
+        [System.Security.AccessControl.InheritanceFlags]::None
+    }
+
     foreach ($identity in @("NT AUTHORITY\SYSTEM", "BUILTIN\Administrators")) {
         $rule = New-Object System.Security.AccessControl.FileSystemAccessRule(
             $identity,
             [System.Security.AccessControl.FileSystemRights]::FullControl,
+            $inheritanceFlags,
+            [System.Security.AccessControl.PropagationFlags]::None,
             [System.Security.AccessControl.AccessControlType]::Allow
         )
         $acl.AddAccessRule($rule)
@@ -254,11 +266,20 @@ $config = [ordered]@{
 $config | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $configPath -Encoding UTF8
 
 try {
-    Protect-AgentConfigFile -Path $configPath
+    Protect-AgentPath -Path $configPath
     Write-Output "config.json ACL restricted to SYSTEM and Administrators."
 }
 catch {
     Write-Output "Warning: failed to restrict config.json ACL: $($_.Exception.Message)"
+}
+
+try {
+    Protect-AgentPath -Path $logsPath
+    Protect-AgentPath -Path $cachePath
+    Write-Output "logs\ and cache\ ACL restricted to SYSTEM and Administrators."
+}
+catch {
+    Write-Output "Warning: failed to restrict logs\/cache\ ACL: $($_.Exception.Message)"
 }
 
 $executionPolicy = Get-AgentScheduledTaskExecutionPolicy -SkipSignatureCheck:$SkipSignatureCheck

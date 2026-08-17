@@ -192,7 +192,7 @@ Regras:
 * Senhas sao verificadas contra `password_hash` PBKDF2-SHA256.
 * Rotas administrativas validam usuario ativo e permissao.
 * Logout registra auditoria; o token expira naturalmente.
-* Erros de login sao genericos para nao enumerar usuarios.
+* Erros de login sao genericos para nao enumerar usuarios. Desde a EPIC 28 (2026-08-17), isso vale tambem para o tempo de resposta: `POST /api/v1/auth/login` (`backend/app/routes/auth.py`) sempre roda `verify_password` (PBKDF2, 210.000 iteracoes) — contra o hash real quando o e-mail existe (ativo ou nao) ou contra um hash dummy pre-computado no modulo quando nao existe — antes de decidir se a requisicao falha, eliminando a diferenca de latencia que antes distinguia conta cadastrada de inexistente.
 
 ### Fallback de desenvolvimento do `AUTH_TOKEN_SECRET`
 
@@ -243,7 +243,7 @@ Campos minimos:
 | `metadata` | json | sim | Dados adicionais sem segredo. |
 | `created_at` | timestamp | sim | Data da acao. |
 
-Ressalva sobre `ip_address`: o Nginx usa `$proxy_add_x_forwarded_for` (`infra/nginx/nginx.conf.template`), que ANEXA o IP real ao valor ja enviado pelo cliente em vez de sobrescreve-lo, e `request_ip()` (`backend/app/services/auth.py`) le apenas o primeiro valor dessa lista — um `X-Forwarded-For` forjado pelo cliente sobrevive intacto ate `audit_logs` (`auth.login`, `auth.login_failed`, `alert.resolve`, `machine.rustdesk_update`). Nao tratar este campo como prova forense confiavel de origem sem cruzar com outros logs. Correcao prevista na EPIC 28 (`docs/development/TASKS.md`): usar `X-Real-IP` (definido pelo proprio Nginx como `$remote_addr`, nao anexavel pelo cliente).
+Nota sobre `ip_address` (corrigido na EPIC 28, 2026-08-17): `request_ip()` (`backend/app/services/auth.py`) le `X-Real-IP` — definido pelo proprio Nginx como `$remote_addr` em todos os `location` de `infra/nginx/nginx.conf.template`, nao anexavel/forjavel pelo cliente — em vez do primeiro valor de `X-Forwarded-For` (que usa `$proxy_add_x_forwarded_for`, que ANEXA o IP real ao valor ja enviado pelo cliente em vez de sobrescreve-lo, permitindo forjar o primeiro valor da lista). Fallback para `request.client.host` quando `X-Real-IP` nao vier, preservando o suporte a rodar sem Nginx na frente (dev/testes). `audit_logs` (`auth.login`, `auth.login_failed`, `alert.resolve`, `machine.rustdesk_update`) passam a gravar esse IP nao forjavel.
 
 Invariantes:
 
