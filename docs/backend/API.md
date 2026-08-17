@@ -132,19 +132,20 @@ Exemplo de envio:
 
 `usb_devices` é `list[dict]` sem schema fixo no Pydantic (`list[dict[str, Any]]`), mas a API só lê a chave `name` de cada item (`device.get("name")`, com fallback para `"USB device"` quando ausente) para compor a descrição do `security_event` `usb_detected`. Outras chaves enviadas pelo agente são aceitas mas ignoradas.
 
-`processes` é opcional e traz os nomes dos processos em execução no momento da coleta. Eles passam pelas mesmas listas de ferramentas monitoradas usadas em `installed_programs` (remoto autorizado/não autorizado, VPN, torrent, ferramentas dual-use e indicadores de malware/ransomware) — ver `malware_or_ransomware_indicator` e `suspicious_tool_detected` abaixo.
+`processes` é opcional e traz os nomes dos processos em execução no momento da coleta. Eles passam pelas mesmas listas de ferramentas remotas autorizadas/não autorizadas, ferramentas dual-use e indicadores de malware/ransomware usadas em `installed_programs` — ver `malware_or_ransomware_indicator` e `suspicious_tool_detected` abaixo. As listas de VPN não autorizada (`unauthorized_vpn_tool`) e torrent (`torrent_software_detected`) só são avaliadas para `installed_programs`; `processes` não passa por essas duas checagens.
 
 Efeitos SOC atuais:
 
 ```text
+hostname fora de KNOWN_ASSET_HOSTNAMES (ASSET_POLICY.md) -> security_event unknown_asset + alerta high; verificado incondicionalmente em todo check-in, nao depende de nenhum campo especifico de security
 security.firewall_enabled = false -> security_event firewall_disabled + alerta high
 security.defender_enabled = false -> security_event defender_disabled + alerta high
 security.rdp_enabled = true -> security_event rdp_enabled; alerta medium se a maquina nao estiver autorizada em ASSET_POLICY.md
 security.local_admins com novo admin apos baseline -> security_event new_admin_user + alerta high
 security.usb_devices preenchido -> security_event usb_detected low
 security.failed_logins_last_hour > 5 -> security_event failed_login + alerta medium
-installed_programs com RustDesk -> security_event remote_access_tool_detected low
-installed_programs com AnyDesk, TeamViewer ou UltraViewer -> security_event unauthorized_remote_access_tool + alerta medium
+installed_programs ou processes com RustDesk -> security_event remote_access_tool_detected low
+installed_programs ou processes com AnyDesk, TeamViewer ou UltraViewer -> security_event unauthorized_remote_access_tool + alerta medium
 installed_programs com Hamachi, ZeroTier, Radmin VPN ou Tailscale -> security_event unauthorized_vpn_tool + alerta high
 installed_programs com uTorrent, BitTorrent ou qBittorrent -> security_event torrent_software_detected + alerta high
 installed_programs ou processes com Mimikatz, WannaCry, WCry, LockBit, BlackCat, ALPHV, Conti, Ryuk, REvil ou DarkSide -> security_event malware_or_ransomware_indicator + alerta high
@@ -170,6 +171,7 @@ Cria ou atualiza a máquina em machines.
 Registra uma nova linha em metrics.
 Substitui o snapshot atual de installed_programs da máquina.
 Cria agent_configs padrão para a máquina quando ainda não existir.
+Sincroniza machine_local_admins com o baseline recebido em security.local_admins, registrando novos administradores.
 Atualiza last_seen e status online da máquina.
 ```
 
@@ -688,6 +690,8 @@ Se last_seen for maior que 10 minutos:
 ```
 
 **Atenção — a transição para offline acontece dentro de uma leitura, não em um job de background.** `GET /api/v1/machines`, `GET /api/v1/machines/{machine_id}` e `GET /api/v1/dashboard/summary` chamam `mark_stale_machines_offline()` antes de responder. Essa função faz um `UPDATE` em `machines.status` para `offline` em qualquer máquina cujo `last_seen` esteja além de `OFFLINE_THRESHOLD_MINUTES` (10 minutos) e, para cada máquina que transicionar, insere um `security_events` do tipo `machine_offline`. Ou seja, consultar essas três rotas pode gravar dados como efeito colateral de uma requisição GET — não existe hoje um worker separado que marque máquinas como offline.
+
+Os dois endpoints de exportação em PDF (EPIC 20) reaproveitam os mesmos services e têm o mesmo efeito colateral: `GET /api/v1/machines/{machine_id}/report.pdf` chama `get_registered_machine()` (mesmo caminho de `GET /api/v1/machines/{machine_id}`) e `GET /api/v1/reports/executive.pdf` chama `get_registered_dashboard_summary()` (mesmo caminho de `GET /api/v1/dashboard/summary`) — ou seja, baixar um relatório em PDF também pode gravar `machines.status`/`security_events` como efeito colateral, mesmo sendo uma exportação.
 
 ---
 

@@ -238,10 +238,12 @@ Campos minimos:
 | `action` | string | sim | Acao executada. |
 | `entity_type` | string | sim | Tipo da entidade afetada. |
 | `entity_id` | string/integer nullable | nao | Identificador da entidade afetada. |
-| `ip_address` | string nullable | nao | IP de origem quando disponivel. |
+| `ip_address` | string nullable | nao | IP de origem quando disponivel; confiabilidade limitada, ver ressalva abaixo. |
 | `user_agent` | string nullable | nao | User-Agent quando disponivel. |
 | `metadata` | json | sim | Dados adicionais sem segredo. |
 | `created_at` | timestamp | sim | Data da acao. |
+
+Ressalva sobre `ip_address`: o Nginx usa `$proxy_add_x_forwarded_for` (`infra/nginx/nginx.conf.template`), que ANEXA o IP real ao valor ja enviado pelo cliente em vez de sobrescreve-lo, e `request_ip()` (`backend/app/services/auth.py`) le apenas o primeiro valor dessa lista — um `X-Forwarded-For` forjado pelo cliente sobrevive intacto ate `audit_logs` (`auth.login`, `auth.login_failed`, `alert.resolve`, `machine.rustdesk_update`). Nao tratar este campo como prova forense confiavel de origem sem cruzar com outros logs. Correcao prevista na EPIC 28 (`docs/development/TASKS.md`): usar `X-Real-IP` (definido pelo proprio Nginx como `$remote_addr`, nao anexavel pelo cliente).
 
 Invariantes:
 
@@ -314,7 +316,11 @@ Estado atual:
 AGENT_API_KEY unica por ambiente.
 ```
 
-Planejamento futuro:
+### Risco conhecido e aceito hoje: personificacao de maquina
+
+Isto nao e apenas uma melhoria futura — e um risco concreto ja explorável com o codigo atual. O backend valida somente essa chave global e identifica a maquina exclusivamente pelo `hostname` autorreportado no payload de check-in; nao ha vinculo servidor-side entre a chave usada e uma maquina especifica. Quem extrai `AGENT_API_KEY` de uma unica maquina comprometida (`config.json` em texto puro na maquina, ver ADR-025) pode forjar um check-in em nome de qualquer outro hostname ja cadastrado/autorizado em `ASSET_POLICY.md`, sobrescrevendo IP/MAC/numero de serie e inventario de programas dessa outra maquina com dados forjados — sem disparar a regra `unknown_asset` (que so reage a hostname fora da allowlist, nao a uso indevido da chave por um hostname ja conhecido). Correcao prevista na EPIC 28 (`docs/development/TASKS.md`): vincular a identidade da maquina a algo alem do hostname autorreportado (segredo por maquina emitido no primeiro registro, ou `machine_id` assinado validado contra o hostname ja conhecido antes de aceitar sobrescrita).
+
+Planejamento futuro (evolucao completa do modelo de credencial, alem da correcao minima acima):
 
 * Criar tabela propria para credenciais de agentes.
 * Gerar uma chave por maquina/agente.

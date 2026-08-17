@@ -93,7 +93,7 @@ Referencia de inspiracao (EPIC 25, `docs/development/TASKS.md`): "design DNA" ex
 
 ## Seguranca de dependencias
 
-O dashboard usa Next.js `16.2.12`, `picomatch` `4.0.4` e `overrides` de `postcss`/`sharp` (`8.5.25`/`0.35.3`) em `package.json` para fechar CVEs high de dependencias internas do Next que a versao atual ainda nao corrigiu.
+O dashboard usa Next.js `16.2.12`, `picomatch` `4.0.4` e `overrides` de `postcss`/`sharp`/`nanoid` (`8.5.25`/`0.35.3`/`3.3.18`) em `package.json` para fechar CVEs high de dependencias internas do Next que a versao atual ainda nao corrigiu. O override de `nanoid` (`3.3.18`) foi adicionado para corrigir a `GHSA-2v37-7h3g-55p8` em uma dependencia transitiva de `postcss`.
 
 Durante o build Docker, o script abaixo substitui o `picomatch` compilado dentro do Next.js pela versao corrigida instalada no projeto:
 

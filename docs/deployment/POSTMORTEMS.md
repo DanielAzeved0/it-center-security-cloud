@@ -1735,6 +1735,104 @@ docker compose --env-file .env.production -f infra/docker-compose.production.yml
 
 ---
 
+# INCIDENTE 022
+
+## Resumo
+
+O unico usuario administrador da tenancy Oracle Cloud perdeu o segundo fator de autenticacao (MFA), sem fator de backup nem segundo administrador cadastrado, bloqueando qualquer acesso ao Console OCI ou via `oci` CLI.
+
+## Severidade
+
+```text
+Alta
+```
+
+## Data
+
+```text
+2026-08-15
+```
+
+## Ambiente
+
+```text
+Producao
+Oracle Cloud
+Console OCI / IAM
+Terraform (EPIC 15)
+```
+
+## Sintomas
+
+Tentativa de login no Console Oracle Cloud, para retomar a EPIC 15 (criar o bucket de Object Storage do state remoto do Terraform), bloqueada na etapa de MFA: o segundo fator estava vinculado a um celular antigo, sem fator de backup configurado.
+
+## Impacto
+
+* Nenhuma acao no Console ou via `oci` CLI e possivel ate a conta ser recuperada: criar/rotacionar API keys, criar o bucket de Object Storage para o state remoto, ou qualquer recriacao de emergencia da VM ou da rede (cenario de disaster recovery da EPIC 15/`docs/architecture/IAC.md`).
+* A aplicacao em si (dashboard, backend, agente, Nginx) continua funcionando normalmente em `itcenter-edge-01` — o bloqueio e apenas para operacoes administrativas de infraestrutura na nuvem.
+* Combinado com a dependencia de uma unica chave SSH pessoal (INCIDENTE 018), a operacao do projeto passa a depender inteiramente do acesso SSH continuo a VM, sem plano B caso a VM ou a rede precisem ser recriadas do zero.
+* Migracao do state do Terraform para backend remoto (ultimo item pendente da EPIC 15) bloqueada sem previsao.
+
+## Linha do tempo
+
+```text
+T+00 - Tentativa de acessar o Console Oracle Cloud para criar o bucket
+       de Object Storage do state remoto (EPIC 15)
+T+05 - Login bloqueado na etapa de MFA: segundo fator vinculado a um
+       celular antigo, sem fator de backup configurado
+T+10 - Confirmado que nao existe segundo usuario administrador
+       cadastrado na tenancy
+T+15 - Investigacao adicional: terraform.tfvars e terraform.tfstate
+       reais do import de 2026-08-04 nao localizados em itcenter-edge-01
+       nem em copia conhecida
+T+20 - API key do usuario IAM terraform-provisioner (criada em
+       2026-08-04) tambem dada como perdida
+T+25 - Bloqueio registrado em docs/deployment/KNOWN_ISSUES.md e como
+       pendencia explicita da EPIC 15 em docs/development/TASKS.md
+```
+
+## Causa raiz
+
+Mesmo padrao do INCIDENTE 018 (perda de acesso administrativo sem plano de backup), aqui na camada da conta Oracle Cloud em vez da chave SSH: um unico usuario administrador da tenancy, com um unico fator de MFA, sem fator de backup nem segundo administrador cadastrado. Nao havia redundancia de acesso administrativo na nuvem, apenas na VM.
+
+## Correcao aplicada
+
+Nenhuma — bloqueio em aberto. Nao ha acao possivel sem recuperar o acesso ao Console Oracle Cloud primeiro (fator de backup na tela de login, um segundo administrador existente na tenancy, ou Service Request com o suporte Oracle provando titularidade da conta).
+
+## Como validar
+
+```text
+Tentar login no Console Oracle Cloud (https://cloud.oracle.com) com o
+usuario administrador conhecido — segue bloqueado no MFA ate a
+recuperacao ser concluida.
+```
+
+## Licoes aprendidas
+
+* O mesmo tipo de single point of failure do INCIDENTE 018 (credencial administrativa sem backup) pode existir em mais de uma camada ao mesmo tempo — aqui na conta cloud, nao apenas na chave SSH da VM. A licao do INCIDENTE 018 nao havia sido generalizada para a conta Oracle Cloud.
+* Artefatos de estado sensiveis (`terraform.tfstate`, `terraform.tfvars`, API keys de automacao) tambem podem se perder por falta de copia de backup, agravando o mesmo tipo de risco em outra camada — o Terraform da EPIC 15 ficou sem state local rastreavel e sem credencial de automacao ao mesmo tempo em que o acesso humano ao Console ficou bloqueado.
+* MFA sem fator de backup e sem segundo administrador transforma qualquer perda de dispositivo em bloqueio total, nao apenas inconveniente.
+
+## Melhorias futuras
+
+* Recuperar o acesso ao Console OCI (fator de backup na tela de login, um segundo administrador existente, ou Service Request com o suporte Oracle).
+* Apos recuperado: cadastrar um segundo usuario administrador e um fator de MFA de backup, para nao repetir esse bloqueio.
+* Gerar uma API key nova para `terraform-provisioner` e refazer a descoberta/import do Terraform do zero (`infra/terraform/README.md`), ja que o state de 2026-08-04 nao foi localizado.
+* Guardar copias de `terraform.tfstate`/`terraform.tfvars` em um local seguro fora da VM (cofre de senhas ou storage cifrado), nao apenas localmente.
+* Tratar recuperacao de acesso administrativo (SSH e conta cloud) como uma unica categoria de risco operacional, revisada em conjunto, em vez de dois incidentes isolados.
+
+## Automacao recomendada
+
+```text
+Nao ha checagem tecnica automatizavel para MFA de conta cloud a partir
+do dashboard operacional. Mitigar via processo: checklist periodico
+(ex.: trimestral) confirmando que existe segundo administrador ativo,
+fator de MFA de backup cadastrado, e copia de backup de chaves
+SSH/API keys/terraform.tfstate fora do unico ponto de falha atual.
+```
+
+---
+
 # Analise consolidada de causa raiz
 
 ## Erros mais recorrentes
@@ -1749,6 +1847,7 @@ docker compose --env-file .env.production -f infra/docker-compose.production.yml
 * Seed de dados pos-deploy (usuario admin, configuracao inicial) tratado como implicito em vez de etapa explicita (INCIDENTE 019).
 * Esquemas de autenticacao concorrentes disputando o mesmo cabecalho `Authorization` (INCIDENTE 020).
 * Tags de imagens externas fixadas no Compose sem confirmar a existencia real no registry (INCIDENTE 021).
+* MFA de conta cloud sem fator de backup nem segundo administrador cadastrado (INCIDENTE 022) — mesmo padrao do INCIDENTE 018, em outra camada de acesso administrativo.
 
 ## Causas mais recorrentes
 
@@ -1817,6 +1916,7 @@ docker compose --env-file .env.production -f infra/docker-compose.production.yml
 * Automatizar o seed idempotente do primeiro admin a partir do `deploy.sh` (INCIDENTE 019).
 * Guardar copia de recuperacao de chaves SSH administrativas fora do unico ponto de falha atual (INCIDENTE 018).
 * Incluir `docker compose --profile maintenance pull`/`config` no preflight ou em checagem periodica (INCIDENTE 021).
+* Cadastrar segundo administrador e fator de MFA de backup na conta Oracle Cloud, e guardar copia de `terraform.tfstate`/`terraform.tfvars`/API keys de automacao fora do unico ponto de falha atual (INCIDENTE 022).
 
 ---
 

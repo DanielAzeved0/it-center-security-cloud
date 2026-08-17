@@ -1214,7 +1214,17 @@ Validacao em 2026-08-14: `agent-windows/tests/run-agent-tests.ps1` passou
 (incluindo os novos casos de Get-AgentSerialNumber: valor real, fallback
 por placeholder, ambos placeholder, e leitor que lanca excecao). Suite
 completa do backend via `pytest` local com PostgreSQL via Docker Compose:
-89 passed. `npm run build` do frontend limpo (TypeScript OK, Turbopack).
+89 passed. Esse numero e o mesmo `89 passed` ja registrado em
+`docs/deployment/DEPLOYMENT_HISTORY.md` (2026-08-11, "Reversao da
+integracao Snipe-IT") - nao ha contradicao com o `96 passed` da EPIC 20
+(tambem 2026-08-11, mas registrado horas antes da reversao do Snipe-IT
+na mesma data): a reversao removeu `test_snipeit_service.py` (7 testes),
+96 - 7 = 89, e EPIC 27 so editou testes ja existentes em
+`test_agent_checkin.py` (nenhuma funcao de teste nova), entao o total
+nao mudou desde a reversao. Contagem reconfirmada em 2026-08-17 contando
+as funcoes `def test_` reais em `backend/tests/` (79) mais os casos
+`@pytest.mark.parametrize` de `test_users_schema.py` (+8) e
+`test_audit_logs_schema.py` (+2) = 89. `npm run build` do frontend limpo (TypeScript OK, Turbopack).
 Teste end-to-end real: agente real (dot-source de
 `itcenter-agent.ps1`) gerou payload com `serial_number = "5M56TH4"`,
 enviado via HTTP para uma instancia local do backend, persistido em
@@ -1530,23 +1540,25 @@ Corrigir divergencias entre documentacao e codigo real encontradas na auditoria 
     para cobrir VPN/torrent (fechando a lacuna real) ou corrigir API.md
     para bater com SOC_RULES.md.
 
-[ ] Documentar que os endpoints de PDF tambem disparam `mark_stale_machines_offline` (`docs/backend/API.md:690`, severidade baixa)
+[x] Documentar que os endpoints de PDF tambem disparam `mark_stale_machines_offline` (`docs/backend/API.md:690`, severidade baixa)
 
-    A doc lista so 3 rotas JSON com esse efeito colateral de escrita
-    durante leitura. Os dois endpoints .pdf (relatorio de maquina e
-    executivo) reusam os mesmos services e disparam o mesmo UPDATE
-    machines SET status='offline' - baixar um PDF pode gravar no banco
-    sem que a doc avise. Direcao: adicionar os dois endpoints .pdf a
-    lista de API.md.
+    Corrigido em 2026-08-17: confirmado no codigo real que
+    GET /api/v1/machines/{id}/report.pdf chama get_registered_machine()
+    (mesmo caminho de GET /api/v1/machines/{id}) e
+    GET /api/v1/reports/executive.pdf chama
+    get_registered_dashboard_summary() (mesmo caminho de
+    GET /api/v1/dashboard/summary) - ambos acabam chamando
+    mark_stale_machines_offline(). Paragrafo adicionado em
+    docs/backend/API.md logo apos o aviso das 3 rotas JSON.
 
-[ ] Atualizar a allowlist documentada do proxy em SECURITY.md (`docs/security/SECURITY.md:132`, severidade baixa)
+[x] Atualizar a allowlist documentada do proxy em SECURITY.md (`docs/security/SECURITY.md:132`, severidade baixa)
 
-    SECURITY.md lista 5 prefixos permitidos no proxy; o codigo real tem
-    9, incluindo api/v1/dashboard e api/v1/reports (adicionados na
-    EPIC 20). Quem ler so a doc concluiria - errado - que chamadas ao
-    executivo/relatorios PDF seriam bloqueadas pelo proxy. Direcao:
-    atualizar a lista em SECURITY.md para os 9 prefixos reais de
-    ALLOWED_PATH_PREFIXES.
+    Corrigido em 2026-08-17: confirmado em
+    frontend/dashboard/app/api/backend/[...path]/route.ts que
+    ALLOWED_PATH_PREFIXES tem 9 prefixos reais (health, auth/login,
+    auth/me, auth/logout, machines, alerts, security-events, dashboard,
+    reports). docs/security/SECURITY.md atualizado para listar os 9,
+    com nota de que dashboard/reports foram adicionados na EPIC 20.
 
 ---
 

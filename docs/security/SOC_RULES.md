@@ -428,5 +428,5 @@ Comportamento atual:
 * `torrent_software_detected`: gerado para uTorrent, BitTorrent e qBittorrent; severidade `high`; gera alerta aberto.
 * `machine_offline`: gerado quando uma maquina transiciona de `online` para `offline` por ficar sem check-in por mais de 10 minutos; severidade `low`; origem `system`; nao gera alerta.
 * `unknown_asset`: gerado quando o hostname do check-in nao esta na allowlist de ativos conhecidos em ASSET_POLICY.md; severidade `high`; gera alerta aberto.
-* Alertas abertos nao sao duplicados para a mesma maquina e mesmo tipo.
+* Alertas abertos nao devem ser duplicados para a mesma maquina e mesmo tipo — esse e o comportamento esperado do caminho sequencial feliz (SELECT verificando alerta aberto existente antes do INSERT), mas nao e uma garantia absoluta sob concorrencia: nao existe constraint `UNIQUE` no banco sustentando essa regra. Um retry do agente apos timeout do proxy (o agente trata qualquer `5xx` como falha temporaria e reenvia o mesmo check-in) pode, em tese, gerar um alerta duplicado se a segunda requisicao concorrente ainda nao enxergar o commit da primeira. Correcao prevista na EPIC 30 (`docs/development/TASKS.md`): indice parcial `UNIQUE` em `(machine_id, alert_type)` para os status abertos, ou `SELECT ... FOR UPDATE` na mesma transacao.
 * Eventos continuam sendo registrados a cada check-in em estado de risco.

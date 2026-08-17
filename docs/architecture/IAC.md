@@ -107,6 +107,18 @@ Fase alvo:    remoto, backend S3-compativel apontando para OCI Object Storage
 
 O bucket de Object Storage e criado manualmente uma unica vez (Terraform nao pode gerenciar o bucket que guarda o proprio state). Versionamento do bucket habilitado como rede de seguranca adicional para o state. Configuracao do backend preparada como partial configuration (`backend "s3" {}` em `versions.tf` + `backend.hcl.example`, sem valores reais nem chaves versionados) — runbook completo de criacao do bucket, Customer Secret Key e `terraform init -migrate-state` em `infra/terraform/README.md`, secao "State".
 
+**Migracao bloqueada desde 2026-08-15 (nao e apenas tarefa nao iniciada)**: ao retomar a EPIC 15 para criar o bucket e migrar o state, descobriu-se que (1) o unico usuario administrador da tenancy Oracle Cloud perdeu o MFA (celular antigo), sem fator de backup nem segundo administrador cadastrado — nenhuma acao de Console OCI ou `oci` CLI e possivel ate a conta ser recuperada; e (2) o `terraform.tfstate` e o `terraform.tfvars` reais do import de 2026-08-04 nao foram localizados (nem em `itcenter-edge-01` nem em copia conhecida), e a API key do usuario `terraform-provisioner` tambem foi dada como perdida. Ver `docs/deployment/KNOWN_ISSUES.md` ("Acesso ao Console Oracle Cloud bloqueado (MFA do administrador perdido)") e `docs/development/TASKS.md` (EPIC 15).
+
+Ordem de desbloqueio necessaria antes de sequer poder migrar o state:
+
+```text
+1. Recuperar o acesso ao Console OCI (fator de backup, segundo administrador ja existente, ou Service Request ao suporte Oracle provando titularidade da tenancy)
+2. Cadastrar um segundo administrador e um fator de MFA de backup, para nao repetir o bloqueio
+3. Gerar uma API key nova para terraform-provisioner
+4. Refazer a descoberta/import do Terraform do zero (infra/terraform/README.md), ja que o state de 2026-08-04 nao existe mais
+5. So entao criar o bucket de Object Storage e rodar terraform init -migrate-state
+```
+
 ## Secrets
 
 ```text
@@ -123,6 +135,8 @@ State local corrompido por sync      -> pasta do projeto esta sob OneDrive
 IP publico efemero (nao reservado)   -> confirmado EPHEMERAL em producao (2026-08-04); replace acidental da instancia trocaria o IP e quebraria o DNS - mitigado por nunca rodar apply de recriacao
 Shape Always Free indisponivel       -> risco ao recriar a instancia numa recuperacao futura
 Drift de versao do provider oci      -> comitar .terraform.lock.hcl
+Acesso Console/oci CLI bloqueado (MFA do admin perdido, desde 2026-08-15) -> nenhuma acao administrativa na nuvem e possivel (bucket de state, rotacao de API key, disaster recovery da VM/rede); ver docs/deployment/KNOWN_ISSUES.md
+terraform.tfstate/terraform.tfvars do import de 2026-08-04 nao localizados -> migracao de state bloqueada; sera necessario refazer a descoberta/import do zero com credenciais novas antes de migrar
 ```
 
 Detalhes operacionais (comandos, runbook de import) ficam em `infra/terraform/README.md`. Decisao registrada em ADR-024 (`docs/development/DECISIONS.md`).

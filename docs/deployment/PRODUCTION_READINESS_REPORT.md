@@ -137,9 +137,9 @@ curl --fail --user admin:SENHA_FORTE_AQUI https://SEU_DOMINIO/
 
 * Separar `requirements.txt` em runtime e dev/test para reduzir a imagem do backend.
 * Adicionar CI/CD com build, testes, Docker Scout e publish controlado. **Já implementado** desde então (`.github/workflows/ci.yml` e `deploy-production.yml`).
-* Adicionar Prometheus para metricas. **Já tem planejamento formal**: EPIC 21 / ADR-030 (`docs/development/DECISIONS.md`).
+* Adicionar Prometheus para metricas. **Já implementado e ativo em produção** desde 2026-08-15 (EPIC 21 / ADR-030, `docs/development/DECISIONS.md`): roda sob `profiles: ["observability"]` em `infra/docker-compose.production.yml`, opt-in, sem porta pública. Risco de memória aceito e documentado em `docs/deployment/KNOWN_ISSUES.md` ("Observabilidade (EPIC 21): memoria em alerta com o profile ativo").
 * Adicionar Loki/Promtail para logs.
-* Adicionar Grafana para dashboards operacionais. **Já tem planejamento formal**: EPIC 21 / ADR-030, junto com Prometheus.
+* Adicionar Grafana para dashboards operacionais. **Já implementado e ativo em produção** desde 2026-08-15 (EPIC 21 / ADR-030, junto com Prometheus), com dashboard "Edge Node Overview" provisionado automaticamente e senha de admin real configurada (ver `docs/deployment/DEPLOYMENT_HISTORY.md`, "Ativacao real da observabilidade em producao").
 * Adicionar Wazuh para telemetria defensiva avancada. Continua como EPIC 14, fora do escopo do MVP, sem ADR ainda.
 * Adicionar alertas de disco, memoria, containers unhealthy e expiracao de certificado.
 * Avaliar PostgreSQL gerenciado ou instancia privada dedicada quando o MVP crescer.

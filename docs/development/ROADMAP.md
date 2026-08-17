@@ -36,6 +36,15 @@ Este documento numera as fases detalhadas abaixo como "Fase N" (a partir de 0). 
 | Fase 19 | EPIC 22 |
 | Fase 20 | EPIC 23 |
 | Fase 21 | EPIC 24 |
+| Fase 22 | EPIC 25 |
+| Fase 23 | EPIC 26 |
+| Fase 24 | EPIC 27 |
+| Fase 25 | EPIC 28 |
+| Fase 26 | EPIC 29 |
+| Fase 27 | EPIC 30 |
+| Fase 28 | EPIC 31 |
+| Fase 29 | EPIC 32 |
+| Fase 30 | EPIC 33 |
 
 ---
 
@@ -72,6 +81,15 @@ EPIC 21 - Observabilidade de Infraestrutura (Prometheus + Grafana)
 EPIC 22 - Auto-atualizacao do Agente Windows (Updater Dedicado)
 EPIC 23 - Auto-deteccao do ID do RustDesk no Agente
 EPIC 24 - Polimento Visual do Dashboard (GSAP)
+EPIC 25 - Modernizacao Visual do Dashboard (Design DNA)
+EPIC 26 - Layout Persistente de Autenticacao (Velocidade de Navegacao)
+EPIC 27 - Numero de Serie da Maquina (Coleta pelo Agente)
+EPIC 28 - Correcao de Achados de Seguranca (Auditoria Tecnica 2026-08-15)
+EPIC 29 - Correcao de Confiabilidade Operacional (Auditoria Tecnica 2026-08-15)
+EPIC 30 - Correcao de Integridade de Dados do Backend (Auditoria Tecnica 2026-08-15)
+EPIC 31 - Correcao de Resiliencia do Agente Windows (Auditoria Tecnica 2026-08-15)
+EPIC 32 - Correcao de Aderencia Documentacao-Codigo (Auditoria Tecnica 2026-08-15)
+EPIC 33 - Cobertura de Testes (Auditoria Tecnica 2026-08-15)
 ```
 
 ## Arquitetura
@@ -103,6 +121,11 @@ security_events -> EPIC 3
 alerts -> EPIC 3
 agent_configs -> EPIC 3
 machine_local_admins -> EPIC 6
+users -> EPIC 12
+audit_logs -> EPIC 12
+machines.mac_address -> EPIC 4
+machines.rustdesk_id -> EPIC 19
+machines.serial_number -> EPIC 27
 ```
 
 ## API
@@ -115,6 +138,13 @@ GET /api/v1/machines/{id} -> EPIC 2
 GET /api/v1/machines/{id}/metrics -> EPIC 2
 GET /api/v1/machines/{id}/programs -> EPIC 2
 PATCH /api/v1/alerts/{id}/resolve -> EPIC 2
+POST /api/v1/auth/login -> EPIC 12
+GET /api/v1/auth/me -> EPIC 12
+POST /api/v1/auth/logout -> EPIC 12
+PATCH /api/v1/machines/{id}/rustdesk -> EPIC 19
+GET /api/v1/dashboard/summary -> EPIC 20
+GET /api/v1/reports/executive.pdf -> EPIC 20
+GET /api/v1/machines/{id}/report.pdf -> EPIC 20
 ```
 
 ## Agente
@@ -136,6 +166,9 @@ Instalacao como produto -> EPIC 8
 Servico Windows ou tarefa agendada -> EPIC 8
 Retry inteligente -> EPIC 8
 Validacao contra producao -> EPIC 8 e EPIC 9
+MAC Address -> EPIC 4
+Hardening (ACL, quarentena de cache, rotacao de logs, assinatura de codigo) -> EPIC 16
+Numero de serie -> EPIC 27
 ```
 
 ## SOC Light
@@ -461,7 +494,7 @@ Produto comercializável.
 
 # Fase 12
 
-Infraestrutura como Codigo — quase concluida (ADR-024), 4 pendencias de infraestrutura
+Infraestrutura como Codigo — quase concluida (ADR-024), 2 pendencias bloqueadas por acesso a conta Oracle Cloud
 
 Meta:
 
@@ -472,13 +505,13 @@ Entregas:
 * Modulos Terraform (network e compute)
 * Import dos recursos existentes, com `terraform plan` em "No changes." (concluido em 2026-08-04)
 * Documentacao de shape, availability domain, regiao e compartment antes ausente (concluido)
+* Scripts de bootstrap (`infra/bootstrap/{01-system,02-packages,03-directories,04-docker,05-firewall,bootstrap}.sh`) conforme `docs/deployment/BOOTSTRAP.md` (implementados em 2026-08-15, nao executados contra a VM real — so tem efeito numa VM nova ou recuperacao de desastre)
+* Variavel opcional de cloud-init/bootstrap no module compute, documentada e cross-referenciada (sem ativar em producao)
 
-Pendente (4 itens; detalhes e progresso em EPIC 15 de `docs/development/TASKS.md`):
+Pendente (2 itens, ambos **BLOQUEADOS em 2026-08-15** pela perda de acesso ao unico usuario administrador da tenancy Oracle Cloud — sem MFA de backup nem segundo administrador; ver `docs/deployment/KNOWN_ISSUES.md`, "Acesso ao Console Oracle Cloud bloqueado", e progresso em EPIC 15 de `docs/development/TASKS.md`):
 
 * Bucket OCI Object Storage para state remoto
-* Migracao do state para o backend remoto (`terraform init -migrate-state`)
-* Scripts de bootstrap (`infra/bootstrap/{01-system,02-packages,03-directories,04-docker,05-firewall,bootstrap}.sh`) conforme `docs/deployment/BOOTSTRAP.md`
-* Variavel opcional de cloud-init/bootstrap no module compute (sem ativar em producao)
+* Migracao do state para o backend remoto (`terraform init -migrate-state`) — bloqueada tambem por um segundo motivo: `terraform.tfvars`/`terraform.tfstate` do import de 2026-08-04 nao foram localizados, exigindo gerar API key nova e refazer a descoberta/import do zero antes de qualquer migracao
 
 Resultado Esperado:
 
@@ -601,7 +634,7 @@ Validado em 2026-08-11: suite completa do backend com 96 testes passando e build
 
 # Fase 18
 
-Observabilidade de Infraestrutura (Prometheus + Grafana) — planejamento concluido (ADR-030), implementacao pendente
+Observabilidade de Infraestrutura (Prometheus + Grafana) — concluida (ADR-030)
 
 Meta:
 
@@ -609,14 +642,16 @@ Monitorar o Edge Node e os containers, com escopo corrigido para nao duplicar o 
 
 Entregas:
 
-* `node_exporter` e cAdvisor (ou metricas nativas do Docker) no Compose de producao.
-* Prometheus com scrape config; Grafana com dashboard(s) de saude do Edge Node.
-* Prometheus/Grafana nao expostos publicamente (Nginx continua unico ponto de entrada).
-* Validacao de impacto de recursos no free tier antes de ativar (`infra/scripts/ops-check.sh`).
+* `node_exporter` e cAdvisor no Compose de producao, sob `profiles: ["observability"]` (opt-in, mesmo padrao do `certbot`/`maintenance`)
+* Prometheus com scrape config (`infra/observability/prometheus/prometheus.yml`, retencao `5d`/`200MB`) e Grafana com dashboard pre-configurado de saude do Edge Node
+* Prometheus/Grafana nao expostos publicamente (Nginx continua unico ponto de entrada); acesso via `docker exec`/tunel SSH
+* Revisao de seguranca corrigiu 2 achados altos (mount de `/var/run` no cAdvisor removido; risco residual do mount de `/` documentado em SECURITY.md) e 2 medios (imagens no gate do Docker Scout; `ops-check.sh` falha se `GRAFANA_ADMIN_PASSWORD` estiver no fallback)
 
 Resultado Esperado:
 
 Visibilidade operacional da infraestrutura sem aumentar a superficie publica nem duplicar responsabilidade com o agente.
+
+Validado na VM real em 2026-08-15: os 4 containers subiram healthy via `docker compose --profile observability up -d`; `ops-check.sh` reportou `OK Operacao sem falhas criticas` (memoria da VM em `WARN`, risco aceito e documentado em `docs/deployment/KNOWN_ISSUES.md`). EPIC 21 de `docs/development/TASKS.md` encerrada.
 
 ---
 
@@ -682,3 +717,200 @@ Entregas:
 Resultado Esperado:
 
 Dashboard com a mesma funcionalidade, com polimento visual consistente em todas as telas. Validado via `npm run build` e smoke test das rotas autenticadas com dados reais; nao verificado visualmente em navegador real nesta rodada (sem ferramenta de automacao de browser conectada) — revisao visual manual recomendada antes de producao. EPIC 24 de `docs/development/TASKS.md` encerrada.
+
+---
+
+# Fase 22
+
+Modernizacao Visual do Dashboard (Design DNA) — concluida
+
+Meta:
+
+Harmonizar o visual das 7 telas do dashboard (design system consistente), sem mudar logica de dados/API/RBAC — mesmo espirito da Fase 21. Referencia de inspiracao extraida via a skill `zanwei/design-dna` a partir de screenshots da demo publica do Snipe-IT (valor no padrao de organizacao, nao no acabamento visual — paleta propria do projeto foi mantida).
+
+Entregas:
+
+* Tokens semanticos unificados em `app/globals.css` (`--success`/`--warning`/`--danger`/`--info`/`--critical`), dark mode automatico via `prefers-color-scheme`
+* `StatCard` com prop `tone`; novo componente `Panel` substituindo o padrao repetido `<section className="panel">`
+* Aplicado nas 6 telas de dados (9 paineis), preservando o RBAC visual existente
+
+Resultado Esperado:
+
+Dashboard com aparencia consistente entre telas, sem alterar dado/API/RBAC. Validado via `npm run build`; nao verificado visualmente em navegador real (mesma limitacao da Fase 21). EPIC 25 de `docs/development/TASKS.md` encerrada.
+
+---
+
+# Fase 23
+
+Layout Persistente de Autenticacao (Velocidade de Navegacao) — concluida
+
+Meta:
+
+Reduzir o tempo de carregamento percebido ao navegar entre telas: `Shell.tsx` nao vivia em um layout compartilhado do Next.js App Router, entao cada navegacao desmontava/remontava a sidebar inteira e refazia o fetch `GET /api/v1/auth/me`.
+
+Entregas:
+
+* `AuthProvider.tsx` (Context) buscando `/api/v1/auth/me` uma unica vez por sessao
+* `Shell.tsx` -> `AppShell.tsx` (chrome persistente); paginas autenticadas movidas para `app/(authenticated)/` com layout unico
+* Fetch duplicado de `/api/v1/auth/me` removido de `AlertsView`/`MachineDetailView`
+* `middleware.ts` ganhou `/executive` no `matcher` (unica rota autenticada sem protecao server-side de cookie)
+
+Resultado Esperado:
+
+Navegacao mais rapida entre telas sem refazer autenticacao a cada clique, sem mudar URLs nem RBAC. Validado via `npm run build`; verificacao de rede em navegador real recomendada antes de producao. EPIC 26 de `docs/development/TASKS.md` encerrada.
+
+---
+
+# Fase 24
+
+Numero de Serie da Maquina (Coleta pelo Agente) — quase concluida, 1 pendencia de validacao
+
+Meta:
+
+Coletar o numero de serie (service tag) via agente Windows para uso em inventario de ativos, com a mesma filosofia de resiliencia das demais integracoes do agente (falha na leitura nunca bloqueia o check-in).
+
+Entregas:
+
+* `Get-AgentSerialNumber`: tenta `Win32_BIOS.SerialNumber`, com fallback para `Win32_ComputerSystemProduct.IdentifyingNumber` quando vazio/placeholder — testado em maquina fisica real (2026-08-14)
+* Coluna `machines.serial_number` (migration `008_machines_serial_number.sql`), persistida a cada check-in, exposta em `GET /api/v1/machines`/`{id}` e exibida no detalhe da maquina
+
+Pendente (1 item; detalhes em EPIC 27 de `docs/development/TASKS.md`):
+
+* Testar o mesmo campo contra maquina(s) virtual(is) — nao realizado por falta de VM disponivel no ambiente de testes; lista de placeholders (vazio, "System Serial Number", "To Be Filled By O.E.M." etc.) baseada em valores publicamente conhecidos, ainda nao validada empiricamente
+
+Resultado Esperado:
+
+Numero de serie disponivel no inventario sem digitacao manual quando o hardware expuser o dado via WMI/CIM. EPIC 27 **nao encerrada** ate a validacao contra VM.
+
+---
+
+# Fase 25
+
+Correcao de Achados de Seguranca (Auditoria Tecnica 2026-08-15) — nao iniciada
+
+Meta:
+
+Corrigir os achados de seguranca da auditoria tecnica completa de 2026-08-15 (backend, frontend, agente Windows), com verificacao adversarial 1:1 por achado. Detalhes completos em EPIC 28 de `docs/development/TASKS.md`.
+
+Entregas previstas:
+
+* Vincular a identidade da maquina a algo alem do hostname autorreportado (severidade alta — personificacao de maquina via `AGENT_API_KEY` compartilhada)
+* Corrigir bypass de path traversal via `%2f` no proxy do dashboard (severidade alta — expoe `/docs` da API sem autenticacao)
+* Equalizar tempo de resposta do login (severidade media — enumeracao de e-mail)
+* Ler `X-Real-IP` em vez do primeiro valor de `X-Forwarded-For` em `audit_logs` (severidade media)
+* Remover `unsafe-inline` de `script-src` na CSP do dashboard (severidade media)
+* Restringir ACL de `logs\`/`cache\` do agente, nao so `config.json` (severidade media)
+* Bloco `permissions:` restrito em `ci.yml` (severidade baixa)
+
+Resultado Esperado:
+
+Fechar os achados de seguranca mais graves identificados na auditoria antes de qualquer exposicao adicional do produto. Nenhuma tarefa iniciada ate o momento.
+
+---
+
+# Fase 26
+
+Correcao de Confiabilidade Operacional (Auditoria Tecnica 2026-08-15) — nao iniciada
+
+Meta:
+
+Corrigir os dois achados mais graves da auditoria tecnica de 2026-08-15: backup e restore podem reportar sucesso mesmo tendo falhado. Detalhes completos em EPIC 29 de `docs/development/TASKS.md`.
+
+Entregas previstas:
+
+* Corrigir falha silenciosa em `backup.sh` (pipe `pg_dump | gzip` nao propaga o exit code do `pg_dump`)
+* Corrigir falha silenciosa em `restore.sh` (mesmo problema, agravado por rodar apos um `DROP SCHEMA public CASCADE` destrutivo e sem `-v ON_ERROR_STOP=1` no `psql`)
+* Automatizar o gate de CVE do Docker Scout no deploy (hoje so documentado, nunca invocado por `ci.yml`/`deploy-production.yml`)
+
+Resultado Esperado:
+
+Backup/restore reportando sucesso somente quando de fato bem-sucedidos, e o gate de CVE deixando de depender de um humano lembrar de rodar manualmente. Nenhuma tarefa iniciada ate o momento.
+
+---
+
+# Fase 27
+
+Correcao de Integridade de Dados do Backend (Auditoria Tecnica 2026-08-15) — nao iniciada
+
+Meta:
+
+Corrigir uma race condition que duplica alertas, um mismatch de constraint que pode derrubar o check-in inteiro, e consultas sem filtro/paginacao que crescem sem parar. Detalhes completos em EPIC 30 de `docs/development/TASKS.md`.
+
+Entregas previstas:
+
+* Indice parcial UNIQUE (ou `SELECT ... FOR UPDATE`) para evitar alertas abertos duplicados sob retry do agente
+* Alinhar a constraint UNIQUE de `installed_programs` com a chave de dedup real do agente (incluir `publisher`)
+* Filtrar por `machine_id` no SQL do relatorio PDF de maquina, em vez de filtrar em Python apos carregar tudo
+* Paginacao em `/alerts`, `/security-events` e `/machines/{id}/metrics`
+* Indice composto para a query de existencia de alerta (`machine_id`, `alert_type`, `status`)
+* Identidade de admin local case-insensitive de ponta a ponta (indice sobre `lower(admin_name)`)
+* Deduplicar deteccao de VPN/torrent dentro do mesmo check-in; validar formato de `ip_address` no schema
+
+Resultado Esperado:
+
+Dados consistentes mesmo sob retry/concorrencia, e listagens que nao crescem sem limite na VM de 1GB. Nenhuma tarefa iniciada ate o momento.
+
+---
+
+# Fase 28
+
+Correcao de Resiliencia do Agente Windows (Auditoria Tecnica 2026-08-15) — nao iniciada
+
+Meta:
+
+Corrigir gaps de resiliencia do agente Windows, mantendo a filosofia de robustez ja aplicada no hardening da Fase 13 (EPIC 16): falha em uma coleta nunca deve travar o check-in inteiro. Detalhes completos em EPIC 31 de `docs/development/TASKS.md`.
+
+Entregas previstas:
+
+* Try/catch proprio em `Get-AgentLocalAdmins` (severidade alta — excecao terminante hoje derruba o check-in inteiro, maquina some do dashboard)
+* Consultar o usuario do console interativo em vez do processo (severidade media — Tarefa Agendada roda como SYSTEM, todo check-in reporta "NT AUTHORITY\SYSTEM")
+* Lock ao redor do envio de cache pendente (severidade media — execucao manual concorrente com o ciclo agendado pode abandonar a fila)
+* Excluir adaptadores virtuais/VPN da selecao de IP (severidade baixa)
+
+Resultado Esperado:
+
+Agente Windows que nunca some do dashboard por falha de coleta isolada, e que reporta o usuario real em vez de SYSTEM. Nenhuma tarefa iniciada ate o momento.
+
+---
+
+# Fase 29
+
+Correcao de Aderencia Documentacao-Codigo (Auditoria Tecnica 2026-08-15) — em andamento
+
+Meta:
+
+Corrigir divergencias entre documentacao e codigo real encontradas na auditoria tecnica de 2026-08-15. Detalhes completos em EPIC 32 de `docs/development/TASKS.md`.
+
+Entregas:
+
+* Documentado (2026-08-17) que os endpoints de PDF tambem disparam `mark_stale_machines_offline`, em `docs/backend/API.md`
+* Atualizada (2026-08-17) a allowlist documentada do proxy em `docs/security/SECURITY.md` para os 9 prefixos reais de `ALLOWED_PATH_PREFIXES` (antes listava so 5)
+
+Pendente (1 item):
+
+* Resolver a divergencia entre `API.md` e `SOC_RULES.md` sobre deteccao de VPN/torrent em processos — exige decidir entre estender a checagem de processos (fechando uma lacuna real de deteccao) ou so corrigir a doc; decisao de escopo de codigo, nao resolvida nesta rodada de documentacao
+
+Resultado Esperado:
+
+Documentacao tecnica confiavel para quem decide com base nela, sem lacuna de deteccao SOC real esquecida.
+
+---
+
+# Fase 30
+
+Cobertura de Testes (Auditoria Tecnica 2026-08-15) — nao iniciada
+
+Meta:
+
+Fechar lacunas de cobertura de teste encontradas na auditoria tecnica de 2026-08-15: uma regra SOC sem nenhum teste, e duas garantias de comportamento de seguranca nunca exercitadas. Detalhes completos em EPIC 33 de `docs/development/TASKS.md`.
+
+Entregas previstas:
+
+* Teste de fronteira para a regra SOC `failed_login` (5 nao alerta, 6 alerta) — unica das 14 regras SOC sem teste dedicado
+* Teste de idempotencia de `apply_migrations()` (aplicar o conjunto completo duas vezes seguidas contra um banco limpo)
+* Teste de revogacao de sessao em tempo real (emitir token, desabilitar usuario, confirmar 401 na proxima requisicao)
+* Incluir e testar o campo usuario no evento de USB (`payload.username` ausente hoje em `raw_data`/descricao, exigido pela Regra 6 de `SOC_RULES.md`)
+
+Resultado Esperado:
+
+Cobertura de teste que barra regressao nas garantias de seguranca ja implementadas, mas nunca verificadas por CI. Nenhuma tarefa iniciada ate o momento.

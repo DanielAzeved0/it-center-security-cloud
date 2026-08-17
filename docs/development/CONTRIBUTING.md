@@ -64,8 +64,11 @@ Antes de escrever código, consulte:
 * docs/security/SECURITY.md
 * docs/security/SOC_RULES.md
 * docs/security/ASSET_POLICY.md
+* docs/security/AUTH.md
 * docs/development/DECISIONS.md
 * docs/development/AI_WORKFLOW.md
+* docs/deployment/DEPLOYMENT_HISTORY.md
+* docs/deployment/CHANGELOG_DEPLOYMENT.md
 
 ---
 
@@ -325,7 +328,7 @@ Todo Pull Request deve responder:
 
 # Regras para Agentes de IA
 
-Antes de implementar qualquer funcionalidade, ler a lista completa em "Documentação Obrigatória" (topo deste documento) — inclui ROADMAP.md, TASKS.md, ARCHITECTURE.md, DATABASE.md, API.md, CHECKIN.md, SECURITY.md, SOC_RULES.md, ASSET_POLICY.md, DECISIONS.md e AI_WORKFLOW.md. Não reenumerar um subconjunto: a lista completa é a única fonte válida.
+Antes de implementar qualquer funcionalidade, ler a lista completa em "Documentação Obrigatória" (topo deste documento) — inclui ROADMAP.md, TASKS.md, ARCHITECTURE.md, DATABASE.md, API.md, CHECKIN.md, SECURITY.md, SOC_RULES.md, ASSET_POLICY.md, AUTH.md, DECISIONS.md, AI_WORKFLOW.md, DEPLOYMENT_HISTORY.md e CHANGELOG_DEPLOYMENT.md. Não reenumerar um subconjunto: a lista completa é a única fonte válida.
 
 ---
 

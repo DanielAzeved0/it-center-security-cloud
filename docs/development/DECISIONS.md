@@ -1121,7 +1121,7 @@ A ideia original de "Prometheus + Grafana" na EPIC 14 (Melhorias Futuras) não t
 
 Impactos:
 
-* Três containers novos no Compose de produção — primeiro crescimento real da topologia desde o MVP inicial; precisa validar recursos antes de ativar.
+* Quatro containers novos no Compose de produção (`node_exporter`, `cadvisor`, `prometheus`, `grafana`) — primeiro crescimento real da topologia desde o MVP inicial; precisa validar recursos antes de ativar.
 * `docs/architecture/ARCHITECTURE.md`, `docs/architecture/CONTAINERS.md`, `docs/architecture/NETWORK.md` e `docs/security/SECURITY.md` serão atualizados no momento da implementação.
 
 ---

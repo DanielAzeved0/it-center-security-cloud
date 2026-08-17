@@ -2,7 +2,26 @@
 
 Este documento registra o processo real de implantacao do IT Center Security Cloud na Oracle Cloud.
 
+## 2026-08-15 - Ativacao real da observabilidade em producao (fechamento da EPIC 21)
+
+> Este e o desfecho, ainda no mesmo dia, da entrada seguinte ("Implementacao da observabilidade..."), que havia registrado a validacao manual como pendente.
+
+Contexto: sequencia da sessao anterior no mesmo dia. Com o codigo ja implementado e revisado (2 achados altos e 2 medios de seguranca corrigidos — mount de `/var/run` removido do cAdvisor, imagens novas adicionadas ao gate do Docker Scout, checagem de `GRAFANA_ADMIN_PASSWORD` fallback adicionada a `ops-check.sh`), a validacao manual pendente foi executada de fato contra a VM real.
+
+1. `docker compose --env-file .env.production -f infra/docker-compose.production.yml --profile observability up -d` executado em `itcenter-edge-01`: os 4 containers (`node_exporter`, `cadvisor`, `prometheus`, `grafana`) subiram healthy/running.
+2. `infra/scripts/ops-check.sh` executado contra o ambiente real: primeira rodada reportou `FAIL GRAFANA_ADMIN_PASSWORD nao configurado` (Grafana havia subido com o fallback placeholder por falta da variavel em `.env.production`) e `WARN Memoria disponivel MB em 424` (`free -h`: 448MB em uso no swap de 1GB de `itcenter-edge-01`).
+3. `GRAFANA_ADMIN_PASSWORD` corrigido com senha forte em `.env.production` e o container `grafana` recriado (`docker compose ... --profile observability up -d grafana`).
+4. `ops-check.sh` executado novamente: `OK Operacao sem falhas criticas` — o `FAIL` de senha foi eliminado; o `WARN` de memoria permanece, tratado como risco aceito (ver `docs/deployment/KNOWN_ISSUES.md`, "Observabilidade (EPIC 21): memoria em alerta com o profile ativo").
+5. Decisao registrada: manter os 4 servicos ativos continuamente por ora (424MB ainda acima do limite critico de `MEM_FAIL_MB=256`); candidatos ja identificados se a situacao piorar: remover `cadvisor` do profile, ou ativar `observability` so sob demanda em vez de continuamente.
+
+Resultado:
+
+* EPIC 21 encerrada em `docs/development/TASKS.md` no mesmo dia 2026-08-15 — profile `observability` ativo em producao, nao mais apenas codigo implementado.
+* Nenhum dos 4 servicos existentes (`postgres`, `backend`, `frontend`, `nginx`) foi alterado nesta ativacao.
+
 ## 2026-08-15 - Implementacao da observabilidade de infraestrutura (EPIC 21, ADR-030) - ainda nao ativada em producao
+
+> **Atualizacao (mesmo dia, ver entrada acima):** a ressalva de "nao ativada em producao" registrada abaixo ficou desatualizada poucas horas depois — o profile `observability` foi de fato ativado em producao e a EPIC 21 foi encerrada ainda em 2026-08-15. Entrada mantida sem alteracao como registro do que foi escrito naquele momento.
 
 Contexto: ADR-030 e a Fase F de `docs/architecture/FUTURE_ARCHITECTURE.md` ja definiam a decisao (Prometheus + Grafana para o Edge Node/containers, nunca para as maquinas Windows monitoradas pelo agente); esta sessao implementou o codigo.
 
@@ -18,6 +37,20 @@ Resultado:
 
 * EPIC 21 tem o codigo implementado, mas o profile `observability` **nao foi ativado em producao** nesta sessao. Falta rodar `infra/scripts/ops-check.sh` e observar memoria/disco reais em `itcenter-edge-01` com `docker compose --profile observability up -d` antes de considerar isso seguro continuamente — validacao manual pendente, deliberadamente nao simulada aqui.
 * Nenhum dos 4 servicos existentes (`postgres`, `backend`, `frontend`, `nginx`) foi alterado; `docker-compose.yml` (dev local) nao foi tocado.
+
+## 2026-08-15 - Descoberta do bloqueio de acesso a conta Oracle Cloud (EPIC 15)
+
+Contexto: tentativa de retomar a EPIC 15 (migracao do state do Terraform para backend remoto em OCI Object Storage), mais cedo no mesmo dia, antes do trabalho de observabilidade (EPIC 21) registrado nas duas entradas acima.
+
+1. Ao tentar acessar o Console Oracle Cloud para criar o bucket de Object Storage do state remoto, foi identificado que o unico usuario administrador da tenancy havia perdido o segundo fator de autenticacao (MFA vinculado a um celular antigo), sem fator de backup configurado e sem um segundo usuario administrador cadastrado na conta.
+2. Investigacao adicional revelou que o `terraform.tfvars` e o `terraform.tfstate` reais do import de 2026-08-04 (EPIC 15) tambem nao foram localizados — nao estao em `itcenter-edge-01` nem em copia conhecida. A API key do usuario IAM `terraform-provisioner` (criada na mesma epoca) tambem foi dada como perdida.
+3. Confirmado que nenhuma acao no Console ou via `oci` CLI e possivel ate a conta ser recuperada; a aplicacao em producao (dashboard, backend, agente, Nginx) continua funcionando normalmente, pois o bloqueio afeta apenas operacoes administrativas de infraestrutura na nuvem.
+4. Registrado como bloqueio aberto em `docs/deployment/KNOWN_ISSUES.md` ("Acesso ao Console Oracle Cloud bloqueado") e como pendencia explicita da EPIC 15 em `docs/development/TASKS.md`. Incidente formal registrado retroativamente em `docs/deployment/POSTMORTEMS.md` (INCIDENTE 022).
+
+Resultado:
+
+* Migracao do state do Terraform para backend remoto (ultimo item pendente da EPIC 15) permanece bloqueada, sem previsao — depende de recuperacao de acesso ao Console Oracle Cloud (fator de backup, segundo administrador existente ou Service Request ao suporte Oracle).
+* Nenhuma mudanca de infraestrutura foi feita nesta sessao; e um registro de descoberta/bloqueio, nao de deploy.
 
 ## 2026-08-11 - Reversao da integracao Snipe-IT (ADR-028 -> ADR-033)
 

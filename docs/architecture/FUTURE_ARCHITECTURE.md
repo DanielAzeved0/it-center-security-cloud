@@ -169,7 +169,7 @@ Resultado esperado:
 
 Banco previsivel, menor risco de crescimento descontrolado e operacao mais simples.
 
-### Fase F - Observabilidade — implementada (ADR-030, EPIC 21, 2026-08-15), ativacao em producao pendente
+### Fase F - Observabilidade — implementada e ativa em producao (ADR-030, EPIC 21, encerrada em 2026-08-15)
 
 Meta:
 
@@ -186,7 +186,7 @@ Entregas recomendadas:
 * [ ] Criar alerta para certificado perto do vencimento — nao implementado nesta rodada.
 * [ ] Criar alerta para falha de backup — nao implementado nesta rodada.
 * [ ] Registrar metricas de latencia da API e volume de check-ins/eventos (comportamento da plataforma, nao substitui `metrics` por maquina) — nao implementado nesta rodada.
-* [ ] Validar impacto de recursos no free tier (`infra/scripts/ops-check.sh`) antes de ativar em producao — pendente de execucao manual em `itcenter-edge-01`, deliberadamente nao simulada (ver `docs/development/TASKS.md` e `docs/deployment/DEPLOYMENT_HISTORY.md`, 2026-08-15).
+* [x] Validar impacto de recursos no free tier (`infra/scripts/ops-check.sh`) — executado em `itcenter-edge-01` em 2026-08-15: os 4 containers subiram healthy/running, `ops-check.sh` reportou `WARN` de memoria disponivel (424MB, acima do limite critico `MEM_FAIL_MB=256`); risco de pressao de memoria aceito conscientemente e documentado em `docs/deployment/KNOWN_ISSUES.md` ("Observabilidade (EPIC 21): memoria em alerta com o profile ativo") — decisao de manter os 4 servicos ativos continuamente em vez de reverter (ver `docs/development/TASKS.md`).
 
 Resultado esperado:
 
@@ -259,9 +259,10 @@ Experiencia unificada para o operador — RustDesk para acesso remoto no curto p
 3. Profissionalizar agente Windows (concluido, EPIC 16, incluindo assinatura de codigo via ADR-031)
 4. Transformar regras SOC em politicas configuraveis
 5. Criar estrategia de retencao e agregacao de dados
-6. Adicionar observabilidade de infraestrutura (Prometheus + Grafana, ADR-030, EPIC 21)
+6. Adicionar observabilidade de infraestrutura (concluido e ativo em producao, Prometheus + Grafana, ADR-030, EPIC 21, 2026-08-15)
 7. Separar servicos somente quando a carga justificar
 8. Hub de integracao: RustDesk (concluido, ADR-027, EPIC 19) e relatorios/dashboard executivo (concluido, ADR-029, EPIC 20); Snipe-IT revertido (ADR-028 -> ADR-033) e NetBox somente se o projeto operar em contexto que justifique
+9. Polimento continuo do dashboard: GSAP (concluido, EPIC 24) seguido de modernizacao visual (concluido, EPIC 25) e layout persistente de autenticacao (concluido, EPIC 26), ambas 2026-08-12; numero de serie da maquina coletado pelo agente (EPIC 27, implementado, ainda sem encerrar — falta validacao em VM); auditoria tecnica de 2026-08-15 abriu 6 EPICs de correcao ainda pendentes de implementacao (28 seguranca, 29 confiabilidade operacional de backup/restore, 30 integridade de dados do backend, 31 resiliencia do agente Windows, 32 aderencia documentacao-codigo, 33 cobertura de testes)
 ```
 
 ## Principios de decisao
