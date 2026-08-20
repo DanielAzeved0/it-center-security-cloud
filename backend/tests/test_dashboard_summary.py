@@ -20,16 +20,22 @@ def _insert_machine(hostname: str, status: str) -> int:
         ).fetchone()["id"]
 
 
-def _insert_alert(*, machine_id: int, severity: str, status: str) -> None:
+def _insert_alert(
+    *,
+    machine_id: int,
+    severity: str,
+    status: str,
+    alert_type: str = "unauthorized_remote_access_tool",
+) -> None:
     resolved_at_expression = "now()" if status in ("resolved", "ignored") else "NULL"
 
     with get_connection() as connection:
         connection.execute(
             f"""
             INSERT INTO alerts (machine_id, alert_type, severity, status, title, description, resolved_at)
-            VALUES (%s, 'unauthorized_remote_access_tool', %s, %s, 'Alerta de teste', 'Descricao de teste', {resolved_at_expression})
+            VALUES (%s, %s, %s, %s, 'Alerta de teste', 'Descricao de teste', {resolved_at_expression})
             """,
-            (machine_id, severity, status),
+            (machine_id, alert_type, severity, status),
         )
 
 
@@ -66,8 +72,8 @@ def test_dashboard_summary_counts_machines_and_open_alerts_by_severity(auth_head
     online_id = _insert_machine("PC-ONLINE-01", "online")
     offline_id = _insert_machine("PC-OFFLINE-01", "offline")
 
-    _insert_alert(machine_id=online_id, severity="high", status="open")
-    _insert_alert(machine_id=online_id, severity="high", status="investigating")
+    _insert_alert(machine_id=online_id, severity="high", status="open", alert_type="unauthorized_remote_access_tool")
+    _insert_alert(machine_id=online_id, severity="high", status="investigating", alert_type="unauthorized_vpn_tool")
     _insert_alert(machine_id=offline_id, severity="low", status="resolved")
     _insert_security_event(machine_id=online_id, severity="medium")
 

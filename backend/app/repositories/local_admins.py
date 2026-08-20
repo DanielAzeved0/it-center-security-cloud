@@ -37,7 +37,7 @@ def sync_machine_local_admins(machine_id: int, admin_names: list[str]) -> list[s
                         last_seen_at
                     )
                     VALUES (%s, %s, now())
-                    ON CONFLICT (machine_id, admin_name)
+                    ON CONFLICT (machine_id, lower(admin_name))
                     DO UPDATE SET last_seen_at = now()
                     """,
                     (machine_id, admin),

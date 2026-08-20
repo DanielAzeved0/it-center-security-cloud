@@ -11,64 +11,61 @@ def create_open_alert_once(
     description: str,
 ) -> bool:
     with get_connection() as connection:
-        with connection.transaction():
-            existing = connection.execute(
-                """
-                SELECT id
-                FROM alerts
-                WHERE
-                    machine_id = %s
-                    AND alert_type = %s
-                    AND status IN ('open', 'investigating')
-                LIMIT 1
-                """,
-                (machine_id, alert_type),
-            ).fetchone()
-
-            if existing is not None:
-                return False
-
-            connection.execute(
-                """
-                INSERT INTO alerts (
-                    machine_id,
-                    alert_type,
-                    severity,
-                    status,
-                    title,
-                    description
-                )
-                VALUES (%s, %s, %s, 'open', %s, %s)
-                """,
-                (
-                    machine_id,
-                    alert_type,
-                    severity,
-                    title,
-                    description,
-                ),
-            )
-
-    return True
-
-
-def list_alerts() -> list[AlertSummary]:
-    with get_connection() as connection:
-        rows = connection.execute(
+        row = connection.execute(
             """
-            SELECT
-                id,
+            INSERT INTO alerts (
                 machine_id,
                 alert_type,
                 severity,
                 status,
                 title,
+                description
+            )
+            VALUES (%s, %s, %s, 'open', %s, %s)
+            ON CONFLICT (machine_id, alert_type) WHERE status IN ('open', 'investigating')
+            DO NOTHING
+            RETURNING id
+            """,
+            (
+                machine_id,
+                alert_type,
+                severity,
+                title,
                 description,
-                created_at
-            FROM alerts
-            ORDER BY created_at DESC, id DESC
-            """
-        ).fetchall()
+            ),
+        ).fetchone()
+
+    return row is not None
+
+
+def list_alerts(
+    machine_id: int | None = None,
+    limit: int = 100,
+    offset: int = 0,
+) -> list[AlertSummary]:
+    query = """
+        SELECT
+            id,
+            machine_id,
+            alert_type,
+            severity,
+            status,
+            title,
+            description,
+            created_at
+        FROM alerts
+    """
+    params: list[object] = []
+
+    if machine_id is not None:
+        query += " WHERE machine_id = %s"
+        params.append(machine_id)
+
+    query += " ORDER BY created_at DESC, id DESC LIMIT %s OFFSET %s"
+    params.extend([limit, offset])
+
+    with get_connection() as connection:
+        rows = connection.execute(query, params).fetchall()
 
     return [AlertSummary(**row) for row in rows]
 

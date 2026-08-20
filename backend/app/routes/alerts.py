@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 
 from app.repositories.audit_logs import create_audit_log
 from app.schemas.alert import AlertResolveResponse, AlertSummary
@@ -10,9 +10,12 @@ router = APIRouter(prefix="/api/v1/alerts", tags=["alerts"])
 
 @router.get("", response_model=list[AlertSummary])
 def list_alerts(
+    machine_id: int | None = Query(default=None),
+    limit: int = Query(default=100, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
     current_user: CurrentUser = Depends(require_roles("admin", "analyst", "viewer")),
 ) -> list[AlertSummary]:
-    return list_registered_alerts()
+    return list_registered_alerts(machine_id=machine_id, limit=limit, offset=offset)
 
 
 @router.patch("/{alert_id}/resolve", response_model=AlertResolveResponse)

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 
 from app.repositories.audit_logs import create_audit_log
 from app.schemas.machine import (
@@ -49,9 +49,11 @@ def get_machine(
 @router.get("/{machine_id}/metrics", response_model=list[MachineMetric])
 def list_machine_metrics(
     machine_id: int,
+    limit: int = Query(default=100, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
     current_user: CurrentUser = Depends(require_roles("admin", "analyst", "viewer")),
 ) -> list[MachineMetric]:
-    metrics = list_registered_machine_metrics(machine_id)
+    metrics = list_registered_machine_metrics(machine_id, limit=limit, offset=offset)
 
     if metrics is None:
         raise HTTPException(

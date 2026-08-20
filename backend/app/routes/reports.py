@@ -53,8 +53,8 @@ def get_machine_report(
     metrics = list_registered_machine_metrics(machine_id) or []
     programs = list_registered_machine_programs(machine_id) or []
     admins = list_registered_machine_local_admins(machine_id) or []
-    alerts = [alert for alert in list_alerts() if alert.machine_id == machine_id]
-    events = [event for event in list_security_events() if event.machine_id == machine_id]
+    alerts = list_alerts(machine_id=machine_id, limit=500)
+    events = list_security_events(machine_id=machine_id, limit=500)
 
     pdf_bytes = build_machine_report_pdf(
         machine=machine,

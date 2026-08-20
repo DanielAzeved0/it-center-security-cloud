@@ -21,8 +21,12 @@ def update_registered_machine_rustdesk_id(machine_id: int, rustdesk_id: str | No
     return update_machine_rustdesk_id(machine_id, rustdesk_id)
 
 
-def list_registered_machine_metrics(machine_id: int) -> list[MachineMetric] | None:
-    return list_machine_metrics(machine_id)
+def list_registered_machine_metrics(
+    machine_id: int,
+    limit: int = 100,
+    offset: int = 0,
+) -> list[MachineMetric] | None:
+    return list_machine_metrics(machine_id, limit=limit, offset=offset)
 
 
 def list_registered_machine_programs(machine_id: int) -> list[MachineProgram] | None:
