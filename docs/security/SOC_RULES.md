@@ -223,7 +223,7 @@ Ferramentas monitoradas:
 
 Condição:
 
-Ferramenta instalada sem autorização.
+Ferramenta instalada sem autorização, avaliada tanto em `installed_programs` quanto em `processes` (corrigido em 2026-08-19, EPIC 37 — antes só cobria `installed_programs`).
 
 Ação:
 
@@ -248,6 +248,10 @@ Ferramentas monitoradas:
 * uTorrent
 * BitTorrent
 * qBittorrent
+
+Condição:
+
+Ferramenta instalada ou em execução, avaliada tanto em `installed_programs` quanto em `processes` (corrigido em 2026-08-19, EPIC 37 — antes só cobria `installed_programs`).
 
 Ação:
 
@@ -322,7 +326,7 @@ Ferramentas monitoradas:
 * Metasploit
 * Cobalt Strike
 * Process Hacker
-* Netcat
+* Netcat (tambem casado pelo alias `nc.exe`, ja que a comparacao por substring nao reconhece "nc.exe" como "netcat")
 * Rclone
 * MegaSync
 * Tor Browser
@@ -445,7 +449,7 @@ Comportamento atual:
 * `failed_login`: gerado quando `failed_logins_last_hour` for maior que 5; severidade `medium`; gera alerta aberto.
 * `remote_access_tool_detected`: gerado para RustDesk; severidade `low`; nao gera alerta.
 * `unauthorized_remote_access_tool`: gerado para AnyDesk, TeamViewer e UltraViewer; severidade `medium`; gera alerta aberto.
-* `suspicious_tool_detected`: gerado para Advanced IP Scanner, Angry IP Scanner, Nmap, Masscan, PsExec, PAExec, Metasploit, Cobalt Strike, Process Hacker, Netcat, Rclone, MegaSync e Tor Browser; severidade `medium`; gera alerta aberto.
+* `suspicious_tool_detected`: gerado para Advanced IP Scanner, Angry IP Scanner, Nmap, Masscan, PsExec, PAExec, Metasploit, Cobalt Strike, Process Hacker, Netcat (tambem via alias `nc.exe`), Rclone, MegaSync e Tor Browser; severidade `medium`; gera alerta aberto.
 * `malware_or_ransomware_indicator`: gerado para Mimikatz, WannaCry, WCry, LockBit, BlackCat, ALPHV, Conti, Ryuk, REvil e DarkSide; severidade `high`; gera alerta aberto.
 * `unauthorized_vpn_tool`: gerado para Hamachi, ZeroTier, Radmin VPN e Tailscale; severidade `high`; gera alerta aberto.
 * `torrent_software_detected`: gerado para uTorrent, BitTorrent e qBittorrent; severidade `high`; gera alerta aberto.

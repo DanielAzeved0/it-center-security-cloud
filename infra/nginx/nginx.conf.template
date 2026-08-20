@@ -77,6 +77,34 @@ server {
         proxy_send_timeout 30s;
     }
 
+    # Agent updater authenticates the same way as check-in (X-Agent-Api-Key), EPIC 22.
+    # No rate limit here: much lower volume than check-in (updater polls ~1x/day/machine,
+    # not every checkin_interval_minutes). Two exact-match blocks (not a regex) to keep the
+    # same match semantics as /api/v1/agent/checkin above.
+    location = /api/v1/agent/manifest {
+        proxy_pass http://backend:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Agent-Api-Key $http_x_agent_api_key;
+        proxy_connect_timeout 5s;
+        proxy_read_timeout 30s;
+        proxy_send_timeout 30s;
+    }
+
+    location = /api/v1/agent/download {
+        proxy_pass http://backend:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Agent-Api-Key $http_x_agent_api_key;
+        proxy_connect_timeout 5s;
+        proxy_read_timeout 30s;
+        proxy_send_timeout 30s;
+    }
+
     # The dashboard's own API calls carry a Bearer token issued at login.
     # HTTP allows only one Authorization header per request, so Basic Auth
     # here would collide with that Bearer token and break every

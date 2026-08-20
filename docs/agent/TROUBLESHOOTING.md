@@ -337,7 +337,28 @@ Acao corretiva:
 2. Gere/obtenha os scripts corretamente assinados (`agent-windows\scripts\Sign-AgentScripts.ps1`) e reinstale com `install-agent.ps1` (sem `-SkipSignatureCheck`) para reimportar o certificado, se necessario.
 3. Para instalacao local/dev sem certificado configurado, use `-SkipSignatureCheck` explicitamente — isso volta a Tarefa Agendada para `ExecutionPolicy Bypass` e nunca deve ser usado em producao.
 
-## 13. Quando escalar
+## 13. Updater nao atualiza, ou rollback disparou (EPIC 22, ADR-032)
+
+O updater (`itcenter-agent-updater.ps1`) roda numa Tarefa Agendada separada (`ITCenterAgentUpdater`, frequencia padrao 24h) e loga em `logs\itcenter-agent-updater.log` — arquivo distinto de `itcenter-agent.log`, para nao arriscar rotacao concorrente entre os dois processos independentes.
+
+Diagnostico:
+
+```powershell
+Get-ScheduledTaskInfo -TaskName "ITCenterAgentUpdater"
+Get-Content "C:\Program Files\ITCenterAgent\logs\itcenter-agent-updater.log" -Tail 50
+Get-Content "C:\Program Files\ITCenterAgent\update-state.json" -Raw
+```
+
+Interpretacao:
+
+* `update-state.json` inexistente: normal em maquinas que nunca receberam uma atualizacao automatica — nenhum comportamento novo deve aparecer no ciclo de coleta.
+* Log com "held back: target_agent_version is pinned": comportamento esperado — a maquina esta travada numa versao especifica por `machines.target_agent_version`, nao e erro.
+* Log com "rejected: invalid signature" ou "hash mismatch": o updater corretamente recusou um download que falhou na validacao obrigatoria (sem fallback de bypass, diferente do instalador) — nenhum arquivo foi substituido; investigar o backend (`GET /api/v1/agent/manifest`/`/download`) antes de qualquer coisa no agente.
+* Log com "Rollback applied": o agente coletou 5 check-ins consecutivos com falha apos uma atualizacao (`consecutive_checkin_failures` em `update-state.json`) e o updater restaurou `itcenter-agent.ps1.previous` automaticamente — a maquina deve voltar a fazer check-in normalmente no proximo ciclo; se nao voltar, o problema nao era da atualizacao em si (investigar como qualquer outra falha de check-in, itens 6-8 acima).
+* Sem nenhuma linha nova no log apos varios ciclos esperados: confirmar que a Tarefa Agendada `ITCenterAgentUpdater` existe e nao esta desabilitada (`Get-ScheduledTask -TaskName "ITCenterAgentUpdater"`).
+* HTTP 401 do Nginx (nao do backend) ao consultar `/agent/manifest`/`/agent/download`: `infra/nginx/nginx.conf.template` ja isenta esses 2 endpoints do Basic Auth desde 2026-08-19 (EPIC 37, blocos dedicados espelhando o de `/agent/checkin`) — se ainda aparecer, confirme que a VM real esta rodando a versao corrigida do template (`git log -1 -- infra/nginx/nginx.conf.template` no checkout de producao) e que o container `nginx` foi recriado apos a mudanca chegar.
+
+## 14. Quando escalar
 
 Escalar para backend/infra quando:
 

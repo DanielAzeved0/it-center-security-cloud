@@ -1109,6 +1109,265 @@ def test_agent_checkin_rejected_identity_mismatch_generates_soc_event_and_alert(
     assert alerts[0]["status"] == "open"
 
 
+def test_agent_checkin_persists_programs_with_same_name_version_but_different_publisher(monkeypatch):
+    monkeypatch.setenv("AGENT_API_KEY", "test-key")
+    client = TestClient(app)
+    payload = {
+        **VALID_PAYLOAD,
+        "installed_programs": [
+            {"name": "Driver Pack", "version": "1.0", "publisher": "Vendor A"},
+            {"name": "Driver Pack", "version": "1.0", "publisher": "Vendor B"},
+        ],
+    }
+
+    response = client.post(
+        "/api/v1/agent/checkin",
+        json=payload,
+        headers={"X-Agent-Api-Key": "test-key"},
+    )
+
+    assert response.status_code == 200
+    machine_id = response.json()["machine_id"]
+
+    with get_connection() as connection:
+        programs = connection.execute(
+            """
+            SELECT name, version, publisher
+            FROM installed_programs
+            WHERE machine_id = %s
+            ORDER BY publisher
+            """,
+            (machine_id,),
+        ).fetchall()
+
+    assert [program["publisher"] for program in programs] == ["Vendor A", "Vendor B"]
+
+
+def test_agent_checkin_does_not_crash_on_duplicate_installed_program_entries(monkeypatch):
+    monkeypatch.setenv("AGENT_API_KEY", "test-key")
+    client = TestClient(app)
+    duplicate_program = {"name": "Driver Pack", "version": "1.0", "publisher": "Vendor A"}
+    payload = {
+        **VALID_PAYLOAD,
+        "installed_programs": [duplicate_program, dict(duplicate_program)],
+    }
+
+    response = client.post(
+        "/api/v1/agent/checkin",
+        json=payload,
+        headers={"X-Agent-Api-Key": "test-key"},
+    )
+
+    assert response.status_code == 200
+    machine_id = response.json()["machine_id"]
+
+    with get_connection() as connection:
+        count = connection.execute(
+            "SELECT count(*) FROM installed_programs WHERE machine_id = %s",
+            (machine_id,),
+        ).fetchone()["count"]
+
+    assert count == 1
+
+
+def test_agent_checkin_deduplicates_unauthorized_vpn_tool_within_same_checkin(monkeypatch):
+    monkeypatch.setenv("AGENT_API_KEY", "test-key")
+    client = TestClient(app)
+    payload = {
+        **VALID_PAYLOAD,
+        "installed_programs": [
+            {"name": "Hamachi 2.2", "version": "2.2", "publisher": "LogMeIn"},
+            {"name": "Hamachi Client", "version": "2.2", "publisher": "LogMeIn"},
+        ],
+    }
+
+    response = client.post(
+        "/api/v1/agent/checkin",
+        json=payload,
+        headers={"X-Agent-Api-Key": "test-key"},
+    )
+
+    assert response.status_code == 200
+
+    with get_connection() as connection:
+        event_count = connection.execute(
+            "SELECT count(*) FROM security_events WHERE event_type = 'unauthorized_vpn_tool'"
+        ).fetchone()["count"]
+        alert_count = connection.execute(
+            "SELECT count(*) FROM alerts WHERE alert_type = 'unauthorized_vpn_tool'"
+        ).fetchone()["count"]
+
+    assert event_count == 1
+    assert alert_count == 1
+
+
+def test_agent_checkin_deduplicates_torrent_software_within_same_checkin(monkeypatch):
+    monkeypatch.setenv("AGENT_API_KEY", "test-key")
+    client = TestClient(app)
+    payload = {
+        **VALID_PAYLOAD,
+        "installed_programs": [
+            {"name": "uTorrent", "version": "3.6", "publisher": "BitTorrent Inc"},
+            {"name": "uTorrent (x64)", "version": "3.6", "publisher": "BitTorrent Inc"},
+        ],
+    }
+
+    response = client.post(
+        "/api/v1/agent/checkin",
+        json=payload,
+        headers={"X-Agent-Api-Key": "test-key"},
+    )
+
+    assert response.status_code == 200
+
+    with get_connection() as connection:
+        event_count = connection.execute(
+            "SELECT count(*) FROM security_events WHERE event_type = 'torrent_software_detected'"
+        ).fetchone()["count"]
+        alert_count = connection.execute(
+            "SELECT count(*) FROM alerts WHERE alert_type = 'torrent_software_detected'"
+        ).fetchone()["count"]
+
+    assert event_count == 1
+    assert alert_count == 1
+
+
+def test_agent_checkin_detects_unauthorized_vpn_tool_via_processes(monkeypatch):
+    monkeypatch.setenv("AGENT_API_KEY", "test-key")
+    client = TestClient(app)
+    payload = {
+        **VALID_PAYLOAD,
+        "processes": ["hamachi.exe"],
+    }
+
+    response = client.post(
+        "/api/v1/agent/checkin",
+        json=payload,
+        headers={"X-Agent-Api-Key": "test-key"},
+    )
+
+    assert response.status_code == 200
+
+    with get_connection() as connection:
+        event_count = connection.execute(
+            "SELECT count(*) FROM security_events WHERE event_type = 'unauthorized_vpn_tool'"
+        ).fetchone()["count"]
+        alert_count = connection.execute(
+            "SELECT count(*) FROM alerts WHERE alert_type = 'unauthorized_vpn_tool'"
+        ).fetchone()["count"]
+
+    assert event_count == 1
+    assert alert_count == 1
+
+
+def test_agent_checkin_detects_torrent_software_via_processes(monkeypatch):
+    monkeypatch.setenv("AGENT_API_KEY", "test-key")
+    client = TestClient(app)
+    payload = {
+        **VALID_PAYLOAD,
+        "processes": ["utorrent.exe"],
+    }
+
+    response = client.post(
+        "/api/v1/agent/checkin",
+        json=payload,
+        headers={"X-Agent-Api-Key": "test-key"},
+    )
+
+    assert response.status_code == 200
+
+    with get_connection() as connection:
+        event_count = connection.execute(
+            "SELECT count(*) FROM security_events WHERE event_type = 'torrent_software_detected'"
+        ).fetchone()["count"]
+        alert_count = connection.execute(
+            "SELECT count(*) FROM alerts WHERE alert_type = 'torrent_software_detected'"
+        ).fetchone()["count"]
+
+    assert event_count == 1
+    assert alert_count == 1
+
+
+def test_agent_checkin_rejects_invalid_ip_address(monkeypatch):
+    monkeypatch.setenv("AGENT_API_KEY", "test-key")
+    client = TestClient(app)
+    payload = {**VALID_PAYLOAD, "ip_address": "not-an-ip"}
+
+    response = client.post(
+        "/api/v1/agent/checkin",
+        json=payload,
+        headers={"X-Agent-Api-Key": "test-key"},
+    )
+
+    assert response.status_code == 422
+
+
+def test_agent_checkin_accepts_valid_ipv6_address(monkeypatch):
+    monkeypatch.setenv("AGENT_API_KEY", "test-key")
+    client = TestClient(app)
+    payload = {**VALID_PAYLOAD, "ip_address": "fe80::1ff:fe23:4567:890a"}
+
+    response = client.post(
+        "/api/v1/agent/checkin",
+        json=payload,
+        headers={"X-Agent-Api-Key": "test-key"},
+    )
+
+    assert response.status_code == 200
+
+
+def test_agent_checkin_accepts_missing_ip_address(monkeypatch):
+    monkeypatch.setenv("AGENT_API_KEY", "test-key")
+    client = TestClient(app)
+    payload = {**VALID_PAYLOAD, "ip_address": None}
+
+    response = client.post(
+        "/api/v1/agent/checkin",
+        json=payload,
+        headers={"X-Agent-Api-Key": "test-key"},
+    )
+
+    assert response.status_code == 200
+
+
+def test_agent_checkin_treats_local_admin_names_case_insensitively(monkeypatch):
+    monkeypatch.setenv("AGENT_API_KEY", "test-key")
+    client = TestClient(app)
+    first_payload = {
+        **VALID_PAYLOAD,
+        "security": {**VALID_PAYLOAD["security"], "local_admins": ["Administrator"]},
+    }
+
+    first_response = client.post(
+        "/api/v1/agent/checkin",
+        json=first_payload,
+        headers={"X-Agent-Api-Key": "test-key"},
+    )
+    assert first_response.status_code == 200
+    agent_secret = first_response.json()["agent_secret"]
+
+    second_payload = {
+        **first_payload,
+        "agent_secret": agent_secret,
+        "security": {**VALID_PAYLOAD["security"], "local_admins": ["administrator"]},
+    }
+    second_response = client.post(
+        "/api/v1/agent/checkin",
+        json=second_payload,
+        headers={"X-Agent-Api-Key": "test-key"},
+    )
+    assert second_response.status_code == 200
+
+    with get_connection() as connection:
+        admins = connection.execute("SELECT admin_name FROM machine_local_admins").fetchall()
+        new_admin_event_count = connection.execute(
+            "SELECT count(*) FROM security_events WHERE event_type = 'new_admin_user'"
+        ).fetchone()["count"]
+
+    assert len(admins) == 1
+    assert new_admin_event_count == 0
+
+
 def test_agent_checkin_adopts_secret_for_machine_registered_before_this_feature(monkeypatch):
     monkeypatch.setenv("AGENT_API_KEY", "test-key")
     client = TestClient(app)

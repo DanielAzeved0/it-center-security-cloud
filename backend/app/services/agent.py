@@ -270,6 +270,52 @@ def _process_software_value(
                 ),
             )
 
+    for tool in UNAUTHORIZED_VPN_TOOLS:
+        if _program_matches(software_name, tool):
+            detection_key = ("unauthorized_vpn_tool", tool)
+
+            if detection_key in seen_detections:
+                continue
+
+            seen_detections.add(detection_key)
+            _record_security_detection(
+                machine_id=machine_id,
+                event_type="unauthorized_vpn_tool",
+                severity="high",
+                title="VPN nao autorizada",
+                description=f"VPN nao autorizada detectada na maquina {_hostname(payload)}: {software_name}.",
+                raw_data=_software_detection_raw_data(
+                    tool_name=tool,
+                    matched_value=software_name,
+                    category="unauthorized_vpn_tool",
+                    source_field=source_field,
+                    extra=extra,
+                ),
+            )
+
+    for tool in TORRENT_TOOLS:
+        if _program_matches(software_name, tool):
+            detection_key = ("torrent_software_detected", tool)
+
+            if detection_key in seen_detections:
+                continue
+
+            seen_detections.add(detection_key)
+            _record_security_detection(
+                machine_id=machine_id,
+                event_type="torrent_software_detected",
+                severity="high",
+                title="Torrent detectado",
+                description=f"Software torrent detectado na maquina {_hostname(payload)}: {software_name}.",
+                raw_data=_software_detection_raw_data(
+                    tool_name=tool,
+                    matched_value=software_name,
+                    category="torrent_software",
+                    source_field=source_field,
+                    extra=extra,
+                ),
+            )
+
 
 def process_installed_program_rules(payload: AgentCheckinRequest, machine_id: int) -> None:
     seen_detections: set[tuple[str, str]] = set()
@@ -285,28 +331,6 @@ def process_installed_program_rules(payload: AgentCheckinRequest, machine_id: in
             extra=program.model_dump(),
             seen_detections=seen_detections,
         )
-
-        for tool in UNAUTHORIZED_VPN_TOOLS:
-            if _program_matches(program_name, tool):
-                _record_security_detection(
-                    machine_id=machine_id,
-                    event_type="unauthorized_vpn_tool",
-                    severity="high",
-                    title="VPN nao autorizada",
-                    description=f"VPN nao autorizada detectada na maquina {_hostname(payload)}: {program_name}.",
-                    raw_data=program.model_dump(),
-                )
-
-        for tool in TORRENT_TOOLS:
-            if _program_matches(program_name, tool):
-                _record_security_detection(
-                    machine_id=machine_id,
-                    event_type="torrent_software_detected",
-                    severity="high",
-                    title="Torrent detectado",
-                    description=f"Software torrent detectado na maquina {_hostname(payload)}: {program_name}.",
-                    raw_data=program.model_dump(),
-                )
 
     for process_name in payload.processes:
         _process_software_value(

@@ -140,7 +140,7 @@ Normalizacao:
 
 * Comparar nomes sem diferenciar maiusculas e minusculas.
 * Aceitar correspondencia por substring para nomes como TeamViewer Host, AnyDesk MSI, rustdesk.exe e lockbit.exe.
-* Avaliar programas instalados e processos em execucao quando o payload do agente trouxer essas informacoes.
+* Avaliar programas instalados e processos em execucao quando o payload do agente trouxer essas informacoes — inclui `unauthorized_vpn_tool` e `torrent_software_detected` (Regras 9 e 10, `docs/security/SOC_RULES.md`), corrigido em 2026-08-19 (EPIC 37): as duas passaram a avaliar tambem `processes`, nao so `installed_programs` (gap real identificado numa auditoria de documentacao no mesmo dia, corrigido na mesma sessao).
 
 Limitacao conhecida:
 
