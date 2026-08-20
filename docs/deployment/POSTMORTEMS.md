@@ -1831,6 +1831,131 @@ fator de MFA de backup cadastrado, e copia de backup de chaves
 SSH/API keys/terraform.tfstate fora do unico ponto de falha atual.
 ```
 
+# INCIDENTE 023
+
+## Resumo
+
+Deploy em producao (`Deploy Production #21`) falhou durante o build da imagem do frontend: a sessao SSH que carrega o script remoto de deploy caiu (`client_loop: send disconnect: Broken pipe`, exit code 255) logo apos o Next.js entrar em "Creating an optimized production build...". Causa raiz **nao confirmada** — hipotese mais provavel e pressao de memoria na VM, mas nao foi possivel diagnosticar em tempo real por falta de acesso SSH manual funcional (achado a parte, ver "Licoes aprendidas").
+
+## Severidade
+
+```text
+Media
+```
+
+## Data
+
+```text
+2026-08-17
+```
+
+## Ambiente
+
+```text
+Producao
+GitHub Actions (.github/workflows/deploy-production.yml)
+Oracle Cloud VM itcenter-edge-01
+```
+
+## Sintomas
+
+Log do job "Deploy to Oracle VM" (run 32052153823, 7m 22s):
+
+```text
+1. backup.sh: sucesso ("Backup criado", retencao aplicada)
+2. preflight-production.sh: todos os checks OK, incluindo
+   "OK Memoria disponivel 352MB" (ja abaixo do MEM_WARN_MB=512,
+   acima do MEM_FAIL_MB=256 - preflight nao falha nesse caso)
+3. docker compose build: backend usa cache em todas as camadas
+   (rapido); frontend chega a "Creating an optimized production
+   build ..." (Next.js 16.2.12, Turbopack)
+4. Conexao cai: "client_loop: send disconnect: Broken pipe"
+5. "Error: Process completed with exit code 255."
+```
+
+O job nunca chegou a rodar `docker compose ... up -d` nem o novo gate do Docker Scout (EPIC 29, `962e7ca`) — a falha ocorre antes desses passos, no build em si.
+
+## Impacto
+
+* Deploy da EPIC 29 (correcao de backup/restore/gate de CVE) nao foi aplicado em producao nesta tentativa.
+* **Sem indisponibilidade**: como o build falhou antes do `up -d`, os containers da versao anterior (`postgres`, `backend`, `frontend`, `nginx`) continuaram rodando normalmente durante e depois da falha.
+* Bloqueia qualquer deploy futuro ate a causa ser confirmada e corrigida (ou ate se confirmar que foi um pico transitorio).
+
+## Linha do tempo
+
+```text
+T+00 - Deploy disparado via workflow_dispatch (commit 962e7ca)
+T+00 - backup.sh concluido com sucesso
+T+00 - preflight-production.sh: OK em todos os checks, memoria
+       disponivel reportada em 352MB
+T+00 - docker compose build inicia (backend + frontend em paralelo,
+       via Compose Bake - "load local bake definitions")
+T+00 - build do backend conclui rapido (todas as camadas em cache)
+T+~1m - build do frontend chega em "Creating an optimized
+        production build ..." (etapa mais pesada de CPU/memoria
+        do Next.js/Turbopack)
+T+7m22s - sessao SSH cai (Broken pipe), job falha com exit 255
+```
+
+## Causa raiz
+
+**Nao confirmada.** Hipotese mais provavel, dado o padrao do erro (queda de conexao durante a etapa historicamente mais pesada de memoria do pipeline) e o contexto ja documentado do projeto:
+
+* A VM (`itcenter-edge-01`) e Oracle Free Tier de 1GB de RAM.
+* Desde a EPIC 21 (2026-08-15), 4 containers de observabilidade (`node_exporter`, `cadvisor`, `prometheus`, `grafana`) ficam **ativos continuamente** por decisao registrada em `docs/deployment/KNOWN_ISSUES.md` ("Observabilidade: memoria em alerta com o profile ativo") - a mesma validacao ja havia medido 424MB disponiveis com esses 4 servicos ativos e nada mais rodando.
+* O preflight desta tentativa mediu 352MB disponiveis **antes mesmo do build comecar** - menos ainda do que os 424MB da validacao da EPIC 21.
+* `npm run build` do Next.js com Turbopack e conhecido por picos de memoria elevados; rodar isso com uma base ja consumida por 4 containers extras e um cenario nunca testado sob carga real ate esta tentativa.
+
+Nao foi possivel confirmar via `free -h`/`dmesg`/`docker stats` no momento da falha porque nao havia acesso SSH manual funcional disponivel para diagnostico em tempo real (ver proximo item).
+
+## Correcao aplicada
+
+Nenhuma ainda - causa raiz nao confirmada, nenhuma mudanca de codigo foi feita em resposta a este incidente.
+
+## Como validar
+
+```text
+Diagnostico pendente. Requer uma das duas vias:
+1. Acesso SSH manual funcional na VM (free -h, docker stats,
+   dmesg -T | grep -i oom durante um novo build) - hoje
+   indisponivel, ver Licoes aprendidas.
+2. Workflow temporario reaproveitando o secret PROD_SSH_PRIVATE_KEY
+   (mesmo padrao usado na recuperacao do INCIDENTE 018) para rodar
+   os mesmos comandos de diagnostico via GitHub Actions.
+```
+
+## Licoes aprendidas
+
+* A decisao da EPIC 21 de manter a observabilidade ativa continuamente "por ora" (risco ja aceito e documentado) nunca havia sido testada sob a carga real de um build de deploy - este e o primeiro deploy de producao desde que os 4 containers passaram a rodar 24/7, e a memoria disponivel no preflight (352MB) ja veio mais baixa que a da propria validacao da EPIC 21 (424MB).
+* **Achado a parte, descoberto durante a tentativa de diagnosticar este incidente**: a chave de acesso SSH manual "de emergencia" (`daniel-manual-access-itcenter-edge-01`) esta incompleta - apenas a chave publica foi localizada salva localmente (`C:\Users\infra\.ssh\daniel-manual-access-itcenter-edge-01.txt`, 118 bytes, confirmado ser so a chave publica pelo cabecalho `ssh-ed25519`); a chave privada correspondente nao foi encontrada em nenhuma pasta comum do usuario. Isso repete o padrao do INCIDENTE 018 (acesso administrativo sem copia de backup) numa forma mais branda: desta vez descoberto ao tentar diagnosticar um problema nao-critico, nao no meio de uma emergencia real. Continua dependendo inteiramente do secret `PROD_SSH_PRIVATE_KEY` do GitHub Actions para qualquer acesso SSH funcional a `itcenter-edge-01`.
+
+## Atualizacao (2026-08-20) - segunda ocorrencia, mesma assinatura
+
+Uma nova tentativa de `Deploy Production` via GitHub Actions falhou de novo com a mesma assinatura exata (`client_loop: send disconnect: Broken pipe`, exit 255, durante `npm run build` do frontend) - preflight mediu **296MB disponiveis**, abaixo dos 352MB desta primeira ocorrencia e dos 424MB da validacao da EPIC 21. Ver `docs/deployment/DEPLOYMENT_HISTORY.md` (entrada de 2026-08-20, "Segunda tentativa de deploy falha de novo por memoria").
+
+Isso confirma o padrao como recorrente, nao um pico isolado: memoria disponivel no preflight caindo em tentativas sucessivas (424 -> 352 -> 296MB), sempre no mesmo ponto de falha. A causa raiz (pressao de memoria durante o build, agravada pela observabilidade sempre ativa) passa de "suspeita" para "fortemente indicada pelo padrao", ainda sem uma medicao direta de `free -h`/`docker stats` durante o build em si (nenhuma das duas ocorrencias teve uma sessao manual acompanhando o momento exato da falha).
+
+Nota tambem que o acesso SSH manual mencionado como indisponivel em "Como validar" abaixo foi recuperado em 2026-08-19 (sessao separada, ver `docs/deployment/DEPLOYMENT_HISTORY.md`) - o diagnostico em tempo real deixou de estar bloqueado por falta de acesso; so nao foi feito ainda porque nenhuma das duas ocorrencias teve uma sessao manual observando o momento exato do build.
+
+## Melhorias futuras
+
+* Rodar o diagnostico pendente (ver "Como validar") na proxima tentativa de deploy, antes de aplicar qualquer mitigacao especulativa.
+* Se confirmado que e pressao de memoria: avaliar pausar o profile `observability` durante o `build` do deploy (parar antes, subir de novo depois do `up -d`), desativar o build paralelo do Compose Bake (`COMPOSE_BAKE=false`) para reduzir o pico de memoria simultaneo de backend+frontend, ou aumentar o swap da VM.
+* Gerar um novo par de chaves para acesso manual administrativo e guardar a chave privada num cofre de senhas (nao so localmente) - fechar a mesma lacuna do INCIDENTE 018, desta vez antes de precisar dela numa emergencia real.
+* Considerar adicionar uma checagem de memoria disponivel tambem durante o build (hoje o preflight so mede antes do build comecar), para o deploy falhar com uma mensagem clara em vez de um "Broken pipe" opaco.
+
+## Automacao recomendada
+
+```text
+Nenhuma diretamente aplicavel ainda sem confirmar a causa raiz.
+Se confirmado que e memoria: adicionar um check de memoria minima
+tambem apos o build (nao so no preflight), e considerar expor o
+uso de memoria do build no proprio log do deploy (ex.: `free -h`
+antes e depois do `docker compose build`) para futuras falhas
+serem diagnosticaveis a partir do proprio log do GitHub Actions,
+sem depender de acesso SSH manual.
+```
+
 ---
 
 # Analise consolidada de causa raiz
@@ -1848,6 +1973,7 @@ SSH/API keys/terraform.tfstate fora do unico ponto de falha atual.
 * Esquemas de autenticacao concorrentes disputando o mesmo cabecalho `Authorization` (INCIDENTE 020).
 * Tags de imagens externas fixadas no Compose sem confirmar a existencia real no registry (INCIDENTE 021).
 * MFA de conta cloud sem fator de backup nem segundo administrador cadastrado (INCIDENTE 022) — mesmo padrao do INCIDENTE 018, em outra camada de acesso administrativo.
+* Build de deploy (frontend) coincidindo com pressao de memoria cronica na VM, sem diagnostico possivel por falta de acesso SSH manual funcional (INCIDENTE 023) — causa raiz nao confirmada.
 
 ## Causas mais recorrentes
 
@@ -1917,6 +2043,7 @@ SSH/API keys/terraform.tfstate fora do unico ponto de falha atual.
 * Guardar copia de recuperacao de chaves SSH administrativas fora do unico ponto de falha atual (INCIDENTE 018).
 * Incluir `docker compose --profile maintenance pull`/`config` no preflight ou em checagem periodica (INCIDENTE 021).
 * Cadastrar segundo administrador e fator de MFA de backup na conta Oracle Cloud, e guardar copia de `terraform.tfstate`/`terraform.tfvars`/API keys de automacao fora do unico ponto de falha atual (INCIDENTE 022).
+* Diagnosticar pressao de memoria durante builds de deploy (`free -h`/`docker stats` antes e depois do `docker compose build`) e gerar novo par de chaves SSH de acesso manual com a privada guardada em cofre de senhas (INCIDENTE 023).
 
 ---
 

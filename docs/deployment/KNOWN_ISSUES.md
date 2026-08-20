@@ -93,6 +93,8 @@ Risco:
 * Builds podem ficar lentos.
 * Uso intenso de swap degrada performance.
 
+**Ocorrencia real em 2026-08-17 (INCIDENTE 023, `docs/deployment/POSTMORTEMS.md`)**: deploy de producao falhou com a sessao SSH caindo (`Broken pipe`) durante o build do frontend, com preflight reportando so 352MB disponiveis antes do build comecar — abaixo dos 424MB ja medidos como `WARN` na validacao da EPIC 21 (observabilidade ativa continuamente desde 2026-08-15). Causa raiz suspeita (pressao de memoria) ainda **nao confirmada** por falta de acesso SSH manual para diagnostico em tempo real. Risco deixa de ser so teorico.
+
 ## Chave SSH pessoal sem copia de backup
 
 Acesso administrativo a `itcenter-edge-01` depende de uma unica chave SSH pessoal.
@@ -100,6 +102,7 @@ Acesso administrativo a `itcenter-edge-01` depende de uma unica chave SSH pessoa
 Risco:
 
 * Perda da chave bloqueia todo acesso administrativo (backup/restore/rollback/TLS, credenciais do dashboard) ate uma recuperacao de emergencia. Ja aconteceu em producao **duas vezes**: INCIDENTE 018 (`POSTMORTEMS.md`, 2026-07-28, com exposicao acidental de uma chave privada durante a recuperacao), e novamente em 2026-08-15 durante a tentativa de retomar a EPIC 15 (state remoto do Terraform) — mesmo workflow de recuperacao reaplicado com sucesso, sem repetir o erro anterior (so a chave publica nova foi compartilhada).
+* **Descoberta em 2026-08-17 (INCIDENTE 023)**: a chave de acesso manual "de emergencia" `daniel-manual-access-itcenter-edge-01` esta incompleta — so a chave publica foi localizada salva localmente; a privada correspondente nunca foi encontrada. **Atualizacao 2026-08-19**: acesso SSH interativo a `itcenter-edge-01` foi recuperado numa sessao separada (ver `docs/deployment/DEPLOYMENT_HISTORY.md`, entrada de 2026-08-19) — a chave de emergencia continua incompleta (nao resolvida), mas o `PROD_SSH_PRIVATE_KEY` do GitHub Actions deixou de ser o unico acesso possivel na pratica.
 
 Mitigacao atual:
 

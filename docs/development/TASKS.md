@@ -2040,3 +2040,629 @@ Corrigir os 3 achados que uma auditoria de lacunas de documentacao (2026-08-19, 
     lacuna entre "commitado" e "rodando de fato" que originou a EPIC 37.
 
 Origem: achados de uma auditoria de lacunas de documentacao pedida explicitamente pelo usuario em 2026-08-19 (nao fazia parte de nenhuma auditoria tecnica previa) - a auditoria revelou que 3 das divergencias entre documentacao e codigo eram, na verdade, bugs/gaps reais no lado do codigo/infra, nao erros de texto. Relatorio completo apresentado na mesma sessao (4 agentes em paralelo cobrindo arquitetura, seguranca, deployment e meta-docs/frontend, mais achados diretos). EPIC 37 encerrada em 2026-08-19 (correcao de codigo/config; deploy em producao fica para quando o usuario autorizar tocar na VM real).
+
+# EPIC 38 - Seguranca (Auditoria de Qualidade 2026-08-20)
+
+Objetivo:
+
+Corrigir achados de seguranca de uma segunda auditoria de qualidade (2026-08-20), independente da auditoria tecnica de 2026-08-15 que fechou as EPICs 28-35, com verificacao adversarial 1:1 por achado. Cobre lacunas que a rodada anterior nao tinha examinado: forca bruta de login, tamanho minimo de segredos, injecao via ReportLab e validacao de rustdesk_id nas duas pontas (backend e frontend).
+
+### Tarefas
+
+[ ] Adicionar rate limiting ao login (`backend/app/routes/auth.py:28`, severidade alta)
+
+    O endpoint POST /api/v1/auth/login nao tem nenhum limite de
+    tentativas por IP ou por e-mail, nem em codigo nem no Nginx
+    (infra/nginx/nginx.conf.template so aplica limit_req_zone na
+    location do check-in do agente, nunca em /api/backend/). O fix de
+    timing-safe da EPIC 28 elimina a enumeracao de e-mail por tempo de
+    resposta, mas nao impede um atacante de tentar milhares de senhas
+    contra um e-mail conhecido sem nenhum bloqueio. Direcao: limitador
+    simples em memoria no proprio endpoint (5 tentativas/60s por IP,
+    sem Redis/fila - cabe no MVP de 1 VM), complementado por
+    limit_req_zone no Nginx como defesa em profundidade.
+
+[ ] Validar tamanho minimo de AUTH_TOKEN_SECRET e AGENT_API_KEY em producao (`backend/app/core/config.py:27`, severidade alta)
+
+    validate_runtime_configuration() so rejeita um conjunto fixo de
+    placeholders (None, "", "change-me" etc), sem checar comprimento
+    nem entropia. Um segredo curto passa a validacao de "producao
+    segura" mas deixa a assinatura HMAC-SHA256 dos tokens de sessao
+    vulneravel a forca bruta offline caso um token vaze, permitindo
+    forjar tokens com sub arbitrario (inclusive de um admin). Direcao:
+    exigir no minimo 32 caracteres para AUTH_TOKEN_SECRET e
+    AGENT_API_KEY dentro de validate_runtime_configuration(), com erro
+    explicito na inicializacao caso nao cumpram o minimo.
+
+[ ] Escapar hostname antes de interpolar em Paragraph() do relatorio PDF (`backend/app/services/reports.py:119`, severidade alta)
+
+    build_machine_report_pdf interpola machine.hostname direto num
+    f-string passado a Paragraph(), que faz parsing de pseudo-XML
+    (tags <b>, <i>, <a href>). hostname vem do check-in do agente sem
+    allowlist de caracteres; um hostname com tag malformada derruba a
+    geracao do PDF (ValueError), e um com tag bem formada injeta um
+    link clicavel num documento que aparenta ser um relatorio oficial,
+    distribuido a admin/analyst/viewer. Direcao: escapar qualquer
+    campo vindo de agente/usuario com xml.sax.saxutils.escape antes de
+    interpolar em Paragraph() (Table() ja e seguro, renderiza celulas
+    como texto literal).
+
+[ ] Restringir o formato de rustdesk_id no schema do backend (`backend/app/schemas/machine.py:46`, severidade media)
+
+    MachineRustdeskUpdate.rustdesk_id so tem max_length=50, sem
+    regex/charset, apesar do PATCH ja ter RBAC correto
+    (admin/analyst). O valor gravado e depois usado no frontend para
+    montar o href do URI customizado rustdesk://connect?id=... sem
+    encoding - um valor com caracteres de controle, aspas ou "&"
+    fica persistido e e interpolado sem sanitizacao no link clicado
+    por outro operador. Direcao: Field(pattern=r"^\d{5,12}$") no
+    schema Pydantic (IDs do RustDesk sao numericos).
+
+[ ] Implementar revogacao real de token no logout (`backend/app/routes/auth.py:86`, severidade media)
+
+    O logout so grava audit log, mas o esquema de autenticacao e HMAC
+    stateless sem tabela de sessao/blacklist - um Bearer token exposto
+    (XSS, log, dispositivo compartilhado) continua valido por ate
+    AUTH_TOKEN_EXPIRATION_MINUTES mesmo apos o usuario clicar em
+    "Sair". Direcao: tabela revoked_tokens (token_hash, expires_at,
+    psycopg puro, sem ORM); logout grava o hash do token atual;
+    get_current_user() passa a checar essa tabela antes de aceitar o
+    token; job de limpeza periodico remove linhas expiradas.
+
+[ ] Validar formato de rustdesk_id tambem no frontend antes de montar a URI (`frontend/dashboard/components/MachineDetailView.tsx:307`, severidade media)
+
+    O botao "Conectar" interpola detail.rustdesk_id direto em
+    href={`rustdesk://connect?id=${detail.rustdesk_id}`}, sem
+    encodeURIComponent e sem checar formato - defesa em profundidade
+    complementar a validacao de schema no backend (item acima), para
+    o caso de um valor antigo ja persistido antes da correcao.
+    Direcao: validar com o mesmo padrao /^\d{5,12}$/ antes de
+    renderizar o botao, e aplicar encodeURIComponent ao montar o href.
+
+[ ] Remover NEXT_PUBLIC_API_BASE_URL dos arquivos de infra/env (`infra/docker-compose.production.yml:52`, severidade baixa)
+
+    O fallback NEXT_PUBLIC_API_BASE_URL ja foi removido do codigo do
+    proxy (EPIC 17), mas a variavel continua declarada em
+    docker-compose.production.yml, docker-compose.yml, .env.example e
+    .env.production.example. Hoje nao e lida por nenhum codigo, mas
+    reabre o footgun (vazar a topologia interna do backend no bundle
+    client-side) caso alguem reintroduza process.env.NEXT_PUBLIC_* no
+    futuro. Direcao: remover a variavel dos 4 arquivos, mantendo so
+    ITCENTER_API_BASE_URL.
+
+[ ] Validar Content-Type e tamanho de corpo no proxy do dashboard (`frontend/dashboard/app/api/backend/[...path]/route.ts:104`, severidade baixa)
+
+    fetchUpstream repassa o Content-Type do cliente sem validar, e
+    proxyRequest le o corpo inteiro para memoria sem checar
+    Content-Length antes. Hoje isso so nao e um vetor de DoS por
+    causa do client_max_body_size 2m do Nginx em producao - uma
+    camada que o proprio codigo do proxy nao conhece nem depende, ao
+    contrario do que ja fez com o path traversal (toSafeSegments, nao
+    confiou so na infra). Direcao: rejeitar Content-Type != 
+    application/json e Content-Length > 1MB direto em proxyRequest,
+    antes de ler o corpo.
+
+---
+
+# EPIC 39 - Infraestrutura: Gestao de Memoria no Deploy (Auditoria de Qualidade 2026-08-20)
+
+Objetivo:
+
+Reduzir o risco de repeticao do INCIDENTE 023 (deploy de producao caiu com suspeita nao confirmada de pressao de memoria durante o build do frontend) e fechar a lacuna que fez o preflight nao bloquear esse cenario. Nenhum item aqui exige tecnologia nova - so ajustes de configuracao de Docker Compose, do workflow de deploy e dos scripts existentes.
+
+### Tarefas
+
+[ ] Remover o override MIN_MEM_MB=256 no workflow de deploy (`.github/workflows/deploy-production.yml:74`, severidade alta)
+
+    A linha MIN_MEM_MB=256 sh infra/scripts/deploy.sh reduz o piso
+    padrao do preflight (512MB) so na execucao via GitHub Actions. No
+    INCIDENTE 023 a memoria disponivel medida foi 352MB - abaixo do
+    padrao de 512MB (que teria bloqueado o deploy antes do build),
+    mas ainda "OK" sob o override de 256MB. O gate de seguranca que
+    existiria por padrao foi afrouxado exatamente no caminho de
+    producao. Direcao: remover o override e manter o piso de 512MB de
+    preflight-production.sh; se a observabilidade sempre ativa (EPIC
+    21) for a causa da pressao de memoria, resolver isso nos itens
+    abaixo, nao abaixando o gate.
+
+[ ] Adicionar mem_limit aos servicos criticos do Compose de producao (`infra/docker-compose.production.yml:2`, severidade alta)
+
+    postgres, backend, frontend e nginx nao tem mem_limit - so os 4
+    containers de observabilidade (node_exporter/cadvisor/prometheus/
+    grafana) tem cap de memoria. Na VM de 1GB (Oracle Free Tier),
+    qualquer um dos 4 servicos criticos pode consumir toda a memoria
+    livre do host sem limite, acionando o OOM killer do kernel de
+    forma nao controlada (pode matar o proprio dockerd ou o postgres
+    em plena escrita) em vez de reiniciar so o container ofensor via
+    restart: unless-stopped. Direcao: mem_limit de 256m (postgres),
+    200m (backend), 200m (frontend) e 32m (nginx), deixando margem
+    para o SO e para o profile observability quando ativo.
+
+[ ] Desativar o build paralelo do Compose Bake no deploy (`infra/scripts/deploy.sh:37`, severidade media)
+
+    O log do INCIDENTE 023 confirma "load local bake definitions" -
+    o Compose Bake builda backend e frontend em paralelo por padrao,
+    dobrando o pico de memoria exatamente na etapa que caiu
+    (Next.js/Turbopack, a mais pesada do pipeline). Essa mitigacao ja
+    esta listada em docs/deployment/POSTMORTEMS.md ("Melhorias
+    futuras") mas nao foi aplicada. Direcao: COMPOSE_BAKE=false e
+    build sequencial (backend, depois frontend) em deploy.sh.
+
+[ ] Pausar o profile observability durante o build de deploy (`infra/scripts/deploy.sh:37`, severidade media)
+
+    node_exporter/cadvisor/prometheus/grafana, quando ativos, seguem
+    consumindo memoria durante todo o docker compose build e up -d -
+    exatamente na janela em que a memoria livre ja esta no limite
+    (352MB no INCIDENTE 023). Essa mitigacao tambem ja esta listada
+    em POSTMORTEMS.md sem ter sido aplicada. Direcao: docker compose
+    --profile observability stop antes do build (no-op se o profile
+    nao estiver rodando) e up -d de novo so depois do deploy saudavel.
+
+[ ] Limitar o tamanho de log dos containers de producao (`infra/docker-compose.production.yml:2`, severidade baixa)
+
+    Nenhum servico define logging.options.max-size/max-file; o driver
+    padrao json-file do Docker acumula logs indefinidamente. Na VM com
+    MIN_DISK_MB=2048 (preflight) e containers restart: unless-stopped
+    de longa duracao, isso pode lentamente consumir disco ate o gate
+    de disco falhar num deploy futuro. Direcao: bloco x-logging
+    reaproveitado via YAML anchor (max-size: "10m", max-file: "3") em
+    todos os servicos.
+
+---
+
+# EPIC 40 - Desempenho do Backend no Check-in (Auditoria de Qualidade 2026-08-20)
+
+Objetivo:
+
+Reduzir o custo por requisicao do fluxo de check-in do agente e das leituras mais frequentes do dashboard, sem introduzir ORM, cache distribuido ou qualquer tecnologia fora da stack aprovada - psycopg puro continua sendo o driver, so o uso dele muda.
+
+### Tarefas
+
+[ ] Adicionar pool de conexoes ao psycopg (`backend/app/database.py:20`, severidade alta)
+
+    get_connection() chama psycopg.connect() isoladamente a cada
+    chamada de repositorio, sem pool (requirements.txt so tem
+    psycopg[binary], sem psycopg_pool). Um unico check-in de agente
+    passa por save_machine_checkin e depois por
+    process_security_posture, que abre uma conexao nova por
+    security_event/alerta/admin processado - facilmente 10 a 40+
+    conexoes TCP novas por requisicao, cada uma pagando handshake TCP
+    + autenticacao do Postgres do zero. Numa VM de 1GB RAM com varios
+    agentes reportando a cada poucos minutos mais o dashboard fazendo
+    polling, e o maior gargalo de desempenho do backend. Direcao:
+    psycopg_pool.ConnectionPool (mesma familia do driver ja usado,
+    min_size=1/max_size=5), sem mudar a assinatura de get_connection()
+    usada pelos repositorios.
+
+[ ] Limitar a frequencia de mark_stale_machines_offline nas rotas de leitura (`backend/app/repositories/machines.py:157`, severidade media)
+
+    list_machines(), get_machine() e get_dashboard_summary() chamam
+    mark_stale_machines_offline() antes de qualquer SELECT - um
+    UPDATE sobre toda a tabela machines, mais um INSERT sequencial em
+    security_events por maquina obsoleta. Isso amarra o custo de uma
+    varredura de escrita ao trafego de leitura do dashboard (que faz
+    polling), nao ao ciclo real de check-in dos agentes. Direcao:
+    throttle simples em memoria (nao repetir a varredura completa mais
+    de uma vez por N segundos quando chamada sem machine_id
+    especifico).
+
+[ ] Evitar reescrever installed_programs quando a lista nao mudou (`backend/app/repositories/machines.py:116`, severidade media)
+
+    save_machine_checkin apaga e reinsere 100% das linhas de
+    installed_programs a cada check-in (padrao 5 min), mesmo numa
+    maquina estavel onde nada mudou - facilmente 100-300 DELETEs +
+    INSERTs por maquina, 24/7, numa VM de 1GB RAM. Direcao: guardar um
+    fingerprint (hash) da lista normalizada numa coluna nova de
+    machines; so apagar/reinserir quando o hash mudar.
+
+[ ] Agrupar em lote a criacao de eventos de USB (`backend/app/services/agent.py:148`, severidade media)
+
+    process_usb_devices cria um security_event por dispositivo com
+    round-trips separados (create_security_event abre conexao propria
+    por chamada); como o mesmo periferico tende a aparecer em quase
+    todo check-in, isso multiplica conexoes/queries por dispositivo a
+    cada ciclo. Direcao: uma funcao create_security_events_batch com
+    executemany, chamada uma vez por check-in com a lista completa de
+    eventos de USB.
+
+[ ] Trocar o loop de insercao de administradores locais por executemany (`backend/app/repositories/local_admins.py:31`, severidade baixa)
+
+    sync_machine_local_admins insere um administrador por vez via
+    connection.execute() sequencial, mesmo dentro da mesma
+    transacao - o mesmo padrao de round-trip evitavel que
+    save_machine_checkin ja resolve com executemany para
+    installed_programs. Direcao: executemany com a lista completa de
+    administradores normalizados.
+
+---
+
+# EPIC 41 - Schema e Retencao do Banco de Dados (Auditoria de Qualidade 2026-08-20)
+
+Objetivo:
+
+Corrigir inconsistencias de schema identificadas na segunda auditoria e criar a primeira rotina de retencao para tabelas que crescem sem controle (metrics, security_events) - hoje sem nenhum job de purga em infra/scripts/.
+
+### Tarefas
+
+[ ] Criar rotina de retencao para metrics e security_events (`backend/migrations/001_initial_schema.sql:36`, severidade alta)
+
+    metrics recebe uma linha por check-in por maquina (a cada 5 min
+    por padrao) e security_events cresce a cada evento; nao existe
+    nenhum job de purga hoje. Apos meses de producao essas tabelas
+    acumulam centenas de milhares de linhas, inflando pg_dump
+    (backup.sh mais lento) e a pressao de autovacuum numa VM de 1GB
+    RAM, sem contrapartida de valor (ninguem consulta metrica de 6
+    meses atras no dashboard). Direcao: script novo
+    infra/scripts/cleanup-old-data.sh (mesmo padrao de
+    install-backup-cron.sh) com DELETE em lote + VACUUM ANALYZE,
+    retencao de 90 dias para metrics e 180 dias para security_events
+    de severidade baixa/media (eventos high/critical preservados).
+
+[ ] Trocar o DELETE+INSERT de installed_programs por UPSERT (`backend/migrations/001_initial_schema.sql:54`, severidade alta)
+
+    Em todo check-in, installed_programs e apagada e reinserida por
+    completo mesmo sem mudanca real - inconsistente com
+    machine_local_admins, que ja resolve o mesmo problema (snapshot
+    por check-in) com ON CONFLICT ... DO UPDATE + last_seen_at. A EPIC
+    30 ja corrigiu a constraint (migration 011, UNIQUE agora inclui
+    publisher) - falta so trocar o padrao de escrita para UPSERT.
+    Direcao: migration adicionando last_seen_at a installed_programs;
+    save_machine_checkin passa a fazer UPSERT por linha (ON CONFLICT
+    (machine_id, name, version, publisher) DO UPDATE) seguido de um
+    DELETE seletivo so dos registros que nao vieram no snapshot atual.
+
+[ ] Reforcar a normalizacao de hostname com um CHECK constraint (`backend/migrations/001_initial_schema.sql:13`, severidade media)
+
+    machines.hostname e UNIQUE case-sensitive; quem garante uppercase
+    e so o codigo da aplicacao (save_machine_checkin). Se qualquer
+    caminho de escrita futuro nao uppercasar, o UNIQUE nao impede duas
+    linhas para a mesma maquina fisica - quebrando a identidade da
+    qual o ADR-036 (agent_secret trust-on-first-use) depende. O mesmo
+    tipo de risco ja foi resolvido para users.email com um indice
+    sobre lower(email). Direcao: CHECK (hostname = upper(hostname))
+    via migration, apos confirmar que nenhum hostname existente ja
+    diverge.
+
+[ ] Adicionar updated_at/trigger em alerts (`backend/migrations/001_initial_schema.sql:109`, severidade baixa)
+
+    alerts sofre UPDATE real (resolve_alert), inclusive para o status
+    intermediario "investigating", mas nao tem updated_at nem trigger
+    set_updated_at() - ao contrario de machines, installed_programs e
+    users, que ja seguem esse padrao. resolved_at so cobre o estado
+    terminal; uma transicao para "investigating" nao deixa rastro de
+    quando aconteceu, dificultando uma futura metrica de
+    tempo-ate-triagem no dashboard executivo. Direcao: coluna
+    updated_at + trigger reaproveitando a funcao set_updated_at() ja
+    existente.
+
+[ ] Decidir o destino de agent_configs (`backend/migrations/001_initial_schema.sql:136`, severidade baixa)
+
+    A tabela e 5 colunas de configuracao sao criadas com um INSERT
+    vazio a cada check-in, mas nenhuma rota/servico faz SELECT/UPDATE
+    nelas depois - hoje e peso morto que so adiciona uma escrita ao
+    hot path do check-in. Direcao: no curto prazo, tirar o INSERT do
+    caminho do check-in (so criar a linha quando algum endpoint
+    realmente for consumi-la); se o time confirmar que configuracao de
+    agente via backend nao entra no roadmap proximo, avaliar remover a
+    tabela por completo numa migration propria.
+
+---
+
+# EPIC 42 - Arquitetura e Limpeza do Backend (Auditoria de Qualidade 2026-08-20)
+
+Objetivo:
+
+Corrigir violacoes do padrao rota -> service -> repository e duplicacao de logica identificadas na segunda auditoria, mantendo psycopg puro e a separacao de camadas ja usada no resto do backend.
+
+### Tarefas
+
+[ ] Repassar excecao de dominio em vez de HTTPException na camada de servico (`backend/app/services/agent.py:399`, severidade media)
+
+    process_agent_checkin importa fastapi.HTTPException direto e
+    decide o status HTTP dentro do service, mesmo ja existindo a
+    excecao de dominio MachineIdentityMismatch pronta para ser
+    repassada - diferente do resto do projeto, onde e sempre a rota
+    que traduz excecao/None em HTTPException. Isso acopla logica de
+    negocio ao framework web e dificulta testar process_agent_checkin
+    isoladamente. Direcao: remover o import de fastapi em
+    services/agent.py, deixar MachineIdentityMismatch subir sem
+    tratamento, e mover o try/except que traduz para 401 para
+    routes/agent.py.
+
+[ ] Centralizar o INSERT de security_events usado por mark_stale_machines_offline (`backend/app/repositories/machines.py:319`, severidade media)
+
+    mark_stale_machines_offline monta e insere manualmente um
+    security_event de machine_offline dentro do repository de
+    machines, duplicando a query que repositories/security_events.py
+    ja centraliza (com source fixo em "agent", diferente do "system"
+    usado aqui). Qualquer mudanca futura no schema de security_events
+    exige lembrar de atualizar os dois lugares. Direcao: generalizar
+    create_security_event() para aceitar source e uma conexao
+    opcional (preservando a atomicidade com o UPDATE de status), e
+    chama-la a partir de mark_stale_machines_offline. Coordenar com o
+    item de throttle da EPIC 40, que toca a mesma funcao.
+
+[ ] Mover o acesso a dados de reports.py para a camada de service (`backend/app/routes/reports.py:5`, severidade media)
+
+    routes/reports.py importa app.repositories.alerts e
+    app.repositories.security_events direto - a unica rota do projeto
+    que quebra o padrao rota -> service -> repository (todas as
+    outras sempre passam por app.services.*). Nota: a EPIC 30 ja
+    corrigiu o problema de performance que motivou este achado
+    (get_machine_report hoje chama list_alerts(machine_id=..., limit=500)/
+    list_security_events(machine_id=..., limit=500) direto - filtrado e
+    paginado); o que resta e so a violacao de camada. Direcao: criar
+    list_registered_alerts_for_machine/list_registered_security_events_for_machine
+    em services/alerts.py e services/security_events.py (repassando
+    para as mesmas chamadas com machine_id/limit ja existentes), e
+    trocar os imports em routes/reports.py.
+
+[ ] Extrair o padrao "machine_exists + segunda query" repetido 3x (`backend/app/repositories/machines.py:244,268,289`, severidade baixa)
+
+    list_machine_metrics, list_machine_programs e
+    list_machine_local_admins repetem, identica, a estrutura "if not
+    machine_exists: return None" seguido de um SELECT separado -
+    triplicando o round-trip ao Postgres nessas rotas sem necessidade.
+    Direcao: helper unico _fetch_for_existing_machine(machine_id,
+    query, row_model) reaproveitado pelas 3 funcoes.
+
+---
+
+# EPIC 43 - Desempenho do Frontend (Auditoria de Qualidade 2026-08-20)
+
+Objetivo:
+
+Corrigir renderizacoes desnecessarias e uma tabela sem limite de linhas identificadas na segunda auditoria, sem introduzir Redux/Zustand/React Query - continua estado local simples via useMemo/useCallback, ja usado no resto do dashboard.
+
+### Tarefas
+
+[ ] Limitar a tabela de programas instalados em MachinesView (`frontend/dashboard/components/MachinesView.tsx:198`, severidade alta)
+
+    selection.programs.map(...) renderiza o array completo sem slice,
+    diferente de MachineDetailView.tsx, que ja usa programsPreview =
+    programs.data.slice(0, 80). Uma maquina Windows real facilmente
+    acumula 150-300+ programas, montando centenas de linhas de uma vez
+    - inclusive animadas pelo stagger do GSAP. Direcao: aplicar o
+    mesmo slice(0, 80) via useMemo, mantendo selection.programs.length
+    no meta do Panel para mostrar o total real.
+
+[ ] Restringir o escopo do useStaggerEntrance em MachinesView (`frontend/dashboard/components/MachinesView.tsx:74`, severidade media)
+
+    useStaggerEntrance([loadingList, selectedId, loadingSelection])
+    reanima toda a secao (lista de maquinas + tabela de programas) a
+    cada clique de selecao, mesmo quando so o painel de detalhe
+    deveria reanimar. Direcao: usar useStaggerEntrance([loadingList])
+    para a lista, e um ref de escopo separado (so a coluna de detalhe)
+    para as dependencias de selectedId/loadingSelection.
+
+[ ] Envolver os calculos de DashboardView em useMemo (`frontend/dashboard/components/DashboardView.tsx:46`, severidade media)
+
+    onlineCount, offlineCount, openAlerts e lastSeen sao calculados
+    direto no corpo do componente a cada render, incluindo um sort()
+    da lista inteira de datas so para achar a mais recente -
+    inconsistente com MachinesView, AlertsView e SecurityView, que ja
+    envolvem derivacoes equivalentes em useMemo. Direcao: useMemo com
+    um unico loop O(n) (reduce) em vez do sort O(n log n).
+
+[ ] Memoizar o value do AuthContext (`frontend/dashboard/components/AuthProvider.tsx:48`, severidade media)
+
+    O objeto passado a AuthContext.Provider value={{ user, loading,
+    logout }} e recriado a cada render de AuthProvider, que fica acima
+    de {children} no layout persistente - como children muda a cada
+    navegacao, todo consumidor de useAuth() (AppShell,
+    MachineDetailView, AlertsView etc.) re-renderiza por identidade de
+    contexto, nao por dado real alterado. Direcao: useMemo(() => ({
+    user, loading, logout }), [user, loading, logout]).
+
+[ ] Memoizar resolvedAlerts em AlertsView (`frontend/dashboard/components/AlertsView.tsx:59`, severidade baixa)
+
+    resolvedAlerts e recalculado em toda renderizacao, inconsistente
+    com openAlerts/highAlerts vizinhos no mesmo componente, que ja
+    usam useMemo. Direcao: envolver em useMemo(() => ..., [alerts]);
+    aproveitar para trocar as 4 passagens .filter() de
+    SecurityView.tsx (uma por severidade) por um unico reduce.
+
+---
+
+# EPIC 44 - Arquitetura e Limpeza do Frontend (Auditoria de Qualidade 2026-08-20)
+
+Objetivo:
+
+Reduzir duplicacao de codigo entre as telas do dashboard identificada na segunda auditoria - o padrao fetch+loading+erro, o filtro por severidade/tipo/maquina e a barra de metrica animada estao cada um copiados em 2 ou mais componentes. Sem framework de estado novo (Redux/Zustand/React Query continuam fora de escopo).
+
+### Tarefas
+
+[ ] Extrair um hook compartilhado para o ciclo fetch+loading+erro (`frontend/dashboard/components/DashboardView.tsx:16`, severidade alta)
+
+    DashboardView, ExecutiveDashboardView, AlertsView e SecurityView
+    repetem, quase byte a byte, o trio useState(loading/error/data) +
+    useCallback(setLoading/try/requestBackend/catch/finally) +
+    useEffect. MachinesView ja diverge sutilmente (dois estados de
+    loading em vez de um). Direcao: criar
+    frontend/dashboard/lib/useBackendResource.ts (hook generico com
+    data/loading/error/reload) e migrar as 4 telas que buscam um unico
+    recurso; MachinesView/MachineDetailView, que buscam multiplos
+    recursos via Promise.all, ficam de fora por ora.
+
+[ ] Dividir MachineDetailView em componentes por secao (`frontend/dashboard/components/MachineDetailView.tsx:48`, severidade alta)
+
+    O componente concentra ~480 linhas: 6 funcoes loadX repetindo a
+    mesma estrutura de fetch, filtro client-side de alertas/eventos
+    por machine_id, calculo de medias/picos de metrica, formulario de
+    RustDesk e exportacao de PDF - tudo no mesmo arquivo, sem cobertura
+    de teste unitario possivel para a logica de negocio embutida no
+    JSX. Direcao: extrair MachineAlertsPanel, MachineEventsPanel,
+    MachineMetricsPanel etc. como componentes proprios (cada um com
+    seu useBackendResource), e mover buildMetricSummary/
+    averageMetric/peakMetric para lib/metrics.ts como funcoes puras
+    testaveis.
+
+[ ] Extrair o filtro por severidade/tipo/maquina para um hook compartilhado (`frontend/dashboard/components/AlertsView.tsx:54`, severidade media)
+
+    AlertsView e SecurityView implementam, quase identica, a mesma
+    logica de 3 filtros (useState + useMemo + uniqueValues +
+    hasActiveFilters + clearFilters) e os mesmos 3 <select> no
+    filter-bar - as duas copias ja divergem em detalhes. Direcao: hook
+    useEntityFilters(items, getSeverity, getType, getMachineId) em
+    lib/, e um componente <EntityFilterBar /> em components/Ui.tsx
+    reaproveitado pelas duas telas (cada uma mantendo seus botoes
+    extras, como "Resolver").
+
+[ ] Remover o fallback `| string` dos union types em lib/types.ts (`frontend/dashboard/lib/types.ts:8`, severidade media)
+
+    MachineSummary.status, AlertSummary.severity/status e
+    SecurityEvent.severity sao tipados como uniao de literais com
+    "| string" - o TypeScript absorve isso em string, perdendo
+    qualquer beneficio de checagem de tipo (um typo em comparacao
+    passa despercebido). Direcao: remover o "| string", nomear os
+    tipos (MachineStatus, AlertSeverity, AlertStatus) para reuso, e
+    tratar valor fora do conjunto esperado explicitamente no ponto de
+    entrada (ex.: default no switch de StatusBadge/SeverityBadge).
+
+[ ] Dividir lib/api.ts por responsabilidade (`frontend/dashboard/lib/api.ts:39`, severidade baixa)
+
+    O arquivo mistura cliente HTTP (requestBackend), manipulacao de
+    DOM/blob (downloadBackendFile) e formatadores de exibicao
+    (formatDateTime etc.) no mesmo modulo - todo componente que so
+    precisa formatar uma data importa tambem logica de fetch e
+    download. Direcao: dividir em lib/http.ts, lib/download.ts e
+    lib/format.ts, mudanca mecanica sem risco funcional.
+
+[ ] Unificar MetricBar e MetricTile num unico componente (`frontend/dashboard/components/MachinesView.tsx:219`, severidade baixa)
+
+    MachinesView (MetricBar) e MachineDetailView (MetricTile) fazem a
+    mesma coisa - normalizar 0-100, animar via GSAP, renderizar
+    <progress> - com assinaturas de tipo ja divergentes entre as duas
+    copias. Direcao: componente unico MetricGauge em components/Ui.tsx,
+    reaproveitado pelas duas telas.
+
+---
+
+# EPIC 45 - Acessibilidade e Resiliencia de UX do Dashboard (Auditoria de Qualidade 2026-08-20)
+
+Objetivo:
+
+Corrigir lacunas de acessibilidade (WCAG) e de feedback/tratamento de erro no cliente identificadas na segunda auditoria - nenhuma delas tinha sido examinada na auditoria tecnica de 2026-08-15, que era focada em seguranca/confiabilidade de backend.
+
+### Tarefas
+
+[ ] Aumentar o contraste do foco de teclado na sidebar (`frontend/dashboard/app/globals.css:299`, severidade alta)
+
+    O :focus-visible de .nav-link e .sidebar-logout so troca
+    border-color/background por tons proximos do fundo da sidebar -
+    contraste recalculado em ~1,15-1,55:1, bem abaixo do minimo de
+    3:1 exigido pela WCAG 1.4.11 para indicadores de estado de UI.
+    Quem navega a sidebar so com Tab nao consegue perceber qual item
+    esta focado. Direcao: outline de alto contraste (2px solid usando
+    --sidebar-text) especificamente em :focus-visible, mantendo o
+    tratamento visual atual de :hover.
+
+[ ] Anunciar o estado de carregamento para leitores de tela (`frontend/dashboard/components/Ui.tsx:120`, severidade media)
+
+    LoadingBlock (usado como estado de "carregando" em todas as 6
+    telas autenticadas) e uma <div> comum sem role nem aria-live - o
+    unico feedback e uma animacao GSAP de opacidade, imperceptivel
+    para leitor de tela. Quando o carregamento termina, tambem nao ha
+    nenhum anuncio. Direcao: role="status" aria-live="polite" na <div>
+    do LoadingBlock.
+
+[ ] Travar o botao "Atualizar" contra clique duplo (`frontend/dashboard/components/Ui.tsx:126`, severidade media)
+
+    ToolbarButton nao recebe prop de "carregando" e nenhum dos 6
+    pontos de uso passa disabled durante a requisicao - inconsistente
+    com os botoes "Resolver", "Salvar" e "Exportar PDF", que ja
+    desabilitam corretamente. Um clique repetido dispara chamadas
+    concorrentes a requestBackend. Direcao: prop loading em
+    ToolbarButton, disabled={disabled || loading} + aria-busy, texto
+    trocado para "Atualizando" durante a operacao.
+
+[ ] Corrigir a estrutura ARIA da lista de maquinas (`frontend/dashboard/components/MachinesView.tsx:98`, severidade media)
+
+    <div role="list"> tem <button> como filhos diretos, sem
+    role="listitem" intermediario - estrutura ARIA invalida que pode
+    impedir o NVDA/JAWS de anunciar "lista com N itens" ou navegar por
+    atalho de item de lista. Direcao: envolver cada <button> num <div
+    role="listitem">.
+
+[ ] Isolar o erro de resolver um alerta do erro de carregar a lista (`frontend/dashboard/components/AlertsView.tsx:48`, severidade media)
+
+    resolveAlert reaproveita o mesmo estado error usado pelo
+    carregamento inicial da lista; como toda a fila de alertas so
+    renderiza quando !loading && !error, uma falha pontual ao resolver
+    um unico alerta esconde a fila inteira (com filtros ja aplicados)
+    atras de uma tela de erro generica. Direcao: estado separado
+    actionError para falhas de resolveAlert, exibido como mensagem
+    contextual sem esconder a lista.
+
+[ ] Marcar o item de menu ativo com aria-current (`frontend/dashboard/components/AppShell.tsx:64`, severidade baixa)
+
+    O item ativo da sidebar e indicado so visualmente (classe
+    "active"); sem aria-current="page" no <Link>, leitores de tela nao
+    informam em qual secao o usuario esta. Direcao: aria-current=
+    {active ? "page" : undefined} no Link.
+
+---
+
+# EPIC 46 - Resiliencia do Agente Windows (Auditoria de Qualidade 2026-08-20)
+
+Objetivo:
+
+Corrigir gaps de resiliencia do agente Windows complementares aos ja rastreados na EPIC 31 (auditoria tecnica de 2026-08-15) - timeouts ausentes em rede/execucao, um erro permanente que trava toda a fila de reenvio, e uma classificacao de falha que mascara o status HTTP real.
+
+### Tarefas
+
+[ ] Adicionar TimeoutSec ao Invoke-RestMethod do check-in (`agent-windows/itcenter-agent.ps1:1083,1224`, severidade alta)
+
+    Nenhum dos 2 pontos de chamada de Invoke-RestMethod @RequestParams
+    (Send-AgentCheckin e o reenvio de cache pendente) define
+    TimeoutSec - no PowerShell 5.1 (host real do agente) o padrao e 0
+    = sem timeout. Se o servidor aceitar a conexao TCP mas nao
+    responder (proxy engasgado, backend travado), a chamada pode
+    ficar pendurada indefinidamente; combinado com -MultipleInstances
+    IgnoreNew da Tarefa Agendada, isso bloqueia TODAS as execucoes
+    agendadas seguintes ate o ExecutionTimeLimit padrao de 72h.
+    Direcao: TimeoutSec = 30 nos 2 hashtables de request.
+
+[ ] Definir ExecutionTimeLimit explicito na Tarefa Agendada (`agent-windows/install-agent.ps1:313`, severidade media)
+
+    New-ScheduledTaskSettingsSet nao define -ExecutionTimeLimit, que
+    por padrao do Task Scheduler e PT72H - defesa em profundidade
+    complementar ao TimeoutSec do item acima. Direcao:
+    -ExecutionTimeLimit (New-TimeSpan -Minutes ([Math]::Max(5,
+    $CheckinIntervalMinutes * 2))).
+
+[ ] Nao interromper toda a fila de cache pendente num erro permanente (`agent-windows/itcenter-agent.ps1:1267`, severidade media)
+
+    O catch generico do loop de reenvio faz break em qualquer falha de
+    Send-AgentCheckin, mesmo quando Get-AgentCheckinFailureClassification
+    ja classifica a falha como "permanent" (nunca vai ter sucesso por
+    retry) - um unico payload rejeitado (schema antigo, por exemplo)
+    bloqueia o reenvio do resto do backlog em todo ciclo subsequente.
+    Direcao: no catch, checar a classificacao; falha permanente vai
+    para quarentena (Move-AgentCacheFileToQuarantine, mesmo tratamento
+    ja dado a JSON corrompido) e o loop continua; so falha temporaria
+    interrompe com break.
+
+[ ] Classificar status HTTP 4xx desconhecidos corretamente (`agent-windows/itcenter-agent.ps1:1014`, severidade media)
+
+    Get-AgentCheckinFailureClassification so marca como "permanent"
+    400/401/403/422 e como "temporary" 5xx/408/429 - qualquer outro
+    4xx real (404, 405, 409, 410) cai no bloco final com
+    reason="network_or_transport_error", uma mensagem de log enganosa
+    que esconde o status HTTP real (ja preenchido em status_code) da
+    causa. Direcao: tratar qualquer 4xx exceto 408/429 como
+    "permanent" com reason="HTTP {status_code}", em vez de uma lista
+    fixa de codigos.
+
+[ ] Extrair a coleta segura repetida nas funcoes Get-Agent* (`agent-windows/itcenter-agent.ps1:665,748,813,837,861,907`, severidade baixa)
+
+    O padrao "@(& $Reader | Where-Object { $null -ne $_ })" se repete
+    identico em 6 funcoes (Get-InstalledAppxPrograms,
+    Get-AgentFirewallEnabled, Get-AgentLocalAdmins,
+    Get-AgentUsbStorageDevices, Get-AgentUsbPeripheralDevices,
+    Get-AgentFailedLoginsLastHour) - qualquer ajuste futuro nessa
+    convencao precisa ser replicado manualmente em todos os pontos.
+    Direcao: funcao auxiliar Get-AgentSafeCollection(-Reader
+    $scriptblock), reusada nos 6 pontos.
+
+Origem: segunda auditoria de qualidade do codigo (2026-08-20), independente da auditoria tecnica de 2026-08-15 que fechou as EPICs 28-35 - 20 agentes (10 de busca especializada por pilar/subsistema + 10 de verificacao adversarial por achado, cada um lido e confirmado contra o codigo real antes de entrar no backlog). 51 achados confirmados nessa rodada; cobrindo backend, frontend, agente Windows, infraestrutura e banco de dados. Registro no backlog atrasou por uma divergencia de sincronizacao deste checkout local com `origin/main` (corrigida em 2026-08-20 antes deste registro) - nesse intervalo, 2 dos 51 achados originais ja tinham sido corrigidos por outro caminho (dedup de deteccao de VPN/Torrent contra as 6 categorias, e o filtro `machine_id` em `/alerts`/`/security-events` ja consumido por `MachineDetailView`) e foram removidos daqui; os 49 restantes foram reconferidos contra o codigo real pos-sincronizacao antes deste registro. Organizados nas EPICs 38 a 46 por area de trabalho (EPICs 36 e 37 ja estavam em uso por outra auditoria - gate de CVE do Docker Scout e correcao de achados de documentacao, ambas de 2026-08-19/20); nenhum repete os 29 achados ja rastreados nas EPICs 28-35 - os que ainda estao abertos continuam com dono nas proprias EPICs 30, 31 e 35. Relatorio completo original (antes da reconferencia) com evidencia e codigo de correcao por achado publicado como artifact privado na mesma sessao.

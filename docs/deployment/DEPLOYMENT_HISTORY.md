@@ -2,6 +2,20 @@
 
 Este documento registra o processo real de implantacao do IT Center Security Cloud na Oracle Cloud.
 
+## 2026-08-20 - Segunda tentativa de deploy falha de novo por memoria, agora antes mesmo do gate de CVE (recorrencia do INCIDENTE 023)
+
+Contexto: apos a correcao do gate de CVE (entrada seguinte, mesmo dia), uma nova tentativa de `Deploy Production` via GitHub Actions foi disparada com o gate ja corrigido. O job falhou de novo, mas antes de chegar no gate - durante o proprio `docker compose build` do frontend.
+
+1. `backup.sh` e `preflight-production.sh` OK em todos os checks, incluindo `Memoria disponivel 296MB` - abaixo dos 352MB do INCIDENTE 023 original (2026-08-17) e dos 424MB da validacao da EPIC 21. `MIN_MEM_MB=256` (override do workflow) deixou passar.
+2. `docker compose build` reconstruiu backend rapido (cache) e seguiu para o frontend (Next.js/Turbopack, "Creating an optimized production build ..."); a sessao SSH caiu com `client_loop: send disconnect: Broken pipe`, `Error: Process completed with exit code 255` - mesma assinatura exata do INCIDENTE 023, nunca alcancou o `docker-scout-gate.sh` nem `up -d`.
+3. Sem indisponibilidade: containers da versao anterior continuaram servindo normalmente.
+
+Resultado:
+
+* Confirma que o INCIDENTE 023 (2026-08-17) e um problema recorrente, nao um pico isolado - memoria disponivel no preflight caiu de 424MB -> 352MB -> 296MB em tentativas sucessivas, e o ponto de falha (build do frontend) e sempre o mesmo.
+* Causa raiz ainda **nao corrigida em nenhuma camada**: `MIN_MEM_MB=256` continua sobrescrevendo o piso de seguranca do preflight (`deploy-production.yml`), `docker compose build` continua em paralelo via Compose Bake, os 4 containers de observabilidade (EPIC 21) continuam ativos 24/7 durante o build, e nenhum servico critico (postgres/backend/frontend/nginx) tem `mem_limit`. Direcao de correcao completa registrada na EPIC de infraestrutura/memoria do deploy em `docs/development/TASKS.md`.
+* Deploy nao aplicado; producao continua na versao anterior.
+
 ## 2026-08-20 - Tentativa de deploy via GitHub Actions falha no gate de CVE; correcao de design do gate
 
 Contexto: apos o deploy manual de 2026-08-19 (EPIC 28/29), o usuario tentou um deploy real via workflow `Deploy Production` do GitHub Actions (nao mais manual por SSH). O job falhou no step "Deploy on VM" apos 1m44s, no `docker-scout-gate.sh`.
@@ -32,6 +46,17 @@ Resultado:
 * Producao agora roda o commit `962e7ca` de verdade (EPIC 28-A, 28-B e 29 ativas) — nao apenas checked out.
 * **Risco novo identificado e nao resolvido**: `docker-scout-gate.sh`, como esta hoje, e impraticavel em `itcenter-edge-01` para imagens construidas localmente (infra-backend/infra-frontend) — precisa de mais memoria/swap na VM, ou rodar o scan em outro lugar (CI, por exemplo, que ja tem Docker Scout disponivel via GitHub Actions), ou aceitar formalmente pular esse gate especifico para imagens locais. Registrado em `docs/deployment/KNOWN_ISSUES.md`. Ate isso ser resolvido, `deploy.sh` completo (com o gate) nao deve ser reexecutado sem supervisao — o proximo operador precisa repetir o bypass manual (`docker compose up -d` direto) ou resolver o gate antes.
 * `postgres:16-alpine` continua com o risco residual P1 ja documentado (CVEs de `golang/stdlib` sem tag corrigida) — inalterado por este deploy.
+
+## 2026-08-17 - Deploy da EPIC 29 falhou no build do frontend (INCIDENTE 023)
+
+Tentativa de deploy do commit `962e7ca` (EPIC 29 - correcao de backup/restore/gate de CVE) via `Deploy Production #21`. `backup.sh` e `preflight-production.sh` rodaram com sucesso (memoria disponivel reportada em 352MB, abaixo do `MEM_WARN_MB=512`). O `docker compose build` chegou ao build do frontend (Next.js/Turbopack, etapa mais pesada de memoria do pipeline) e a sessao SSH caiu (`client_loop: send disconnect: Broken pipe`, exit 255) antes de alcancar `docker compose up -d` ou o novo gate do Docker Scout.
+
+Sem indisponibilidade: como a falha ocorreu antes do `up -d`, os containers da versao anterior continuaram servindo normalmente. Causa raiz suspeita mas **nao confirmada**: pressao de memoria, possivelmente agravada pelos 4 containers de observabilidade (EPIC 21) rodando continuamente desde 2026-08-15. Diagnostico em tempo real nao foi possivel por falta de acesso SSH manual funcional (chave de acesso manual `daniel-manual-access-itcenter-edge-01` incompleta - so a chave publica foi localizada, achado registrado a parte). Detalhes completos, linha do tempo e melhorias futuras em `docs/deployment/POSTMORTEMS.md`, INCIDENTE 023.
+
+Resultado:
+
+* EPIC 29 permanece commitada e enviada ao `origin/main`, mas **nao aplicada em producao** ate uma nova tentativa de deploy bem-sucedida.
+* Nenhuma mudanca de codigo feita em resposta a este incidente - causa raiz ainda nao confirmada.
 
 ## 2026-08-15 - Ativacao real da observabilidade em producao (fechamento da EPIC 21)
 
