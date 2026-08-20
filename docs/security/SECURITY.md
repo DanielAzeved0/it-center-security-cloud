@@ -112,7 +112,7 @@ Duas camadas, desde a EPIC 12 (ADR-021, ADR-022):
 
 * Login administrativo da aplicação: Bearer token HMAC SHA-256, senha em PBKDF2-SHA256, papéis `admin`/`analyst`/`viewer` — contrato completo em `docs/security/AUTH.md`.
 * O Nginx ainda exige HTTP Basic Auth como camada extra de borda para as páginas e assets estáticos (`.secrets/dashboard.htpasswd`, fora do Git, montado somente em leitura) — isso não substitui o login da aplicação (ADR-023).
-* O endpoint público do agente é limitado a `POST /api/v1/agent/checkin`; ele não recebe Basic Auth porque valida obrigatoriamente `X-Agent-Api-Key` no FastAPI.
+* Os endpoints públicos do agente são `POST /api/v1/agent/checkin`, `GET /api/v1/agent/manifest` e `GET /api/v1/agent/download` (os 2 últimos adicionados pela EPIC 22, ADR-032); nenhum deles recebe Basic Auth porque validam obrigatoriamente `X-Agent-Api-Key` no FastAPI. A isenção no `nginx.conf.template` cobre os 3 desde 2026-08-19 (EPIC 37 corrigiu `manifest`/`download`, que até então caíam no bloco geral que exige Basic Auth) — validado localmente ponta a ponta contra o backend real. **Ainda não deployado em `itcenter-edge-01`** (ver `docs/deployment/KNOWN_ISSUES.md`).
 * Endpoints internos do backend não são expostos em portas públicas.
 
 Limitação conhecida:
@@ -174,12 +174,16 @@ Evitar que imagens Docker com vulnerabilidades criticas ou altas sejam promovida
 
 Docker Scout.
 
-`infra/scripts/docker-scout-gate.sh` deixou de ser apenas documentado como obrigatorio: desde a EPIC 29 (2026-08-17), `infra/scripts/deploy.sh` o invoca automaticamente entre o `build` e o `up -d` de todo deploy de producao. Como o script roda com `set -eu`, uma falha do gate (CVE `critical`/`high` em qualquer imagem de `ITCENTER_SCOUT_IMAGES`) aborta o deploy antes de qualquer container novo subir, sem depender de um humano lembrar de rodar manualmente.
+`infra/scripts/docker-scout-gate.sh` deixou de ser apenas documentado como obrigatorio: desde a EPIC 29 (2026-08-17), `infra/scripts/deploy.sh` o invoca automaticamente entre o `build` e o `up -d` de todo deploy de producao. Como o script roda com `set -eu`, uma falha do gate aborta o deploy antes de qualquer container novo subir, sem depender de um humano lembrar de rodar manualmente.
+
+**Correcao de design em 2026-08-20:** o gate original tratava as 7 imagens (`ITCENTER_SCOUT_IMAGES`) com o mesmo criterio rigido (`--exit-code`, falha em qualquer critical/high). Na pratica isso nunca deixava um deploy passar: `postgres:16-alpine` e as 4 imagens da stack de observabilidade (EPIC 21 - `node-exporter`, `cadvisor`, `prometheus`, `grafana-oss`) tem, todas, dezenas de CVEs critical/high de toolchain Go desatualizado (`stdlib`, `golang.org/x/crypto`, `golang.org/x/net`) embutidas pelos proprios mantenedores upstream - confirmado que nem a versao mais recente disponivel (testado `node-exporter:v1.9.1`) resolve. O gate agora e dividido em dois grupos:
+
+* **Gate rigido** (`ITCENTER_SCOUT_IMAGES`, default `infra-backend:latest infra-frontend:latest`) - as unicas 2 imagens que este projeto constroi e controla; qualquer CVE critical/high aqui e sempre corrigivel por nos (bump de dependencia, remover pacote nao necessario em runtime) e deve continuar bloqueando o deploy.
+* **Risco residual aceito, so reportado** (`ITCENTER_SCOUT_ACCEPTED_RISK_IMAGES`, default as 5 imagens de terceiros acima) - escaneadas a cada deploy para visibilidade e para detectar se o quadro mudar, mas nunca derrubam o deploy (`--exit-code` omitido, `|| true`).
 
 Comandos obrigatorios antes de publicar uma nova imagem (equivalente ao que o gate automatizado roda, util para investigacao pontual):
 
 ```powershell
-docker scout cves postgres:16-alpine --only-severity critical,high
 docker scout cves infra-backend:latest --only-severity critical,high
 docker scout cves infra-frontend:latest --only-severity critical,high
 ```
@@ -187,7 +191,6 @@ docker scout cves infra-frontend:latest --only-severity critical,high
 Para investigar caminho de correcao:
 
 ```powershell
-docker scout recommendations postgres:16-alpine
 docker scout recommendations infra-backend:latest
 docker scout recommendations infra-frontend:latest
 ```
@@ -223,7 +226,9 @@ P2:
 Backend:
 
 * Base alterada para `python:3.13-alpine`.
-* Resultado esperado no Docker Scout: zero vulnerabilidades critical/high.
+* `pip`, `setuptools` e `wheel` removidos da imagem final apos `pip install -r requirements.txt` (2026-08-20) - so servem para instalar as dependencias, nao para rodar a API depois. Mesmo padrao ja usado no frontend para o `npm`. Necessario porque `pip` vendoriza copias proprias de `msgpack`/`setuptools`/`jaraco.*`/`wheel` (pacote `pip._vendor`), que apareciam como CVE high independente do que `requirements.txt` fixa - um pin direto nao adianta porque a copia vendorizada e separada da instalada normalmente.
+* Confirmado que a API continua subindo normalmente sem essas 3 ferramentas (build + `docker compose up` + `GET /api/v1/health` validados localmente).
+* Resultado no Docker Scout em 2026-08-20: zero vulnerabilidades critical/high.
 
 Frontend:
 
@@ -236,5 +241,11 @@ Frontend:
 PostgreSQL:
 
 * Imagem oficial mantida em `postgres:16-alpine`.
-* Se o Scout ainda apontar CVE em `golang/stdlib`, tratar como risco residual P1 enquanto nao houver tag oficial corrigida.
+* CVE conhecida em `golang/stdlib` (2 critical + 20 high em 2026-08-20) - risco residual P1, sem tag oficial corrigida disponivel. Reportado a cada deploy (`ITCENTER_SCOUT_ACCEPTED_RISK_IMAGES`), nunca bloqueia.
 * O banco deve continuar sem exposicao externa e acessivel apenas pela rede Docker/host local controlado.
+
+Observabilidade de infraestrutura (EPIC 21 - `node-exporter`, `cadvisor`, `prometheus`, `grafana-oss`):
+
+* Confirmado em 2026-08-20: as 4 imagens tem, cada uma, dezenas de CVEs critical/high (43/64/47/84 vulnerabilidades respectivamente) do mesmo padrao do Postgres - toolchain Go desatualizado (`stdlib`, `golang.org/x/crypto`, `golang.org/x/net`) embutido pelos mantenedores upstream. Testado `node-exporter:v1.9.1` (versao mais nova que a pinada `v1.8.2`): reduz de 43 para 37 vulnerabilidades, nao resolve o problema de fundo.
+* Mesmo tratamento do Postgres: risco residual P1, reportado a cada deploy, nunca bloqueia.
+* Nenhuma dessas 4 imagens expoe porta publica (ver `docs/architecture/NETWORK.md`) - a superficie de exposicao real dessas CVEs (a maioria em bibliotecas de rede/TLS) e mitigada por a rede continuar sem acesso externo direto.

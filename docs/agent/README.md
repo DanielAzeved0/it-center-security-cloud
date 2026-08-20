@@ -27,6 +27,9 @@ Enquanto nenhum agente realizar check-in, o dashboard pode aparecer vazio. Depoi
 
 ## Proxima fase
 
-* Atualizacao automatica: planejamento completo em ADR-032/EPIC 22 (2026-08-10, `docs/development/DECISIONS.md`, `docs/development/TASKS.md`), implementacao ainda pendente.
 * Auto-deteccao do ID do RustDesk pelo agente, sem substituir o cadastro manual: planejamento completo em ADR-034/EPIC 23, implementacao ainda pendente.
 * Adicionar assinatura dos payloads (sem plano formal ainda).
+
+## Atualizacao automatica (EPIC 22, ADR-032) - concluida em 2026-08-19
+
+Updater dedicado (`agent-windows/itcenter-agent-updater.ps1`), Tarefa Agendada propria (`ITCenterAgentUpdater`), validacao obrigatoria de assinatura Authenticode + hash SHA-256 sem fallback, backup/rollback automatico via `update-state.json`. Detalhes completos em `docs/agent/CHECKIN.md` (secao "EPIC 22") e `docs/specs/epic-22-agent-auto-update/`. O gap do Nginx (endpoints novos sem isencao de Basic Auth) foi corrigido no `nginx.conf.template` em 2026-08-19 (EPIC 37), validado localmente ponta a ponta contra o backend real — **ainda nao deployado em `itcenter-edge-01`** (ver `docs/deployment/KNOWN_ISSUES.md`).

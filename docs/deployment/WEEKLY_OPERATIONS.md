@@ -156,6 +156,8 @@ sh infra/scripts/docker-scout-gate.sh
 
 O gate falha se Docker Scout encontrar CVEs `critical` ou `high` nas imagens configuradas.
 
+**Atencao (achado de 2026-08-19, EPIC 36):** rodar isso contra `infra-backend`/`infra-frontend` (imagens construidas localmente, sem indice pre-computado no Docker Hub como as imagens oficiais) ja travou `itcenter-edge-01` por ~30 minutos esgotando RAM+swap. Antes de rodar manualmente contra essas 2 imagens na VM, ver `docs/deployment/KNOWN_ISSUES.md` ("Docker Scout gate (EPIC 29) impraticavel...") — a EPIC 36 ainda nao tem correcao aplicada.
+
 ## 8. Auditoria de dependencias do frontend
 
 O job `frontend` do CI (`.github/workflows/ci.yml`) roda `npm audit --audit-level=high` a cada PR/push em `main`, com acesso direto ao registry (sem o proxy corporativo que bloqueia esse comando no ambiente local). Consultar o resultado do workflow antes de mesclar quando houver alerta.
@@ -171,3 +173,16 @@ Registrar em `docs/deployment/DEPLOYMENT_HISTORY.md` quando houver:
 * alteracao relevante de infraestrutura.
 
 Registrar em `docs/deployment/POSTMORTEMS.md` somente quando houver incidente real.
+
+## 10. Verificar defasagem entre checkout e containers rodando
+
+Nenhum item desta rotina, nem `infra/scripts/ops-check.sh`, confere se o codigo que os containers `backend`/`frontend` estao servindo de fato bate com o commit do checkout git em `/opt/itcenter/app/it-center-security-cloud` — foi exatamente essa lacuna que deixou uma defasagem de 2 dias passar despercebida ate 2026-08-19 (ver `docs/deployment/DEPLOYMENT_HISTORY.md`, entrada de 2026-08-19). Ate existir uma checagem automatizada, conferir manualmente:
+
+```bash
+cd /opt/itcenter/app/it-center-security-cloud
+git log -1 --format='%H %ci %s'
+docker inspect itcenter-backend --format 'Image Created: {{.Created}}'
+docker inspect itcenter-frontend --format 'Image Created: {{.Created}}'
+```
+
+Se a data do commit for mais recente que a data de criacao das imagens, os containers estao rodando codigo desatualizado frente ao que ja foi commitado/revisado — rodar `sh infra/scripts/deploy.sh` (ou investigar por que um deploy anterior nao completou, como aconteceu com o gate do Scout na EPIC 36).

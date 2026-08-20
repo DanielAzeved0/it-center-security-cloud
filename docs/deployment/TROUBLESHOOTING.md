@@ -316,6 +316,12 @@ docker scout recommendations infra-frontend:latest
 
 Nao publique imagens de backend ou frontend com CVEs `critical` ou `high` corrigiveis.
 
+### Gate travando ~30 minutos sem terminar (nao e falha de CVE)
+
+Achado em 2026-08-19 (EPIC 36): escanear `infra-backend`/`infra-frontend` (imagens construidas localmente, sem indice pre-computado no Docker Hub como as imagens oficiais) pode esgotar por completo a RAM+swap de `itcenter-edge-01`. Sintomas: `docker scout cves infra-backend:latest` fica parado em "...Indexing" por dezenas de minutos; `free -h` mostra swap perto de 100% de uso; o processo `docker-scout` aparece em estado `D` (uninterruptible sleep) no `ps aux`; SSH fica lento/instavel. Isso nao e uma falha de CVE — o processo tende a morrer sozinho apos ~30 min sem completar, sem derrubar os containers de producao ja rodando (o `up -d` do `deploy.sh` so roda depois do gate, entao nada em producao e afetado enquanto o gate esta preso).
+
+Contorno usado em 2026-08-19: matar o processo (`pkill -9 -f 'docker-scout'` — usar `kill -9 <pid>` direto se `pkill` tambem travar por falta de memoria) e rodar os passos restantes do deploy manualmente pulando o gate (`docker compose up -d` direto, ja com as imagens construidas). Sem correcao definitiva ainda — ver `docs/deployment/KNOWN_ISSUES.md` e EPIC 36 (`docs/development/TASKS.md`).
+
 ## Dashboard vazio
 
 Isso e esperado enquanto nenhum Windows Agent tiver enviado check-in com sucesso.

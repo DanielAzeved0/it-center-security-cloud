@@ -46,6 +46,40 @@ Risco aceito:
 
 * Uso de swap ja presente pode degradar latencia de Postgres/backend sob carga. Monitorar ao longo do tempo; se piorar ou os 4 servicos principais comecarem a degradar, revisitar (candidatos ja identificados: remover `cadvisor` do profile, ou ativar `observability` so sob demanda em vez de continuamente).
 
+## Docker Scout gate (EPIC 29) impraticavel em itcenter-edge-01 para imagens locais
+
+Descoberto em 2026-08-19 no primeiro deploy real apos a EPIC 29 ter cablado `infra/scripts/docker-scout-gate.sh` em `deploy.sh` (o gate so tinha sido validado por um harness local ate entao, nunca contra a VM real). Dois problemas, nesta ordem:
+
+1. O plugin `docker scout` nao estava instalado em `itcenter-edge-01` — corrigido instalando o CLI oficial (`docker/scout-cli`) e fazendo `docker login` manual (Docker Hub) como o usuario `ubuntu`.
+2. Com o login feito, `docker scout cves infra-backend:latest` (imagem construida localmente — sem indice pre-computado no Docker Hub, ao contrario de imagens oficiais como `postgres:16-alpine`) esgotou por completo os 954MB de RAM + 1GB de swap da VM so indexando o backend. O processo entrou em estado `D` (uninterruptible sleep), o SSH ficou instavel, e o processo morreu sozinho apos ~30 minutos sem terminar (sem OOM killer disparado, mas efetivamente travado). Nenhum container de producao foi afetado (o `up -d` nunca foi alcancado por esse caminho).
+
+Classificacao:
+
+```text
+Risco operacional real, nao teorico - bloqueia deploy.sh completo
+```
+
+Mitigacao aplicada nesse deploy (2026-08-19):
+
+* `docker compose up -d` executado manualmente, pulando `docker-scout-gate.sh` so nessa execucao — as imagens ja estavam construidas e o codigo ja tinha passado por revisao normal antes do commit.
+
+**Achado adicional e correcao parcial em 2026-08-20:** uma tentativa de deploy real via GitHub Actions (`Deploy Production #22`) travou no gate de novo, mas por um motivo diferente e mais fundamental - `postgres:16-alpine` tem CVEs critical/high conhecidas (golang/stdlib) e o gate original nao tinha NENHUM mecanismo de excecao para risco ja aceito. Investigacao revelou que as 4 imagens de observabilidade da EPIC 21 (`node-exporter`, `cadvisor`, `prometheus`, `grafana-oss`) tem o mesmo problema, em volume maior (43 a 84 vulnerabilidades cada). Ou seja, o gate nunca poderia ter passado desde a EPIC 21 (2026-08-15), independente do problema de RAM. Corrigido: `infra/scripts/docker-scout-gate.sh` reescrito com 2 grupos - gate rigido (`--exit-code`) so para `infra-backend`/`infra-frontend` (as imagens que este projeto controla), e as 5 imagens de terceiros passam a ser reportadas sem bloquear (`docs/security/SECURITY.md` atualizado). No processo, 3 CVEs HIGH reais e corrigiveis em `infra-backend` (mascaradas ate entao pelo gate sempre falhar antes em `postgres`) foram encontradas e corrigidas (remocao de `pip`/`setuptools`/`wheel` da imagem final - ver `docs/security/SECURITY.md`). Gate completo validado localmente com exit code 0.
+
+Risco aceito / pendente (so a parte de RAM, nao mais o resto):
+
+* O problema de RAM ao escanear `infra-backend`/`infra-frontend` **na VM real** continua sem solucao - essas 2 imagens continuam no gate rigido (corretamente), entao `deploy.sh` completo ainda pode travar em `itcenter-edge-01` especificamente por falta de RAM, mesmo com o resto do gate corrigido. Opcoes ainda nao decididas: aumentar RAM/swap da VM; mover o scan dessas 2 imagens para o CI (GitHub Actions ja demonstrou ter recursos suficientes).
+* Ver `docs/deployment/DEPLOYMENT_HISTORY.md` (entradas de 2026-08-19 e 2026-08-20) para o relato completo. Correcao rastreada na EPIC 36 (`docs/development/TASKS.md`).
+
+## Nginx nao libera GET /api/v1/agent/manifest e /agent/download do Basic Auth (EPIC 22) — corrigido no codigo em 2026-08-19, aguardando deploy
+
+Descoberto em 2026-08-19 durante uma auditoria de lacunas de documentacao (nao durante deploy - a EPIC 22 ainda nao foi commitada/deployada). `infra/nginx/nginx.conf.template` so tinha `location = /api/v1/agent/checkin` isenta de `auth_basic`; os 2 endpoints novos da EPIC 22 caiam no bloco geral que exige Basic Auth.
+
+**Corrigido em 2026-08-19 (EPIC 37):** 2 blocos `location =` dedicados adicionados para `/api/v1/agent/manifest` e `/api/v1/agent/download`, espelhando o de `/api/v1/agent/checkin` (sem `auth_basic`, sem `limit_req` proprio — volume esperado baixo, 1x/dia por maquina). Validado localmente ponta a ponta: Nginx real (imagem oficial) + backend real na mesma rede Docker, confirmando via headers de resposta que os 2 endpoints novos retornam o 401 do FastAPI (sem `www-authenticate`) quando sem `X-Agent-Api-Key`, e 200 com a chave correta — e que o dashboard/demais rotas continuam exigindo Basic Auth normalmente (401 com `www-authenticate: Basic`).
+
+**Pendente:** esta correcao existe no codigo/checkout, mas **ainda nao foi deployada em `itcenter-edge-01`** — a VM real continua rodando o `nginx.conf.template` antigo (sem os blocos novos) ate o proximo deploy de producao incluir este commit. Ate la, a auto-atualizacao do agente (EPIC 22) continua sem funcionar atras do Nginx real.
+
+Rastreado na EPIC 37 (`docs/development/TASKS.md`).
+
 ## VM com pouca memoria
 
 Oracle Free Tier pode ter pouca memoria disponivel para build e containers.

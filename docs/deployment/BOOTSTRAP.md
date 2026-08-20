@@ -69,12 +69,14 @@ Responsavel por criar a estrutura oficial:
 |-- app/       # destino futuro do clone do repositorio
 |-- backups/   # dumps e artefatos de backup
 |-- configs/   # configuracoes operacionais externas ao Git
+|-- runtime/   # estado operacional temporario do host
 |-- logs/      # logs operacionais do host
 |-- scripts/   # automacoes do host
-`-- secrets/   # segredos externos ao Git, quando necessario
+|-- secrets/   # segredos externos ao Git, quando necessario
+`-- bin/       # wrappers ou atalhos administrativos locais
 ```
 
-Essa etapa prepara o host, mas nao clona o repositorio e nao cria secrets reais.
+Corrigido em 2026-08-19 (lista anterior tinha só 6 diretórios, faltando `runtime/` e `bin/` — divergia da estrutura de 8 diretórios já assumida por `docs/deployment/PRODUCTION.md`/`SETUP.md` e pela VM real). Essa etapa prepara o host, mas nao clona o repositorio e nao cria secrets reais.
 
 ### 04-docker.sh
 

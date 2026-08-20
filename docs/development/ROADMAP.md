@@ -47,6 +47,7 @@ Este documento numera as fases detalhadas abaixo como "Fase N" (a partir de 0). 
 | Fase 30 | EPIC 33 |
 | Fase 31 | EPIC 34 |
 | Fase 32 | EPIC 35 |
+| Fase 33 | EPIC 36 (achado operacional, fora da auditoria original, ver TASKS.md) |
 
 ---
 
@@ -218,6 +219,7 @@ ADR-032 -> updater dedicado (Tarefa Agendada propria) para auto-atualizacao do a
 ADR-033 -> reversao da integracao Snipe-IT (EPIC 19), sem Snipe-IT real conectado em producao
 ADR-034 -> auto-deteccao do ID do RustDesk pelo agente Windows, planejamento (EPIC 23)
 ADR-035 -> GSAP para polimento visual do dashboard, escolhido sobre Three.js (EPIC 24)
+ADR-036 -> segredo por maquina (trust-on-first-use) para identidade do agente no check-in, alem da AGENT_API_KEY global (EPIC 28-A)
 ```
 
 ---
@@ -661,7 +663,7 @@ Validado na VM real em 2026-08-15: os 4 containers subiram healthy via `docker c
 
 # Fase 19
 
-Auto-atualizacao do Agente Windows — planejamento concluido (ADR-032), implementacao pendente
+Auto-atualizacao do Agente Windows — concluida (ADR-032, EPIC 22 encerrada em 2026-08-19)
 
 Meta:
 
@@ -677,7 +679,7 @@ Entregas:
 
 Resultado Esperado:
 
-Atualizacao do agente Windows sem intervencao manual por maquina, mantendo 100% PowerShell puro e sem Servico Windows via SCM. Somente planejamento/documentacao nesta rodada (EPIC 22 de `docs/development/TASKS.md`).
+Atualizacao do agente Windows sem intervencao manual por maquina, mantendo 100% PowerShell puro e sem Servico Windows via SCM. Implementado e verificado em 2026-08-19 (ver `docs/specs/epic-22-agent-auto-update/verification.md` e EPIC 22 de `docs/development/TASKS.md`). O gap do Nginx (endpoints novos sem isencao de Basic Auth) foi corrigido no codigo no mesmo dia pela EPIC 37, validado localmente — ainda nao deployado em producao (ver `docs/deployment/KNOWN_ISSUES.md`).
 
 ---
 

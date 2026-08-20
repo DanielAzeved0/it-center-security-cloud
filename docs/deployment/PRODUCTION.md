@@ -551,6 +551,8 @@ Monitorar:
 
 `infra/scripts/deploy.sh` chama `docker-scout-gate.sh` automaticamente entre o `build` e o `up -d` (EPIC 29, 2026-08-17) — deixou de depender de um humano lembrar de rodar manualmente antes de publicar. Uma falha do gate (CVE critical/high em alguma imagem de `ITCENTER_SCOUT_IMAGES`) aborta o deploy antes de qualquer container novo subir, graças ao `set -eu` já ativo no script.
 
+**Ressalva importante (achado de 2026-08-19):** "containers antigos continuam rodando" é verdade, mas incompleto — no fluxo real de `deploy-production.yml`, o `git checkout --force FETCH_HEAD` já roda **antes** do `deploy.sh` (e portanto antes do gate). Uma falha do gate deixa o *checkout* já avançado para o novo commit, mesmo com os containers ainda na versão antiga — exatamente a defasagem de 2 dias descoberta nesta data (ver `docs/deployment/DEPLOYMENT_HISTORY.md`). Além disso, o gate pode falhar não só por CVE, mas por travar completamente por falta de RAM ao escanear `infra-backend`/`infra-frontend` (imagens locais, sem índice pré-computado — ver `docs/deployment/KNOWN_ISSUES.md` e EPIC 36), deixando o deploy pendurado em vez de abortar rápido.
+
 Para rodar o gate isoladamente (fora de um deploy, por exemplo durante desenvolvimento local ou investigação de CVE):
 
 ```bash

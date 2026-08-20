@@ -102,6 +102,8 @@ status VARCHAR(20) NOT NULL DEFAULT 'offline'
 last_seen TIMESTAMPTZ NULL
 rustdesk_id VARCHAR(50) NULL
 agent_secret_hash VARCHAR(64) NULL
+agent_version VARCHAR(20) NULL
+target_agent_version VARCHAR(20) NULL
 created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 ```
@@ -119,6 +121,11 @@ updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 * `serial_number` é opcional, coletado pelo agente a cada check-in (migration `008_machines_serial_number.sql`, EPIC 27) via `Win32_BIOS.SerialNumber`, com fallback para `Win32_ComputerSystemProduct.IdentifyingNumber`. Pode ser `null` se a leitura falhar ou se ambos os métodos só retornarem placeholders conhecidos (ex.: "System Serial Number", "None") — a leitura nunca bloqueia o check-in.
 * `rustdesk_id` é opcional, cadastrado manualmente por `admin`/`analyst` via `PATCH /api/v1/machines/{id}/rustdesk` (EPIC 19, ADR-027). Não é coletado pelo agente. Referencia o ID do RustDesk já instalado na máquina; não é uma credencial.
 * `agent_secret_hash` (migration `009_machines_agent_secret.sql`, EPIC 28-A, ADR-036) guarda o hash SHA-256 do segredo de identidade da máquina emitido em trust-on-first-use pelo check-in do agente. Nunca guarda o segredo em texto puro. `NULL` decide o caminho de adoção em `save_machine_checkin()`: hostname novo ou com `agent_secret_hash IS NULL` recebe um segredo novo (devolvido em texto puro só na resposta daquele check-in); hostname com segredo já adotado exige o segredo correto (comparado só pelo hash, `hmac.compare_digest`) em todo check-in seguinte, sob pena de rejeição (`machine_identity_mismatch`, ver `docs/security/SOC_RULES.md`) sem sobrescrever nenhum dado da máquina.
+
+* `agent_version` (migration `013_machines_agent_version.sql`, EPIC 22, ADR-032) é opcional, informada pelo próprio agente a cada check-in (`$script:AgentVersion` de `itcenter-agent.ps1`). Usada só para observabilidade (exibida no dashboard) e pelo updater dedicado para decidir se atualiza uma máquina — nenhuma regra SOC depende dela. `NULL` até o primeiro check-in que a informe.
+* `target_agent_version` (migration `013_machines_agent_version.sql`, EPIC 22, ADR-032) é uma trava opcional de "não atualizar": quando preenchida e diferente da versão publicada pelo backend (`GET /api/v1/agent/manifest`), o updater da máquina correspondente não aplica a atualização (hold-back). Como o backend só guarda o release do agente atualmente publicado (embutido na própria imagem Docker, sem histórico de versões antigas — ver "Origem do release do agente" abaixo), esta coluna **não** permite mandar uma máquina para uma versão arbitrária do passado, só segurá-la na versão que já tem instalada. Sem endpoint de escrita nesta EPIC — preenchida manualmente via SQL pelo operador.
+
+Origem do release do agente servido por `GET /api/v1/agent/manifest`/`GET /api/v1/agent/download` (EPIC 22, ADR-032): o backend não lê `agent-windows/` do repositório em tempo de execução — `backend/Dockerfile` copia `agent-windows/itcenter-agent.ps1` (já assinado, ver ADR-031) para dentro da própria imagem do backend em build-time (`AGENT_RELEASE_PATH`, variável de ambiente com um caminho padrão de container). A versão publicada é extraída por regex do `$script:AgentVersion` desse mesmo arquivo (fonte única de verdade — nunca um número declarado em outro lugar) e o hash SHA-256 é calculado sobre os bytes exatos desse arquivo. **Publicar uma nova versão do agente exige um deploy de backend** (editar `$script:AgentVersion`, assinar com `Sign-AgentScripts.ps1`, redeploy) — decisão consciente para não introduzir armazenamento de binário novo (bucket, tabela); ver `docs/specs/epic-22-agent-auto-update/spec.md` (seção Assumptions) para o raciocínio completo.
 
 A coluna `snipeit_asset_id`, introduzida pela migration `005_machines_snipeit.sql` (integração Snipe-IT, ADR-028), foi removida pela migration `006_remove_machines_snipeit.sql` — a integração foi revertida em 2026-08-11 (ver ADR-033 em `docs/development/DECISIONS.md`) por nunca ter existido um Snipe-IT real conectado em produção.
 
@@ -174,7 +181,8 @@ updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 * A cada inventário completo, a API deve substituir o conjunto de programas da máquina por um novo snapshot.
 * A coluna `installed_at` existe no schema mas hoje é sempre `NULL`: nem o payload de check-in do agente (`docs/agent/CHECKIN.md`) nem o schema de resposta da API (`MachineProgram`) expõem essa data, e o `INSERT INTO installed_programs` em `backend/app/repositories/machines.py` nunca a referencia. É uma coluna morta reservada para uso futuro, não uma informação coletada de forma inconsistente.
 * Será usada para detectar softwares monitorados conforme ASSET_POLICY.md e SOC_RULES.md.
-* Não deve existir duplicidade de name e version para a mesma máquina.
+* Não deve existir duplicidade de name, version e publisher para a mesma máquina (migration `011_installed_programs_publisher_unique.sql`, EPIC 30 — antes a constraint não incluía `publisher`, e o dedup do agente em `itcenter-agent.ps1` já compara os três campos, o que podia derrubar a transação inteira do check-in quando duas entradas tinham mesmo nome/versão e publisher diferente).
+* O `INSERT` em `backend/app/repositories/machines.py` usa `ON CONFLICT (machine_id, name, version, publisher) DO NOTHING` como defesa em profundidade — `publisher` nulo em duas linhas não colide entre si (semântica de `NULL` em `UNIQUE` do Postgres), aceitável porque o dedup do agente já evita duas entradas idênticas no mesmo payload.
 * `updated_at` é preenchido pelo trigger `trg_installed_programs_updated_at` (ver "Coluna updated_at e o trigger set_updated_at()" acima), não pela aplicação.
 
 ---
@@ -198,7 +206,7 @@ last_seen_at TIMESTAMPTZ NOT NULL DEFAULT now()
 * Relacionada com a maquina.
 * Usada para detectar novos administradores locais apos o primeiro baseline.
 * O primeiro check-in estabelece o baseline e nao gera alerta para todos os administradores existentes.
-* Nao deve existir duplicidade de admin_name para a mesma maquina.
+* Identidade case-insensitive: indice unico sobre `(machine_id, lower(admin_name))` (migration `012_machine_local_admins_case_insensitive.sql`, EPIC 30), mesmo padrao ja usado em `users` (`lower(email)`). Antes a constraint era case-sensitive enquanto a logica de "e novo?" em `sync_machine_local_admins` ja comparava em minusculas — o mesmo admin com capitalizacao diferente entre check-ins nao gerava alerta falso, mas criava uma segunda linha fisica para a mesma conta logica.
 
 ---
 
@@ -287,6 +295,7 @@ ignored
 * severity deve aceitar apenas: low, medium, high, critical.
 * status deve aceitar apenas: open, investigating, resolved, ignored.
 * Constraint `alerts_resolved_at_check` (migration `001_initial_schema.sql`) é bidirecional: `resolved_at` deve ser `NOT NULL` quando status for `resolved` ou `ignored`, **e também** deve ser `NULL` quando status for `open` ou `investigating`. Não é permitido, por exemplo, um alerta `open` com `resolved_at` preenchido.
+* No máximo um alerta `open`/`investigating` por `(machine_id, alert_type)`: índice único parcial `idx_alerts_machine_alert_type_open_unique` (migration `010_alerts_open_unique_index.sql`, EPIC 30). `create_open_alert_once` (`backend/app/repositories/alerts.py`) virou um único `INSERT ... ON CONFLICT (machine_id, alert_type) WHERE status IN ('open','investigating') DO NOTHING RETURNING id` — antes era um `SELECT` seguido de `INSERT` em chamadas separadas, com uma race condition real entre as duas sob retry do agente.
 
 ---
 
@@ -342,14 +351,14 @@ CHECK disk_usage BETWEEN 0 AND 100
 
 ```text
 INDEX machine_id
-UNIQUE machine_id, name, version
+UNIQUE machine_id, name, version, publisher
 ```
 
 ## machine_local_admins
 
 ```text
 INDEX machine_id
-UNIQUE machine_id, admin_name
+UNIQUE machine_id, lower(admin_name)
 ```
 
 ## security_events
@@ -370,6 +379,7 @@ INDEX status
 INDEX severity
 INDEX created_at
 INDEX status, severity
+UNIQUE PARCIAL machine_id, alert_type WHERE status IN ('open', 'investigating')
 ```
 
 ## agent_configs

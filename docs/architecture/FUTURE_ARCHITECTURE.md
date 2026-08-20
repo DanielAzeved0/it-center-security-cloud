@@ -95,7 +95,7 @@ Entregas recomendadas:
 * Separar o agente como produto com ciclo de versao proprio.
 * Criar instalador.
 * Criar servico Windows — item generico (para a coleta em si, via Service Control Manager) segue sem decisao; resolvido parcialmente apenas para o caso de atualizacao automatica, ver item abaixo.
-* Adicionar atualizacao automatica — em planejamento real (ADR-032, EPIC 22): updater dedicado (`itcenter-agent-updater.ps1`) 100% PowerShell puro, com Tarefa Agendada propria de frequencia menor que o check-in, sem Servico Windows nativo via SCM e sem NSSM/WinSW (ver ADR-005, ADR-025). Ainda sem codigo.
+* Adicionar atualizacao automatica — implementada (ADR-032, EPIC 22, 2026-08-19): updater dedicado (`itcenter-agent-updater.ps1`) 100% PowerShell puro, com Tarefa Agendada propria (`ITCenterAgentUpdater`) de frequencia menor que o check-in, sem Servico Windows nativo via SCM e sem NSSM/WinSW (ver ADR-005, ADR-025).
 * Melhorar cache offline.
 * Adicionar retry inteligente.
 * Adicionar compressao de payloads quando necessario.

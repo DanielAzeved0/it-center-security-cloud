@@ -1004,33 +1004,60 @@ EPIC 21 encerrada em 2026-08-15.
 
 Objetivo:
 
-Implementar atualizacao automatica do agente Windows via um updater dedicado, 100% PowerShell puro, com Tarefa Agendada propria e frequencia menor que o check-in de coleta (ADR-032). Sem Servico Windows nativo via SCM, sem NSSM/WinSW. Resolve, apenas para este caso, o item "Criar servico Windows" da Fase B de `docs/architecture/FUTURE_ARCHITECTURE.md`; o caso geral (servico Windows para a coleta em si) continua pendente. Somente planejamento/documentacao nesta rodada.
+Implementar atualizacao automatica do agente Windows via um updater dedicado, 100% PowerShell puro, com Tarefa Agendada propria e frequencia menor que o check-in de coleta (ADR-032). Sem Servico Windows nativo via SCM, sem NSSM/WinSW. Resolve, apenas para este caso, o item "Criar servico Windows" da Fase B de `docs/architecture/FUTURE_ARCHITECTURE.md`; o caso geral (servico Windows para a coleta em si) continua pendente. Implementada via `/sdd` em 2026-08-19 (`docs/specs/epic-22-agent-auto-update/`).
 
 ### Tarefas
 
-[ ] Endpoint `GET /api/v1/agent/manifest` retornando `{version, sha256}` da versao publicada do agente
+[x] Endpoint `GET /api/v1/agent/manifest` retornando `{version, sha256}` da versao publicada do agente
 
-[ ] Endpoint `GET /api/v1/agent/download` (ou similar) para baixar o script mais recente, assinado com o certificado do ADR-031
+    Implementado com um parametro de query opcional `hostname`, adicionado durante a
+    implementacao: o updater nao tinha nenhuma forma de descobrir seu proprio
+    `target_agent_version` (so tem `X-Agent-Api-Key`, sem identidade individual) - o manifest
+    passou a devolver tambem `target_agent_version` quando o hostname bate com uma maquina
+    cadastrada. Ver nota de implementacao na ADR-032.
 
-[ ] Adicionar coluna `machines.agent_version` (nullable) via migration
+[x] Endpoint `GET /api/v1/agent/download` (ou similar) para baixar o script mais recente, assinado com o certificado do ADR-031
 
-[ ] Adicionar coluna `machines.target_agent_version` (nullable) via migration
+[x] Adicionar coluna `machines.agent_version` (nullable) via migration
 
-[ ] Persistir `agent_version` a cada check-in (agente passa a informar a propria versao no payload)
+    Migration `013_machines_agent_version.sql`.
 
-[ ] Adicionar `$script:AgentVersion` no topo de `itcenter-agent.ps1`
+[x] Adicionar coluna `machines.target_agent_version` (nullable) via migration
 
-[ ] Criar `agent-windows/itcenter-agent-updater.ps1` (download do manifest/script, backup do script atual, substituicao atomica via `Move-Item -Force`)
+    Mesma migration `013`. Sem endpoint de escrita nesta EPIC (nao estava no backlog original) -
+    preenchida manualmente via SQL pelo operador; funciona como trava de "nao atualizar"
+    (hold-back), nao como envio para uma versao arbitraria do passado, ja que o backend so
+    publica a versao atualmente embutida na propria imagem Docker.
 
-[ ] Validacao obrigatoria de assinatura Authenticode (`Get-AuthenticodeSignature` Status `Valid`) e hash SHA-256 no updater, sem fallback `-SkipSignatureCheck`
+[x] Persistir `agent_version` a cada check-in (agente passa a informar a propria versao no payload)
 
-[ ] Auto-rollback: restaurar `itcenter-agent.ps1.previous` apos N check-ins consecutivos com falha pos-atualizacao, com log da falha
+[x] Adicionar `$script:AgentVersion` no topo de `itcenter-agent.ps1`
 
-[ ] Registrar Tarefa Agendada dedicada `ITCenterAgentUpdater` em `install-agent.ps1` (frequencia configuravel, menor que o check-in de coleta)
+[x] Criar `agent-windows/itcenter-agent-updater.ps1` (download do manifest/script, backup do script atual, substituicao atomica via `Move-Item -Force`)
 
-[ ] Exibir `agent_version` no dashboard (telas de maquina)
+[x] Validacao obrigatoria de assinatura Authenticode (`Get-AuthenticodeSignature` Status `Valid`) e hash SHA-256 no updater, sem fallback `-SkipSignatureCheck`
 
-[ ] Atualizar `docs/backend/API.md`, `docs/backend/DATABASE.md`, `docs/agent/CHECKIN.md` e `docs/agent/INSTALLATION.md` no momento da implementacao
+[x] Auto-rollback: restaurar `itcenter-agent.ps1.previous` apos N check-ins consecutivos com falha pos-atualizacao, com log da falha
+
+    N = 5 falhas consecutivas (rollback) / 3 sucessos consecutivos (confirmacao) - numeros
+    propostos na spec (ADR-032 deixou "a definir na implementacao"). Estado rastreado em
+    `update-state.json` (mesma ACL restrita de `config.json`), atualizado pelo proprio
+    `itcenter-agent.ps1` a cada check-in via `Update-AgentUpdateStateCounters` (no-op em
+    maquinas nunca atualizadas automaticamente).
+
+[x] Registrar Tarefa Agendada dedicada `ITCenterAgentUpdater` em `install-agent.ps1` (frequencia configuravel, menor que o check-in de coleta)
+
+    Parametro novo `-UpdaterIntervalHours` (padrao 24), persistido em `config.json` como
+    `updater_interval_hours`. `uninstall-agent.ps1` e `scripts/Sign-AgentScripts.ps1` atualizados
+    para cobrir o novo script/tarefa.
+
+[x] Exibir `agent_version` no dashboard (telas de maquina)
+
+[x] Atualizar `docs/backend/API.md`, `docs/backend/DATABASE.md`, `docs/agent/CHECKIN.md` e `docs/agent/INSTALLATION.md` no momento da implementacao
+
+Origem do release do agente servido pelo backend (lacuna que a ADR-032 nao resolvia): `backend/Dockerfile` passou a copiar `agent-windows/itcenter-agent.ps1` (ja assinado) para dentro da propria imagem em build-time - build context do servico `backend` mudou de `../backend` para a raiz do repositorio em `infra/docker-compose.yml`/`infra/docker-compose.production.yml`, com `.dockerignore` novo na raiz do repositorio para nao inflar a imagem. Publicar uma nova versao do agente passa a exigir um deploy de backend.
+
+Validacao em 2026-08-19: suite completa do backend via `pytest` local (Postgres via `infra/docker-compose.yml`, `DATABASE_URL` apontando para `127.0.0.1` - usar `localhost` nesta maquina Windows aciona um fallback de resolucao IPv6 lento por conexao, ~5s cada, o que parecia uma suite travada e nao era): 123 passed (114 anteriores + 9 novos). As 3 suites de teste do agente Windows (`run-agent-tests.ps1`, `run-install-agent-tests.ps1`, `run-agent-updater-tests.ps1`, este ultimo novo) passaram via PowerShell real neste ambiente Windows. `npm run build` do frontend limpo. `docker compose build backend` validado com sucesso a partir do novo build context; copia do arquivo do agente para dentro da imagem confirmada por inspecao direta (`docker run --rm ... cat /app/agent-release/itcenter-agent.ps1`). **Nao validado nesta sessao**: subir o container `backend` de ponta a ponta contra o Postgres local via `docker compose up` - o Postgres local deste ambiente tem um problema pre-existente e nao relacionado a esta EPIC (EPIC 33: `apply_migrations.py` reaplica todas as migrations sem tabela de controle, e a migration `011` nao e idempotente contra um schema ja migrado, entrando em crash-loop); geracao real do certificado de assinatura de producao e assinatura dos 4 scripts (`Sign-AgentScripts.ps1`) fica a cargo do mantenedor antes do primeiro deploy que ative a Tarefa Agendada `ITCenterAgentUpdater` de verdade (mesmo padrao ja estabelecido pela EPIC 16/ADR-031); revisao visual manual do campo "Versao do Agente" no dashboard em navegador real (mesma ressalva das EPICs 24/25/26). EPIC 22 encerrada.
 
 ---
 
@@ -1508,7 +1535,7 @@ Corrigir achados de corretude/integridade de dados encontrados na auditoria tecn
 
 ### Tarefas
 
-[ ] Prevenir alertas abertos duplicados sob retry do agente (`backend/app/repositories/alerts.py:13`, severidade alta)
+[x] Prevenir alertas abertos duplicados sob retry do agente (`backend/app/repositories/alerts.py:13`, severidade alta)
 
     create_open_alert_once faz SELECT-entao-INSERT sem constraint UNIQUE
     que sustente a garantia de "um alerta aberto por tipo" - so
@@ -1521,7 +1548,16 @@ Corrigir achados de corretude/integridade de dados encontrados na auditoria tecn
     ('open','investigating'), ou SELECT ... FOR UPDATE na mesma
     transacao.
 
-[ ] Alinhar constraint de `installed_programs` com a chave de dedup real do agente (`backend/app/repositories/machines.py:79`, severidade alta)
+    Implementado em 2026-08-19 via skill de SDD (`.claude/skills/sdd/`):
+    migration `010_alerts_open_unique_index.sql` cria o indice unico
+    parcial; `create_open_alert_once` virou um unico `INSERT ... ON
+    CONFLICT (machine_id, alert_type) WHERE status IN
+    ('open','investigating') DO NOTHING RETURNING id`, atomico, sem o
+    `SELECT` previo. Convergiu com o achado seguinte de indice de
+    existencia (ver nota la embaixo) - a mesma mudanca resolve os dois.
+    Testado em `backend/tests/test_alerts.py::test_create_open_alert_once_is_idempotent`.
+
+[x] Alinhar constraint de `installed_programs` com a chave de dedup real do agente (`backend/app/repositories/machines.py:79`, severidade alta)
 
     A constraint no banco e UNIQUE (machine_id, name, version) - sem
     publisher. O agente deduplica com uma chave que INCLUI publisher
@@ -1535,7 +1571,15 @@ Corrigir achados de corretude/integridade de dados encontrados na auditoria tecn
     constraint UNIQUE do banco, ou usar ON CONFLICT ... DO UPDATE em
     vez de INSERT puro.
 
-[ ] Filtrar por `machine_id` no SQL do relatorio PDF de maquina (`backend/app/routes/reports.py:56`, severidade media)
+    Implementado em 2026-08-19: migration
+    `011_installed_programs_publisher_unique.sql` troca a constraint por
+    UNIQUE (machine_id, name, version, publisher); o `executemany` do
+    `INSERT INTO installed_programs` ganhou `ON CONFLICT (...) DO
+    NOTHING` como defesa em profundidade adicional. Testado em
+    `test_agent_checkin_persists_programs_with_same_name_version_but_different_publisher`
+    e `test_agent_checkin_does_not_crash_on_duplicate_installed_program_entries`.
+
+[x] Filtrar por `machine_id` no SQL do relatorio PDF de maquina (`backend/app/routes/reports.py:56`, severidade media)
 
     get_machine_report chama list_alerts()/list_security_events() sem
     WHERE nem LIMIT e so filtra pelo machine_id pedido depois, em
@@ -1544,7 +1588,14 @@ Corrigir achados de corretude/integridade de dados encontrados na auditoria tecn
     list_alerts(machine_id=...)/list_security_events(machine_id=...)
     com WHERE machine_id = %s real no SQL.
 
-[ ] Adicionar paginacao a `/alerts`, `/security-events` e `/machines/{id}/metrics` (`backend/app/repositories/alerts.py:55`, severidade media)
+    Implementado em 2026-08-19: list_alerts/list_security_events
+    ganharam parametro opcional machine_id (default None, preserva o
+    comportamento dos outros chamadores); reports.py passa a chamar
+    list_alerts(machine_id=machine_id, limit=500) em vez do filtro em
+    Python. Testes existentes de test_reports_pdf.py continuam
+    passando sem alteracao.
+
+[x] Adicionar paginacao a `/alerts`, `/security-events` e `/machines/{id}/metrics` (`backend/app/repositories/alerts.py:55`, severidade media)
 
     As tres listagens rodam ORDER BY created_at DESC sem LIMIT/OFFSET,
     e nenhuma rota aceita parametro de paginacao. metrics ganha uma
@@ -1554,7 +1605,22 @@ Corrigir achados de corretude/integridade de dados encontrados na auditoria tecn
     VM de 1GB ja apertada. Direcao: LIMIT/OFFSET (ou cursor) nas tres
     rotas, com teto default razoavel.
 
-[ ] Adicionar indice para a query de existencia de alerta (`backend/app/repositories/alerts.py:18`, severidade media)
+    Implementado em 2026-08-19: `limit` (default 100, min 1, max 500) e
+    `offset` (default 0) adicionados as 3 rotas via `Query`, valores
+    fora do intervalo retornam 422. Descoberta durante a spec: paginar
+    `/alerts`/`/security-events` sem mais nada quebraria
+    silenciosamente `MachineDetailView.tsx`, que buscava a lista
+    inteira e filtrava por `machine_id` no cliente (tech debt da EPIC
+    26) - acima de `limit` registros ela deixaria de mostrar
+    alertas/eventos antigos de uma maquina. Corrigido junto: `machine_id`
+    exposto como filtro publico em `GET /api/v1/alerts` e
+    `GET /api/v1/security-events`, e `MachineDetailView.tsx` atualizado
+    para usar `?machine_id=` em vez do filtro client-side - fecha
+    tambem a tech debt da EPIC 26. `AlertsView`/`SecurityView` (listas
+    administrativas completas) ficam sem UI de paginacao por ora,
+    aceito dado o volume baixo de producao atual.
+
+[x] Adicionar indice para a query de existencia de alerta (`backend/app/repositories/alerts.py:18`, severidade media)
 
     Todo check-in que casa uma condicao persistente roda WHERE
     machine_id=%s AND alert_type=%s AND status IN (...), mas so existe
@@ -1564,7 +1630,13 @@ Corrigir achados de corretude/integridade de dados encontrados na auditoria tecn
     MVP). Direcao: indice composto (ou parcial, so status aberto) em
     alerts(machine_id, alert_type, status).
 
-[ ] Tornar a identidade de admin local case-insensitive de ponta a ponta (`backend/app/repositories/local_admins.py:24`, severidade media)
+    Convergiu com o primeiro achado desta EPIC (alertas duplicados): o
+    mesmo indice unico parcial de `010_alerts_open_unique_index.sql`
+    cobre esta query, e a query de existencia em si deixou de existir
+    como `SELECT` separado (virou parte do `INSERT ... ON CONFLICT`).
+    Nao foi criado indice adicional.
+
+[x] Tornar a identidade de admin local case-insensitive de ponta a ponta (`backend/app/repositories/local_admins.py:24`, severidade media)
 
     machine_local_admins tem UNIQUE (machine_id, admin_name)
     case-sensitive, mas sync_machine_local_admins decide "e novo?"
@@ -1576,7 +1648,14 @@ Corrigir achados de corretude/integridade de dados encontrados na auditoria tecn
     resolveu com indice lower(email), nao aplicado aqui. Direcao: mesmo
     padrao de users, indice unico sobre lower(admin_name).
 
-[ ] Deduplicar deteccao de VPN/torrent dentro do mesmo check-in (`backend/app/services/agent.py:287`, severidade baixa)
+    Implementado em 2026-08-19: migration
+    `012_machine_local_admins_case_insensitive.sql` troca a constraint
+    por indice unico sobre `(machine_id, lower(admin_name))`;
+    `sync_machine_local_admins` passou a usar
+    `ON CONFLICT (machine_id, lower(admin_name))`. Testado em
+    `test_agent_checkin_treats_local_admin_names_case_insensitively`.
+
+[x] Deduplicar deteccao de VPN/torrent dentro do mesmo check-in (`backend/app/services/agent.py:287`, severidade baixa)
 
     Os loops de UNAUTHORIZED_VPN_TOOLS e TORRENT_TOOLS, diferente dos
     loops irmaos de ferramentas remotas/malware/dual-use, nao usam o
@@ -1586,13 +1665,39 @@ Corrigir achados de corretude/integridade de dados encontrados na auditoria tecn
     ciclo. Direcao: reaproveitar o mesmo seen_detections nesses dois
     loops.
 
-[ ] Validar formato de `ip_address` no schema do check-in (`backend/app/schemas/agent.py:24`, severidade baixa)
+    Implementado em 2026-08-19: os 2 loops passaram a checar/marcar
+    `seen_detections` com chave `(event_type, tool)`, mesmo padrao dos
+    loops irmaos. Testado em
+    `test_agent_checkin_deduplicates_unauthorized_vpn_tool_within_same_checkin`
+    e `test_agent_checkin_deduplicates_torrent_software_within_same_checkin`.
+
+[x] Validar formato de `ip_address` no schema do check-in (`backend/app/schemas/agent.py:24`, severidade baixa)
 
     O campo so valida comprimento (max 45 chars), nao formato; a coluna
     e INET no Postgres. Um valor invalido quebra o INSERT com
     InvalidTextRepresentation - sem exception handler global, isso sobe
     como 500 generico em vez do 422 de validacao esperado. Direcao:
     validar formato IPv4/IPv6 no schema Pydantic antes do INSERT.
+
+    Implementado em 2026-08-19: `field_validator` em
+    `AgentCheckinRequest.ip_address` usando `ipaddress.ip_address()`
+    (stdlib, sem dependencia nova); `None`/string vazia continuam
+    aceitos sem erro. Testado em
+    `test_agent_checkin_rejects_invalid_ip_address`,
+    `test_agent_checkin_accepts_valid_ipv6_address` e
+    `test_agent_checkin_accepts_missing_ip_address`.
+
+EPIC 30 encerrada em 2026-08-19: os 8 achados foram corrigidos via o
+fluxo da skill de SDD (`.claude/skills/sdd/`, spec compacta aprovada em
+conversa, sem arquivo de spec no repositorio). Suite completa do backend
+via `pytest` local (Postgres via `infra/docker-compose.yml`): 114 passed
+(98 anteriores + 16 novos, incluindo 2 testes preexistentes ajustados -
+`test_dashboard_summary.py` usava 2 alertas de mesmo `alert_type` na
+mesma maquina para simular contagem por severidade, o que o novo indice
+unico da EPIC 30 corretamente passou a impedir; fixture ajustada para 2
+`alert_type` distintos, mesma intencao de teste preservada).
+`npm run build` do frontend limpo (TypeScript OK, Turbopack) apos o
+ajuste em `MachineDetailView.tsx`. Nao validado em producao.
 
 ---
 
@@ -1808,3 +1913,130 @@ Remover `'unsafe-inline'` de `script-src` na CSP do dashboard sem quebrar a hidr
     e reutilizado); `script-src` sem `'unsafe-inline'`.
 
 Origem: item da EPIC 28 (auditoria tecnica de 2026-08-15) que nao pode ser fechado como correcao pontual - registrado como EPIC propria em 2026-08-17 apos a investigacao confirmar a causa raiz e o caminho de correcao.
+
+---
+
+# EPIC 36 - Gate de CVE do Docker Scout inviavel em itcenter-edge-01 para imagens locais
+
+Objetivo:
+
+Corrigir o gate de CVE (`infra/scripts/docker-scout-gate.sh`, cablado em `deploy.sh` pela EPIC 29) para que um deploy de producao completo (com o gate ativo) funcione de ponta a ponta em `itcenter-edge-01` sem travar a VM - hoje ele nao funciona na pratica.
+
+Achado (2026-08-19, primeiro deploy real apos a EPIC 29 ter tornado o gate obrigatorio - a EPIC 29 so validou isso via harness local, nunca contra a VM real): o plugin `docker scout` nao estava sequer instalado em `itcenter-edge-01`, e mesmo apos instalar e autenticar (Docker Hub), escanear uma imagem construida localmente (`infra-backend:latest` - ao contrario de imagens oficiais como `postgres:16-alpine`, que ja vem com indice pronto no Docker Hub) esgotou por completo os 954MB de RAM + 1GB de swap da VM so na etapa de indexacao, travando (estado `D`, sem OOM killer disparado, mas efetivamente sem terminar apos ~30 minutos). Producao nao foi afetada (o `up -d` nunca foi alcancado por esse caminho) porque o deploy foi concluido contornando o gate manualmente nessa sessao - ver `docs/deployment/DEPLOYMENT_HISTORY.md` (entrada de 2026-08-19) e `docs/deployment/KNOWN_ISSUES.md`.
+
+**Achado adicional e mais fundamental (2026-08-20):** um deploy real via GitHub Actions (`Deploy Production #22`) travou no gate, mas nao por RAM - `postgres:16-alpine` tem CVEs critical/high conhecidas (2C/20H, golang/stdlib) e o gate original nao tinha NENHUM mecanismo de excecao para risco ja aceito, so `--exit-code` incondicional. Investigando mais a fundo: as 4 imagens de observabilidade da EPIC 21 (`node-exporter`, `cadvisor`, `prometheus`, `grafana-oss`) tem o MESMO problema, em volume ainda maior (43/64/47/84 vulnerabilidades cada, todas de toolchain Go desatualizado embutido pelos mantenedores upstream - confirmado que nem a versao mais recente de `node-exporter` resolve). Ou seja: o gate, do jeito que a EPIC 29 o desenhou, **nunca poderia ter passado** desde que a EPIC 21 introduziu essas 4 imagens (2026-08-15) - o problema de RAM (paragrafo acima) so apareceu primeiro porque `postgres` e a PRIMEIRA imagem da lista default e ja falhava antes de chegar nas imagens locais.
+
+### Tarefas
+
+[x] Decidir e implementar a estrategia para as imagens de terceiros oficiais (severidade alta)
+
+    Implementado em 2026-08-20: `docker-scout-gate.sh` reescrito com 2 grupos.
+    `ITCENTER_SCOUT_IMAGES` (gate rigido, `--exit-code`) passa a conter SO
+    `infra-backend:latest`/`infra-frontend:latest` - as unicas 2 imagens que
+    este projeto constroi e controla. `ITCENTER_SCOUT_ACCEPTED_RISK_IMAGES`
+    (novo, default as 5 imagens de terceiros - postgres + as 4 de
+    observabilidade) continua sendo escaneado a cada deploy para visibilidade,
+    mas sem `--exit-code` (`|| true`) - nunca bloqueia. Validado localmente:
+    gate completo roda com exit code 0 (`infra-backend`/`infra-frontend` "No
+    vulnerable packages detected", as 5 imagens de terceiros reportadas com
+    seus totais reais). `docs/security/SECURITY.md` atualizado (secao
+    "Estado Atual das Imagens" + criterio P1 estendido explicitamente as 4
+    imagens de observabilidade, nao so postgres).
+
+[x] Corrigir CVEs reais e corrigiveis encontradas em `infra-backend` no processo (achado lateral, severidade media)
+
+    Ao consertar o gate acima, `infra-backend:latest` revelou 3 CVEs HIGH
+    genuinas (msgpack, setuptools) que estavam mascaradas porque o gate
+    original sempre falhava antes em `postgres` (primeiro da lista antiga),
+    nunca chegando a escanear as imagens locais de verdade. Causa raiz: `pip`
+    vendoriza copias proprias de `msgpack`/`setuptools`/`jaraco.*`/`wheel`
+    (pacote `pip._vendor`) independentes do que `requirements.txt` fixa - um
+    pin direto (tentativa inicial) nao resolve, so cria uma segunda copia
+    paralela. Corrigido removendo `pip`/`setuptools`/`wheel` da imagem final
+    do backend (`backend/Dockerfile`, apos `pip install -r requirements.txt`)
+    - mesmo padrao ja usado no frontend para o `npm`. Validado: build limpo,
+    container sobe normalmente (`Applied 13 migration file(s)`, `GET
+    /api/v1/health` respondendo), novo scan com 0 vulnerabilidades
+    critical/high.
+
+[ ] Instalar o plugin `docker scout` de forma permanente em `itcenter-edge-01` (hoje instalado manualmente nesta sessao, fora de qualquer script versionado) - incluir isso em `infra/bootstrap/` ou documentar como passo manual pos-provisionamento.
+
+[ ] Decidir a estrategia para o problema de RAM ao escanear imagens locais (`infra-backend`/`infra-frontend`) especificamente na VM `itcenter-edge-01` (severidade alta, ainda sem solucao) - esse problema continua existindo mesmo apos a correcao acima, porque `infra-backend`/`infra-frontend` continuam no gate rigido (correto - sao as imagens que realmente queremos bloquear se tiverem CVE nova). Opcoes ja levantadas: (a) aumentar RAM/swap de `itcenter-edge-01`; (b) mover o scan dessas 2 imagens para o CI (GitHub Actions ja tem recursos suficientes - o proprio achado de 2026-08-20 rodou rapido no runner do GitHub, sem o problema de RAM, confirmando que essa opcao funcionaria). Registrar a decisao em `docs/development/DECISIONS.md` (ADR) dado que muda o fluxo de deploy/CI ja documentado.
+
+[ ] Implementar a mudanca escolhida acima e validar rodando `deploy.sh` completo (com o gate ativo) contra `itcenter-edge-01` de ponta a ponta, sem travar a VM, antes de considerar a EPIC encerrada - a EPIC 29 encerrou sem esse tipo de validacao real e foi assim que este problema passou despercebido.
+
+[ ] Atualizar `docs/deployment/KNOWN_ISSUES.md` e `docs/deployment/DEPLOYMENT_HISTORY.md` refletindo a resolucao final (parcial ja aplicada em 2026-08-20 - falta a parte de RAM/VM).
+
+Origem: achado operacional do primeiro deploy real pos-EPIC 29, em 2026-08-19 (nao fazia parte de nenhuma auditoria previa - surgiu ao usar o SSH recuperado para colocar producao em dia com o codigo ja commitado). Achado adicional em 2026-08-20 durante uma tentativa de deploy real via GitHub Actions, que revelou o problema real ser mais amplo que RAM.
+
+---
+
+# EPIC 37 - Correcao de Achados da Auditoria de Documentacao (2026-08-19)
+
+Objetivo:
+
+Corrigir os 3 achados que uma auditoria de lacunas de documentacao (2026-08-19, pedido explicito de "ler a documentacao e procurar lacunas") revelou nao serem so texto desatualizado, mas bugs funcionais/gaps de cobertura reais no codigo e na infra. Implementada via `/sdd` (`docs/specs/epic-37-documentation-audit-fixes/`) no mesmo dia.
+
+### Tarefas
+
+[x] Adicionar `location` dedicado para `GET /api/v1/agent/manifest` e `GET /api/v1/agent/download` em `infra/nginx/nginx.conf.template` (severidade alta)
+
+    Implementado em 2026-08-19: dois blocos `location =` dedicados (correspondencia
+    exata, nao regex - mesma semantica do bloco de `/agent/checkin`), sem
+    `auth_basic`, sem `limit_req` proprio (confirmado com o usuario: volume
+    baixo, 1x/dia por maquina, nao justifica limite dedicado agora). Validado
+    ponta a ponta localmente: Nginx oficial (`nginx:1.28-alpine`) + backend real
+    na mesma rede Docker, certificado dummy para TLS. Resultado: `GET
+    /agent/manifest` sem `X-Agent-Api-Key` retorna 401 do FastAPI (corpo JSON
+    `{"detail": "Invalid or missing agent API key"}`, sem `www-authenticate`);
+    com a chave correta retorna 200 com o manifest real; `/agent/download`
+    segue o mesmo padrao; a raiz do dashboard continua exigindo Basic Auth
+    (401 com `www-authenticate: Basic`), confirmando que a mudanca nao afetou
+    nenhuma outra rota. **Nao deployado em producao nesta sessao** - `itcenter-edge-01`
+    continua rodando o `nginx.conf.template` anterior ate o proximo deploy
+    real incluir este commit (ver `docs/deployment/KNOWN_ISSUES.md`).
+
+[x] Corrigir a migration `011_installed_programs_publisher_unique.sql` para ser idempotente (severidade alta)
+
+    Implementado em 2026-08-19: adicionado `DROP CONSTRAINT IF EXISTS
+    installed_programs_machine_name_version_publisher_unique` antes do `ADD
+    CONSTRAINT` (mesmo cuidado ja aplicado pela propria migration para a
+    constraint ANTERIOR, so faltava para a nova). Corrigido in-place no
+    arquivo `011` (nao uma migration nova) porque nunca foi commitado nem
+    deployado em nenhum ambiente alem de bancos de teste locais descartaveis.
+    Validado manualmente: aplicado 2x seguidas contra Postgres local, sem erro
+    na segunda aplicacao, constraint final identica
+    (`UNIQUE (machine_id, name, version, publisher)`). Confirmado tambem via
+    reproducao real do bug: o container `backend` local, rodando a imagem
+    construida ANTES da correcao (com a migration `011` original ja aplicada
+    manualmente ao banco), entrou exatamente no crash-loop `DuplicateTable`
+    previsto ao reiniciar - rebuild da imagem com o arquivo corrigido resolveu.
+
+[x] Decidir e implementar a cobertura de `unauthorized_vpn_tool`/`torrent_software_detected` sobre `processes` (severidade media)
+
+    Decisao do usuario (2026-08-19): estender a cobertura. Implementado
+    movendo os 2 loops de `UNAUTHORIZED_VPN_TOOLS`/`TORRENT_TOOLS` de dentro do
+    loop de `installed_programs` (em `process_installed_program_rules`) para
+    dentro de `_process_software_value` - a mesma funcao ja compartilhada
+    entre `installed_programs` e `processes` para as outras 4 categorias de
+    deteccao, reaproveitando o `seen_detections` existente sem duplicar logica.
+    Efeito colateral aceito conscientemente (documentado na spec): o `raw_data`
+    desses 2 eventos passa a usar `_software_detection_raw_data(...)` (mesmo
+    formato das outras 4 categorias) em vez de `program.model_dump()` -
+    confirmado antes de implementar que nenhum consumidor (frontend, relatorios
+    PDF) depende do formato antigo. 2 testes novos
+    (`test_agent_checkin_detects_unauthorized_vpn_tool_via_processes`,
+    `test_agent_checkin_detects_torrent_software_via_processes`). Suite
+    completa do backend: 125 passed (123 anteriores + 2 novos), sem regressao.
+    `docs/security/ASSET_POLICY.md` e `docs/security/SOC_RULES.md` (Regras 9 e
+    10) atualizados refletindo a cobertura estendida.
+
+[x] Validar as 3 correcoes acima e atualizar `docs/deployment/KNOWN_ISSUES.md`/`docs/security/ASSET_POLICY.md`/`docs/architecture/SECURITY.md`/`docs/security/AUTH.md`/`docs/security/SECURITY.md` removendo as notas de "gap conhecido" conforme cada uma for corrigida
+
+    Todos os 5 docs atualizados. Cuidado especial: a Trilha 1 (Nginx) esta
+    corrigida no codigo/checkout e validada localmente, mas **nao deployada em
+    producao** - os docs foram redigidos para deixar essa distincao explicita
+    (nunca afirmando que a VM real ja tem a correcao), evitando o mesmo tipo de
+    lacuna entre "commitado" e "rodando de fato" que originou a EPIC 37.
+
+Origem: achados de uma auditoria de lacunas de documentacao pedida explicitamente pelo usuario em 2026-08-19 (nao fazia parte de nenhuma auditoria tecnica previa) - a auditoria revelou que 3 das divergencias entre documentacao e codigo eram, na verdade, bugs/gaps reais no lado do codigo/infra, nao erros de texto. Relatorio completo apresentado na mesma sessao (4 agentes em paralelo cobrindo arquitetura, seguranca, deployment e meta-docs/frontend, mais achados diretos). EPIC 37 encerrada em 2026-08-19 (correcao de codigo/config; deploy em producao fica para quando o usuario autorizar tocar na VM real).

@@ -42,6 +42,7 @@ Em producao, todos os servicos rodam em Docker Compose na Oracle Cloud VM. Somen
 | `backend/` | API, banco de dados e contratos do backend. |
 | `agent/` | Agente Windows, instalacao, preflight de conectividade e check-in. |
 | `development/` | Contribuicao, roadmap, tarefas e decisoes. |
+| `specs/` | Specs de Spec-Driven Development (`/sdd`) para EPICs de nivel arquitetural/critico. |
 | `assets/` | Diagramas e imagens de apoio. |
 
 ## Guia rapido local
@@ -94,7 +95,7 @@ Esta tabela nao tenta listar os 45 arquivos de `docs/` — isso ja provou decair
 | `security/AUTH.md` | Autenticacao do dashboard e do agente. |
 | `security/ASSET_POLICY.md` | Fonte de verdade sobre softwares/ferramentas autorizados. |
 
-A lista completa e sempre atualizada de cada pasta fica no `README.md` de cada subpasta (`agent/`, `architecture/`, `assets/`, `backend/`, `deployment/`, `development/`, `security/`) — cada um indexa 100% dos arquivos-irmaos.
+A lista completa e sempre atualizada de cada pasta fica no `README.md` de cada subpasta (`agent/`, `architecture/`, `assets/`, `backend/`, `deployment/`, `development/`, `security/`, `specs/`) — cada um indexa 100% dos arquivos-irmaos.
 
 ## Estado atual
 

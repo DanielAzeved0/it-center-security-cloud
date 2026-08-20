@@ -304,9 +304,11 @@ Excecoes previstas:
 ```text
 GET /api/v1/health
 POST /api/v1/agent/checkin
+GET /api/v1/agent/manifest
+GET /api/v1/agent/download
 ```
 
-`POST /api/v1/agent/checkin` deve continuar protegido por `X-Agent-Api-Key`, nao por login humano.
+`POST /api/v1/agent/checkin`, `GET /api/v1/agent/manifest` e `GET /api/v1/agent/download` (EPIC 22, ADR-032) devem continuar protegidos por `X-Agent-Api-Key`, nao por login humano — sao autenticacao de classe do agente, nao identidade individual (o `agent_secret` do ADR-036 e especifico do check-in, `manifest`/`download` nao carregam dado por maquina alem do `target_agent_version` opcional via query `hostname`). `infra/nginx/nginx.conf.template` isenta os 3 do Basic Auth — a isencao de `manifest`/`download` foi corrigida em 2026-08-19 (EPIC 37, blocos `location =` dedicados), validada localmente ponta a ponta contra o backend real. **Ainda nao deployado em `itcenter-edge-01`** (ver `docs/deployment/KNOWN_ISSUES.md`) — ate o proximo deploy de producao, a VM real continua sem essa isencao para `manifest`/`download`.
 
 ## API Key por Agente
 

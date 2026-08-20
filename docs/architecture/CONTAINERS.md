@@ -56,6 +56,7 @@ Responsabilidade:
 * Receber check-ins do agente.
 * Aplicar migrations no startup.
 * Persistir dados no PostgreSQL.
+* Publicar o release assinado do agente Windows (`GET /api/v1/agent/manifest`/`/download`, EPIC 22, ADR-032): o build context do serviço `backend` passou a ser a raiz do repositório (não mais `backend/`, ver `infra/docker-compose.yml`/`infra/docker-compose.production.yml`), e `backend/Dockerfile` copia `agent-windows/itcenter-agent.ps1` para dentro da própria imagem em build-time — publicar uma nova versão do agente exige um deploy de backend. Detalhes em `docs/backend/DATABASE.md` ("Origem do release do agente").
 
 Healthcheck:
 

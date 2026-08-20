@@ -26,10 +26,11 @@ Next.js Dashboard
 1. O agente coleta informacoes da maquina Windows.
 2. O agente envia os dados para o endpoint de check-in.
 3. O Nginx repassa a requisicao para o backend.
-4. O backend valida `X-Agent-Api-Key`.
-5. O backend valida o payload.
-6. O backend persiste dados no PostgreSQL.
-7. Eventos e alertas podem ser gerados.
+4. O backend valida `X-Agent-Api-Key` (autenticacao de classe, todo agente compartilha a mesma chave).
+5. O backend valida a identidade individual da maquina (`agent_secret`, trust-on-first-use, ADR-036): hostname novo ou sem segredo ainda adotado recebe um segredo gerado agora; hostname com segredo ja adotado precisa enviar o valor correto ou o check-in e rejeitado (401) e um evento `machine_identity_mismatch` e registrado, sem sobrescrever dados da maquina.
+6. O backend valida o payload.
+7. O backend persiste dados no PostgreSQL.
+8. Eventos e alertas podem ser gerados.
 
 Endpoint:
 

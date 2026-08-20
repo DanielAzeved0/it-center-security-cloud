@@ -43,9 +43,11 @@ Rotas administrativas exigem Bearer token. As excecoes sao:
 GET /api/v1/health
 POST /api/v1/auth/login
 POST /api/v1/agent/checkin
+GET /api/v1/agent/manifest
+GET /api/v1/agent/download
 ```
 
-`POST /api/v1/agent/checkin` continua usando `X-Agent-Api-Key`, separado do login humano.
+`POST /api/v1/agent/checkin`, `GET /api/v1/agent/manifest` e `GET /api/v1/agent/download` continuam usando `X-Agent-Api-Key`, separado do login humano (EPIC 22, ADR-032).
 
 ---
 
@@ -127,9 +129,12 @@ Exemplo de envio:
     ],
     "failed_logins_last_hour": 0
   },
-  "agent_secret": "opcional-string-ate-128-caracteres"
+  "agent_secret": "opcional-string-ate-128-caracteres",
+  "agent_version": "1.0.0"
 }
 ```
+
+`agent_version` (EPIC 22, ADR-032) é opcional e informa a versão do próprio `itcenter-agent.ps1` em execução (`$script:AgentVersion`), usada só para observabilidade e pela auto-atualização — nenhuma regra SOC depende dela. Persistida em `machines.agent_version` a cada check-in, mesmo padrão de sobrescrita de `mac_address`/`serial_number` (ausência sobrescreve com `null`).
 
 `agent_secret` (EPIC 28-A, ADR-036) é opcional e implementa trust-on-first-use por máquina, além da `AGENT_API_KEY` global: no primeiro check-in de um hostname novo (ou de um hostname já cadastrado sem segredo ainda adotado), o backend ignora o valor enviado, gera um segredo aleatório de 256 bits e o devolve em texto puro só na resposta desse check-in — a partir daí, todo check-in seguinte para aquele hostname precisa enviar esse mesmo valor em `agent_secret` (comparado só pelo hash, `sha256`, nunca guardado em texto puro). Um check-in sem o segredo certo é rejeitado com `401` e não altera nenhum dado da máquina.
 
@@ -156,7 +161,7 @@ installed_programs ou processes com Advanced IP Scanner, Angry IP Scanner, Nmap,
 agent_secret ausente ou incorreto para um hostname que ja adotou um segredo (EPIC 28-A, ADR-036) -> rejeita o check-in (401) + security_event machine_identity_mismatch + alerta high; nao sobrescreve nenhum dado da maquina
 ```
 
-Alertas abertos nao sao duplicados para a mesma maquina e mesmo tipo. Novos eventos continuam sendo registrados a cada check-in que mantiver o estado de risco.
+Alertas abertos nao sao duplicados para a mesma maquina e mesmo tipo — garantido por indice unico parcial em `alerts(machine_id, alert_type) WHERE status IN ('open','investigating')` (migration `010_alerts_open_unique_index.sql`, EPIC 30): `create_open_alert_once` virou um unico `INSERT ... ON CONFLICT ... DO NOTHING`, atomico, sem a race condition real que existia entre o `SELECT` e o `INSERT` de chamadas separadas sob retry do agente. Novos eventos continuam sendo registrados a cada check-in que mantiver o estado de risco. Duas entradas de `installed_programs` que casam com a mesma ferramenta de VPN nao autorizada ou torrent no mesmo check-in geram só 1 evento/alerta (EPIC 30) — mesmo padrão de deduplicação já usado para ferramentas remotas não autorizadas, dual-use e malware/ransomware.
 
 Resposta:
 
@@ -181,6 +186,7 @@ Cria agent_configs padrão para a máquina quando ainda não existir.
 Sincroniza machine_local_admins com o baseline recebido em security.local_admins, registrando novos administradores.
 Atualiza last_seen e status online da máquina.
 Emite ou adota agent_secret_hash (EPIC 28-A, ADR-036) quando aplicavel.
+Persiste agent_version quando enviado (EPIC 22, ADR-032).
 ```
 
 Erros esperados:
@@ -199,9 +205,44 @@ Erros esperados:
 
 O segundo erro (`401 Unauthorized`) ocorre quando o hostname já adotou um `agent_secret` e o check-in atual não envia o valor correto (EPIC 28-A, ADR-036) — nesse caso nenhum dado da máquina é sobrescrito e um `security_event`/`alert` `machine_identity_mismatch` é registrado.
 
-Payload invalido retorna `422 Unprocessable Entity` com a lista de campos invalidados pelo FastAPI/Pydantic.
+Payload invalido retorna `422 Unprocessable Entity` com a lista de campos invalidados pelo FastAPI/Pydantic. `ip_address`, quando enviado (não `null`/vazio), precisa ser um IPv4 ou IPv6 válido (`ipaddress.ip_address()`, EPIC 30) — antes um valor inválido só era pego na hora do `INSERT` na coluna `INET`, subindo como `500 Internal Server Error` genérico em vez do `422` de validação esperado.
 
 Se `AGENT_API_KEY` nao estiver configurada no servidor, a API retorna `500 Internal Server Error` com `{"detail": "Agent API key is not configured"}`, antes mesmo de validar o header enviado pelo agente.
+
+---
+
+## Manifest do Agente (EPIC 22, ADR-032)
+
+Consultado por `agent-windows/itcenter-agent-updater.ps1` para decidir se atualiza a instalação local.
+
+```http
+GET /api/v1/agent/manifest
+GET /api/v1/agent/manifest?hostname=PC-FINANCEIRO-01
+```
+
+Autenticação obrigatória: `X-Agent-Api-Key`, mesmo header/valor do check-in.
+
+Resposta:
+
+```json
+{
+  "version": "1.1.0",
+  "sha256": "3f7b...",
+  "target_agent_version": null
+}
+```
+
+`version`/`sha256` descrevem a versão de `itcenter-agent.ps1` atualmente publicada por este backend (extraída via regex de `$script:AgentVersion` do arquivo copiado para dentro da imagem do backend em build-time — ver `docs/backend/DATABASE.md`/ADR-032 sobre onde esse arquivo vive). `target_agent_version` só vem preenchido quando o parâmetro de query `hostname` bate com uma máquina cadastrada que tenha `machines.target_agent_version` definido (trava de "não atualizar" — ver seção "Coluna target_agent_version" em `DATABASE.md`); ausência do parâmetro, ou hostname sem correspondência, devolve `null`. Sem RBAC de usuário humano aqui — é a mesma autenticação de classe do agente, não identidade individual (ADR-036 continua sendo só sobre `/agent/checkin`).
+
+Erros: `401` (API key ausente/inválida, mesmo formato do check-in), `500` quando o backend não tem nenhum release do agente configurado (`AGENT_RELEASE_PATH` aponta para um arquivo inexistente ou sem `$script:AgentVersion`).
+
+## Download do Agente (EPIC 22, ADR-032)
+
+```http
+GET /api/v1/agent/download
+```
+
+Autenticação obrigatória: `X-Agent-Api-Key`. Resposta `200` com `Content-Type: application/octet-stream` e o corpo sendo os bytes exatos do script cujo hash é o mesmo devolvido por `/agent/manifest` — o updater valida assinatura Authenticode (certificado do ADR-031) e o hash SHA-256 antes de substituir o script instalado, sem nenhum fallback de bypass (diferente do instalador, que tem `-SkipSignatureCheck` só para uso local/dev). Mesmos erros `401`/`500` do manifest.
 
 ---
 
@@ -324,12 +365,14 @@ Resposta:
     "serial_number": "5M56TH4",
     "status": "online",
     "last_seen": "2026-06-24T20:00:00",
-    "rustdesk_id": "123456789"
+    "rustdesk_id": "123456789",
+    "agent_version": "1.0.0",
+    "target_agent_version": null
   }
 ]
 ```
 
-`rustdesk_id` é `null` quando a máquina ainda não teve o ID cadastrado (EPIC 19, ADR-027). `serial_number` é `null` quando o agente não conseguiu ler o número de série da máquina (EPIC 27) — nunca bloqueia o check-in.
+`rustdesk_id` é `null` quando a máquina ainda não teve o ID cadastrado (EPIC 19, ADR-027). `serial_number` é `null` quando o agente não conseguiu ler o número de série da máquina (EPIC 27) — nunca bloqueia o check-in. `agent_version` é `null` até o primeiro check-in que a informe (EPIC 22, ADR-032); `target_agent_version` é `null` a menos que um operador o defina manualmente via SQL (sem endpoint de escrita nesta EPIC).
 
 Origem dos dados:
 
@@ -361,11 +404,13 @@ Resposta:
   "os_version": "23H2",
   "status": "online",
   "last_seen": "2026-06-24T20:00:00",
-  "rustdesk_id": "123456789"
+  "rustdesk_id": "123456789",
+  "agent_version": "1.0.0",
+  "target_agent_version": null
 }
 ```
 
-`rustdesk_id` é `null` quando ainda não cadastrado (EPIC 19, ADR-027).
+`rustdesk_id` é `null` quando ainda não cadastrado (EPIC 19, ADR-027). `agent_version`/`target_agent_version`: ver nota na listagem de máquinas acima (EPIC 22, ADR-032).
 
 Quando a máquina não existir, a API retorna `404 Machine not found`.
 
@@ -413,8 +458,17 @@ Registra `audit_logs` com `action = "machine.rustdesk_update"`.
 Retorna as últimas métricas de uma máquina.
 
 ```http
-GET /api/v1/machines/{machine_id}/metrics
+GET /api/v1/machines/{machine_id}/metrics?limit=100&offset=0
 ```
+
+Parâmetros de query (EPIC 30, opcionais):
+
+```text
+limit: int, padrão 100, mínimo 1, máximo 500
+offset: int, padrão 0, mínimo 0
+```
+
+Valores fora do intervalo retornam `422 Unprocessable Entity`. Resultado ordenado por `created_at DESC` (mais recente primeiro) — `limit`/`offset` paginam a partir daí.
 
 Resposta:
 
@@ -499,20 +553,20 @@ Quando a máquina não existir, a API retorna `404 Machine not found`.
 Lista eventos de segurança.
 
 ```http
-GET /api/v1/security-events
+GET /api/v1/security-events?machine_id=1&limit=100&offset=0
 ```
 
-Filtros futuros:
+Parâmetros de query (EPIC 30, todos opcionais):
 
 ```text
-machine_id
-event_type
-severity
-start_date
-end_date
+machine_id: int, filtra por máquina
+limit: int, padrão 100, mínimo 1, máximo 500
+offset: int, padrão 0, mínimo 0
 ```
 
-Observacao: o dashboard ja possui filtros locais por severidade, tipo e maquina usando os dados carregados. Esta secao se refere a filtros futuros na propria API, por query string.
+`limit` fora do intervalo 1-500 retorna `422 Unprocessable Entity`. Resultado ordenado por `created_at DESC, id DESC`. `MachineDetailView` (dashboard) usa `machine_id` para buscar só os eventos da máquina em vez de carregar a lista inteira e filtrar no cliente (antes tech debt registrada na EPIC 26 — corrigida na EPIC 30 justamente para não esconder eventos de uma máquina quando o total do parque ultrapassar `limit`). `AlertsView`/`SecurityView` (listas administrativas completas) continuam sem UI de paginação — exibem só os `limit` registros mais recentes por padrão; extensão futura fica para uma spec própria caso o volume de produção cresça.
+
+Filtros futuros ainda não implementados: `event_type`, `severity`, `start_date`, `end_date`.
 
 Resposta:
 
@@ -545,8 +599,18 @@ Tabela security_events no PostgreSQL.
 Lista alertas gerados pelo sistema.
 
 ```http
-GET /api/v1/alerts
+GET /api/v1/alerts?machine_id=1&limit=100&offset=0
 ```
+
+Parâmetros de query (EPIC 30, todos opcionais):
+
+```text
+machine_id: int, filtra por máquina
+limit: int, padrão 100, mínimo 1, máximo 500
+offset: int, padrão 0, mínimo 0
+```
+
+`limit` fora do intervalo 1-500 retorna `422 Unprocessable Entity`. Resultado ordenado por `created_at DESC, id DESC`. Mesma observação de `machine_id`/paginação de `GET /api/v1/security-events` acima se aplica aqui (uso em `MachineDetailView`, ausência de UI de paginação em `AlertsView`).
 
 Resposta:
 
@@ -664,7 +728,7 @@ PDF com os mesmos indicadores de `GET /api/v1/dashboard/summary` (máquinas onli
 GET /api/v1/machines/{machine_id}/report.pdf
 ```
 
-PDF com o detalhe da máquina, últimas métricas, alertas, eventos de segurança, programas instalados e administradores locais — mesmos dados já expostos em `GET /api/v1/machines/{machine_id}` e endpoints relacionados.
+PDF com o detalhe da máquina, últimas métricas, alertas, eventos de segurança, programas instalados e administradores locais — mesmos dados já expostos em `GET /api/v1/machines/{machine_id}` e endpoints relacionados. Alertas e eventos são filtrados por `machine_id` diretamente no SQL (`list_alerts(machine_id=...)`/`list_security_events(machine_id=...)`, EPIC 30) em vez de carregar a listagem inteira do parque e filtrar em Python.
 
 Quando a máquina não existir, a API retorna `404 Machine not found`.
 
