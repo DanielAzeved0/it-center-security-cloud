@@ -13,6 +13,8 @@ class MachineSummary(BaseModel):
     status: str
     last_seen: datetime | None
     rustdesk_id: str | None = Field(default=None, max_length=50)
+    agent_version: str | None = Field(default=None, max_length=20)
+    target_agent_version: str | None = Field(default=None, max_length=20)
 
 
 class MachineDetail(MachineSummary):

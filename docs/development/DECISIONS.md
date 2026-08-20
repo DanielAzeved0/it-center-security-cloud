@@ -1216,6 +1216,8 @@ Impactos:
 * Nenhuma tecnologia nova entra na stack: continua 100% PowerShell + FastAPI + PostgreSQL, sem Serviço Windows via SCM e sem dependências de terceiros.
 * O caso genérico de "Serviço Windows" (para a coleta, não só para o updater) continua pendente e sem decisão na Fase B.
 
+**Nota de implementação (2026-08-19):** implementado via `/sdd` (`docs/specs/epic-22-agent-auto-update/`). Duas lacunas de design que esta ADR deixou "a definir na implementação" foram resolvidas na spec: (1) origem do release do agente servido por `/manifest`/`/download` — o backend passou a embutir `agent-windows/itcenter-agent.ps1` na própria imagem Docker (build context do serviço `backend` mudou para a raiz do repositório), sem armazenamento de binário novo; (2) limite de rollback fixado em 5 check-ins consecutivos com falha, limite de confirmação em 3 com sucesso, via um arquivo local `update-state.json`. Descoberta durante a implementação, fora do previsto originalmente nesta ADR: `machines.target_agent_version` não tinha nenhuma forma de o updater descobrir seu próprio valor (o updater só tem `X-Agent-Api-Key`, sem identidade individual) — corrigido tornando `GET /api/v1/agent/manifest` ciente do hostname (parâmetro de query opcional), reaproveitando o mesmo sinal de identidade já usado no check-in.
+
 ---
 
 # ADR-033

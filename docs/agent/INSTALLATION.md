@@ -16,9 +16,10 @@ Ja existem:
 * reenvio de check-ins pendentes;
 * logs locais do agente.
 * instalacao em `C:\Program Files\ITCenterAgent`;
-* registro de Tarefa Agendada do Windows;
-* desinstalacao da Tarefa Agendada.
+* registro de Tarefa Agendada do Windows (coleta - `ITCenterAgent` - e updater - `ITCenterAgentUpdater`, EPIC 22);
+* desinstalacao das 2 Tarefas Agendadas.
 * validacao previa de DNS, porta TCP e health check do endpoint antes da instalacao.
+* auto-atualizacao do agente de coleta via updater dedicado (EPIC 22, ADR-032) - ver `docs/agent/CHECKIN.md`.
 
 ## Objetivo
 
@@ -55,7 +56,7 @@ Servico Windows nativo fica reservado para evolucao futura.
 
 ```text
 1. Gerar o certificado uma unica vez com agent-windows\scripts\New-AgentSigningCertificate.ps1.
-2. Assinar os 3 scripts com agent-windows\scripts\Sign-AgentScripts.ps1.
+2. Assinar os 4 scripts com agent-windows\scripts\Sign-AgentScripts.ps1 (inclui itcenter-agent-updater.ps1, EPIC 22).
 ```
 
 Ou, para instalacao local/dev sem assinatura, adicione `-SkipSignatureCheck` ao comando (a Tarefa Agendada volta a usar `ExecutionPolicy Bypass` nesse caso — nunca use isso em producao). Detalhes completos na secao "Code-signing do agente (ADR-031)" mais abaixo.
@@ -92,14 +93,15 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install-agent.ps1 `
 5. Validar conexao TCP na porta do endpoint
 6. Validar health check do endpoint
 7. Importar certificado de assinatura em LocalMachine\Root e LocalMachine\TrustedPublisher (ADR-031)
-8. Validar assinatura Authenticode dos scripts de origem, agora que a cadeia e confiavel (ADR-031)
+8. Validar assinatura Authenticode dos scripts de origem, agora que a cadeia e confiavel (ADR-031), incluindo itcenter-agent-updater.ps1 (EPIC 22)
 9. Criar C:\Program Files\ITCenterAgent
 10. Criar logs\
 11. Criar cache\
-12. Copiar scripts do agente
-13. Gerar config.json
+12. Copiar scripts do agente, incluindo itcenter-agent-updater.ps1 (EPIC 22)
+13. Gerar config.json (inclui updater_interval_hours, EPIC 22)
 14. Restringir ACL de config.json a SYSTEM/Administrators (EPIC 16)
 15. Registrar Tarefa Agendada ITCenterAgent com ExecutionPolicy AllSigned
+16. Registrar Tarefa Agendada ITCenterAgentUpdater, mesmo principal/ExecutionPolicy, frequencia padrao 24h (EPIC 22, ADR-032)
 ```
 
 O certificado precisa ser importado antes da validacao de assinatura: numa maquina nova, a cadeia de confianca ainda nao existe, e `Get-AuthenticodeSignature` reportaria `NotTrusted` mesmo para um script legitimamente assinado se o certificado so fosse importado depois.
@@ -164,7 +166,7 @@ Fluxo de release do agente (obrigatorio antes de distribuir qualquer atualizacao
 4. Distribuir/instalar a partir dos scripts ja assinados.
 ```
 
-O instalador valida a assinatura dos 3 scripts de origem (`Get-AuthenticodeSignature` com `Status -eq 'Valid'`) antes de copiar qualquer arquivo, e falha cedo com mensagem clara se algum nao estiver assinado.
+O instalador valida a assinatura dos 4 scripts de origem (`Get-AuthenticodeSignature` com `Status -eq 'Valid'`, incluindo itcenter-agent-updater.ps1 desde a EPIC 22) antes de copiar qualquer arquivo, e falha cedo com mensagem clara se algum nao estiver assinado.
 
 Bypass consciente, apenas para instalacao local/dev sem certificado configurado (a Tarefa Agendada volta a usar `Bypass` nesse caso — nunca use isso em producao):
 

@@ -4,6 +4,8 @@ param(
 
 $ErrorActionPreference = "Stop"
 $script:AgentRuntimeConfig = $null
+# Compared by itcenter-agent-updater.ps1 against GET /api/v1/agent/manifest (EPIC 22, ADR-032).
+$script:AgentVersion = "1.0.0"
 
 function Get-DefaultAgentLogDirectory {
     Join-Path $PSScriptRoot "logs"
@@ -949,6 +951,7 @@ function New-AgentCheckinPayload {
         installed_programs = $installedPrograms
         security = $securityPayload
         agent_secret = $script:AgentRuntimeConfig.agent_secret
+        agent_version = $script:AgentVersion
     }
 }
 
@@ -1268,6 +1271,48 @@ function Send-PendingAgentCheckins {
     $sentCount
 }
 
+function Get-AgentUpdateStateFilePath {
+    Join-Path (Split-Path -Path $ConfigPath -Parent) "update-state.json"
+}
+
+# Feeds itcenter-agent-updater.ps1's rollback/confirm decision (EPIC 22). No-op on machines that
+# never received an automatic update - the state file only exists once the updater creates it.
+function Update-AgentUpdateStateCounters {
+    param(
+        [Parameter(Mandatory = $true)]
+        [bool]$Success
+    )
+
+    $stateFilePath = Get-AgentUpdateStateFilePath
+    if (-not (Test-Path -LiteralPath $stateFilePath)) {
+        return
+    }
+
+    try {
+        $state = Get-Content -LiteralPath $stateFilePath -Raw | ConvertFrom-Json
+    }
+    catch {
+        Write-AgentLog -Message "Update state file is corrupted, ignoring: $($_.Exception.Message)" -Level "WARN"
+        return
+    }
+
+    if ($Success) {
+        $state.consecutive_checkin_successes = [int]$state.consecutive_checkin_successes + 1
+        $state.consecutive_checkin_failures = 0
+    }
+    else {
+        $state.consecutive_checkin_failures = [int]$state.consecutive_checkin_failures + 1
+        $state.consecutive_checkin_successes = 0
+    }
+
+    try {
+        $state | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $stateFilePath -Encoding UTF8
+    }
+    catch {
+        Write-AgentLog -Message "Failed to persist update state counters: $($_.Exception.Message)" -Level "WARN"
+    }
+}
+
 function Start-ItCenterAgent {
     try {
         $config = Get-AgentConfig -Path $ConfigPath
@@ -1326,6 +1371,7 @@ function Start-ItCenterAgent {
     try {
         $response = Send-AgentCheckin -Config $config -Payload $payload
         Write-AgentLog -Message "Check-in sent successfully."
+        Update-AgentUpdateStateCounters -Success $true
 
         if (-not [string]::IsNullOrWhiteSpace($response.agent_secret)) {
             try {
@@ -1342,6 +1388,7 @@ function Start-ItCenterAgent {
     }
     catch {
         Write-AgentLog -Message "Failed to send check-in: $($_.Exception.Message)" -Level "WARN"
+        Update-AgentUpdateStateCounters -Success $false
         $cacheFile = Save-AgentOfflinePayload -Payload $payload
         Write-AgentLog -Message "Check-in cached locally: $cacheFile" -Level "WARN"
         Write-Output (ConvertTo-AgentCheckinJson -Payload $payload)

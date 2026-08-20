@@ -25,7 +25,8 @@ $cert = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new(
 $scriptsToSign = @(
     "itcenter-agent.ps1",
     "install-agent.ps1",
-    "uninstall-agent.ps1"
+    "uninstall-agent.ps1",
+    "itcenter-agent-updater.ps1"
 )
 
 foreach ($scriptName in $scriptsToSign) {

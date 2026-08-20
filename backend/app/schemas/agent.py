@@ -1,6 +1,7 @@
+import ipaddress
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class InstalledProgram(BaseModel):
@@ -34,6 +35,20 @@ class AgentCheckinRequest(BaseModel):
     processes: list[str] = Field(default_factory=list)
     security: SecurityPayload
     agent_secret: str | None = Field(default=None, max_length=128)
+    agent_version: str | None = Field(default=None, max_length=20)
+
+    @field_validator("ip_address")
+    @classmethod
+    def validate_ip_address(cls, value: str | None) -> str | None:
+        if value is None or not value.strip():
+            return value
+
+        try:
+            ipaddress.ip_address(value.strip())
+        except ValueError as exc:
+            raise ValueError(f"ip_address invalido: {value!r}") from exc
+
+        return value
 
 
 class AgentCheckinResponse(BaseModel):
@@ -41,3 +56,9 @@ class AgentCheckinResponse(BaseModel):
     message: str
     machine_id: int
     agent_secret: str | None = Field(default=None)
+
+
+class AgentManifestResponse(BaseModel):
+    version: str
+    sha256: str
+    target_agent_version: str | None = Field(default=None)

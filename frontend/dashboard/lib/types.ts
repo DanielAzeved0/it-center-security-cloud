@@ -8,6 +8,8 @@ export type MachineSummary = {
   status: "online" | "offline" | string;
   last_seen: string | null;
   rustdesk_id: string | null;
+  agent_version: string | null;
+  target_agent_version: string | null;
 };
 
 export type MachineDetail = MachineSummary & {

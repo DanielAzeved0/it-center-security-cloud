@@ -61,9 +61,10 @@ def save_machine_checkin(payload: AgentCheckinRequest) -> tuple[MachineSummary, 
                     os_version,
                     status,
                     last_seen,
-                    agent_secret_hash
+                    agent_secret_hash,
+                    agent_version
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, 'online', now(), %s)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, 'online', now(), %s, %s)
                 ON CONFLICT (hostname)
                 DO UPDATE SET
                     username = EXCLUDED.username,
@@ -74,8 +75,9 @@ def save_machine_checkin(payload: AgentCheckinRequest) -> tuple[MachineSummary, 
                     os_version = EXCLUDED.os_version,
                     status = 'online',
                     last_seen = now(),
-                    agent_secret_hash = EXCLUDED.agent_secret_hash
-                RETURNING id, hostname, username, host(ip_address) AS ip_address, mac_address, serial_number, status, last_seen
+                    agent_secret_hash = EXCLUDED.agent_secret_hash,
+                    agent_version = EXCLUDED.agent_version
+                RETURNING id, hostname, username, host(ip_address) AS ip_address, mac_address, serial_number, status, last_seen, agent_version, target_agent_version
                 """,
                 (
                     hostname,
@@ -86,6 +88,7 @@ def save_machine_checkin(payload: AgentCheckinRequest) -> tuple[MachineSummary, 
                     payload.operating_system,
                     payload.os_version,
                     secret_hash_to_persist,
+                    payload.agent_version,
                 ),
             ).fetchone()
 
@@ -125,6 +128,7 @@ def save_machine_checkin(payload: AgentCheckinRequest) -> tuple[MachineSummary, 
                             publisher
                         )
                         VALUES (%s, %s, %s, %s)
+                        ON CONFLICT (machine_id, name, version, publisher) DO NOTHING
                         """,
                         [
                             (
@@ -164,7 +168,9 @@ def list_machines() -> list[MachineSummary]:
                 serial_number,
                 status,
                 last_seen,
-                rustdesk_id
+                rustdesk_id,
+                agent_version,
+                target_agent_version
             FROM machines
             ORDER BY id
             """
@@ -190,7 +196,9 @@ def get_machine(machine_id: int) -> MachineDetail | None:
                 os_version,
                 status,
                 last_seen,
-                rustdesk_id
+                rustdesk_id,
+                agent_version,
+                target_agent_version
             FROM machines
             WHERE id = %s
             """,
@@ -201,6 +209,16 @@ def get_machine(machine_id: int) -> MachineDetail | None:
         return None
 
     return MachineDetail(**row)
+
+
+def get_machine_target_agent_version_by_hostname(hostname: str) -> str | None:
+    with get_connection() as connection:
+        row = connection.execute(
+            "SELECT target_agent_version FROM machines WHERE hostname = %s",
+            (hostname.strip().upper(),),
+        ).fetchone()
+
+    return row["target_agent_version"] if row is not None else None
 
 
 def update_machine_rustdesk_id(machine_id: int, rustdesk_id: str | None) -> bool:
@@ -218,7 +236,11 @@ def update_machine_rustdesk_id(machine_id: int, rustdesk_id: str | None) -> bool
     return row is not None
 
 
-def list_machine_metrics(machine_id: int) -> list[MachineMetric] | None:
+def list_machine_metrics(
+    machine_id: int,
+    limit: int = 100,
+    offset: int = 0,
+) -> list[MachineMetric] | None:
     if not machine_exists(machine_id):
         return None
 
@@ -234,8 +256,9 @@ def list_machine_metrics(machine_id: int) -> list[MachineMetric] | None:
             FROM metrics
             WHERE machine_id = %s
             ORDER BY created_at DESC, id DESC
+            LIMIT %s OFFSET %s
             """,
-            (machine_id,),
+            (machine_id, limit, offset),
         ).fetchall()
 
     return [MachineMetric(**row) for row in rows]

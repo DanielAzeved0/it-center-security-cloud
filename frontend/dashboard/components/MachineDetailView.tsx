@@ -143,9 +143,11 @@ export function MachineDetailView({ machineId }: { machineId: string }) {
     setEvents((current) => ({ ...current, loading: true, error: null }));
 
     try {
-      const eventList = await requestBackend<SecurityEvent[]>("/api/v1/security-events");
+      const eventList = await requestBackend<SecurityEvent[]>(
+        `/api/v1/security-events?machine_id=${parsedMachineId}`,
+      );
       setEvents({
-        data: eventList.filter((event) => event.machine_id === parsedMachineId),
+        data: eventList,
         loading: false,
         error: null,
       });
@@ -163,9 +165,11 @@ export function MachineDetailView({ machineId }: { machineId: string }) {
     setAlerts((current) => ({ ...current, loading: true, error: null }));
 
     try {
-      const alertList = await requestBackend<AlertSummary[]>("/api/v1/alerts");
+      const alertList = await requestBackend<AlertSummary[]>(
+        `/api/v1/alerts?machine_id=${parsedMachineId}`,
+      );
       setAlerts({
-        data: alertList.filter((alert) => alert.machine_id === parsedMachineId),
+        data: alertList,
         loading: false,
         error: null,
       });
@@ -288,6 +292,7 @@ export function MachineDetailView({ machineId }: { machineId: string }) {
               <DetailItem label="Sistema operacional" value={detail.operating_system} />
               <DetailItem label="Versao" value={detail.os_version} />
               <DetailItem label="Ultimo check-in" value={formatDateTime(detail.last_seen)} helper={lastSeenLabel} />
+              <DetailItem label="Versao do Agente" value={detail.agent_version} />
               <DetailItem label="ID interno" value={String(detail.id)} />
             </dl>
           </section>

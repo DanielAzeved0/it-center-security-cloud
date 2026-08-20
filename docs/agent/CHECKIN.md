@@ -149,6 +149,7 @@ disk_usage
 uptime_seconds
 installed_programs
 security
+agent_version
 ```
 
 Campo suportado pelo contrato da API mas **não enviado pelo agente atual**:
@@ -182,6 +183,7 @@ Observações:
 * `config.json` tem a ACL restrita a `SYSTEM`/`Administrators` pelo instalador, protegendo o `agent_api_key` em texto puro contra leitura por usuarios comuns (EPIC 16).
 * Falha de configuracao/inicializacao (`Start-ItCenterAgent`) e capturada no nivel mais alto e registrada com `Level = "ERROR"` antes de propagar o erro (EPIC 16).
 * `agent_secret` (EPIC 28-A, ADR-036) fica ausente/`null` em `config.json` ate o primeiro check-in adotar um segredo; a partir dai o agente reenvia o mesmo valor em todo check-in seguinte.
+* `agent_version` (EPIC 22, ADR-032) vem de `$script:AgentVersion`, declarado no topo de `itcenter-agent.ps1` e enviado em todo check-in. So observabilidade/decisao de atualizacao - nenhuma regra SOC depende dele.
 
 ## Testes atuais
 
@@ -219,7 +221,11 @@ Deteccao de USB alem de armazenamento via Win32_PnPEntity
 Falha de configuracao/inicializacao logada como ERROR em Start-ItCenterAgent
 Preservacao/adocao de agent_secret em config.json (ADR-036)
 Envio de agent_secret no payload de check-in (ADR-036)
+Envio de agent_version no payload de check-in (EPIC 22, ADR-032)
+Atualizacao do contador de sucesso/falha em update-state.json apos cada check-in (EPIC 22)
 ```
+
+Testes do updater dedicado ficam em `agent-windows/tests/run-agent-updater-tests.ps1` — ver secao "EPIC 22" abaixo.
 
 ---
 
@@ -241,7 +247,7 @@ O contrato basico do agente e considerado atendido quando:
 * Enviar para API
 * Operar offline temporariamente
 
-Esses pontos ja estao implementados e cobertos pelos testes do agente. Melhorias como assinatura de payloads e empacotamento independente ficam como evolucao futura sem plano formal ainda; atualizacao automatica ja tem plano formal registrado em ADR-032/EPIC 22 (`docs/development/DECISIONS.md`, `docs/development/TASKS.md`), implementacao ainda pendente.
+Esses pontos ja estao implementados e cobertos pelos testes do agente. Melhorias como assinatura de payloads e empacotamento independente ficam como evolucao futura sem plano formal ainda; atualizacao automatica (ADR-032/EPIC 22) esta implementada - ver secao "EPIC 22" abaixo.
 
 ---
 
@@ -298,3 +304,36 @@ Scripts assinados com certificado Authenticode self-signed; Tarefa Agendada com 
 ```
 
 EPIC 16 concluida.
+
+---
+
+# EPIC 22 - Auto-atualizacao do Agente Windows (Updater Dedicado)
+
+Implementa ADR-032: um segundo script, `agent-windows/itcenter-agent-updater.ps1`, roda numa Tarefa Agendada propria (`ITCenterAgentUpdater`, registrada por `install-agent.ps1`, frequencia padrao 24h via `updater_interval_hours` em `config.json`), separado do script de coleta (`itcenter-agent.ps1`).
+
+Fluxo do updater a cada execucao:
+
+```text
+1. Se existir uma atualizacao pendente de confirmacao (update-state.json), resolve primeiro:
+   - 5 check-ins de coleta consecutivos com falha desde a atualizacao -> rollback automatico
+     para itcenter-agent.ps1.previous.
+   - 3 check-ins de coleta consecutivos com sucesso -> marca a atualizacao como confirmada.
+2. Consulta GET /api/v1/agent/manifest?hostname=<hostname> (mesma autenticacao X-Agent-Api-Key
+   do check-in).
+3. Compara a versao instalada ($script:AgentVersion de itcenter-agent.ps1) com a do manifest.
+4. Se target_agent_version (retornado no manifest quando cadastrado) diferir da versao do
+   manifest, segura a atualizacao (hold-back) e loga o motivo - nao atualiza.
+5. Caso contrario, baixa via GET /api/v1/agent/download, valida assinatura Authenticode (Status
+   Valid) e hash SHA-256 contra o manifest - sem nenhum fallback de bypass. Falha em qualquer
+   uma das duas descarta o download e nao substitui nada.
+6. Faz backup do script atual (itcenter-agent.ps1.previous) e substitui atomicamente
+   (Move-Item -Force). Grava update-state.json com a atualizacao pendente de confirmacao.
+```
+
+`update-state.json` (mesmo diretorio de `config.json`, mesma ACL restrita a SYSTEM/Administrators) so existe em maquinas que ja receberam pelo menos uma atualizacao automatica - o script de coleta (`Update-AgentUpdateStateCounters`) so atualiza os contadores de sucesso/falha quando esse arquivo ja existe, nunca cria um novo; uma maquina nunca atualizada automaticamente nao tem nenhuma mudanca de comportamento na coleta.
+
+O updater loga em `logs/itcenter-agent-updater.log` (arquivo separado de `itcenter-agent.log`, para evitar rotacao concorrente entre os dois processos independentes).
+
+Limitacao conhecida de `target_agent_version`: como o backend so publica a versao atualmente embutida na propria imagem Docker (sem historico de releases antigos), esta trava so serve para *segurar* uma maquina fora de um rollout (nao atualizar), nao para mandar uma maquina especifica para uma versao anterior arbitraria - ver `docs/backend/DATABASE.md`.
+
+`docs/specs/epic-22-agent-auto-update/` (research.md, spec.md, plan.md) documenta o raciocinio completo, incluindo as decisoes de design que a ADR-032 deixou para a implementacao (origem do release do agente, limites de rollback/confirmacao, frequencia padrao do updater).

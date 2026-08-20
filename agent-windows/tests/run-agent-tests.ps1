@@ -354,6 +354,7 @@ Assert-True -Condition ($jsonPayload.PSObject.Properties.Name -contains "serial_
 Assert-True -Condition ($jsonPayload.PSObject.Properties.Name -contains "installed_programs") -Message "JSON must contain installed_programs."
 Assert-True -Condition ($jsonPayload.PSObject.Properties.Name -contains "security") -Message "JSON must contain security."
 Assert-True -Condition ($jsonPayload.PSObject.Properties.Name -contains "agent_secret") -Message "JSON must contain agent_secret (ADR-036)."
+Assert-True -Condition ($jsonPayload.agent_version -eq $script:AgentVersion) -Message "JSON agent_version must match `$script:AgentVersion (EPIC 22)."
 Assert-True -Condition ([double]$jsonPayload.cpu_usage -eq [double]$payload.cpu_usage) -Message "JSON CPU usage must match payload CPU usage."
 Assert-True -Condition ([double]$jsonPayload.ram_usage -eq [double]$payload.ram_usage) -Message "JSON RAM usage must match payload RAM usage."
 Assert-True -Condition ([double]$jsonPayload.disk_usage -eq [double]$payload.disk_usage) -Message "JSON disk usage must match payload disk usage."
@@ -746,6 +747,46 @@ finally {
     if (Test-Path -LiteralPath $startupLogDirectory) {
         Remove-Item -LiteralPath $startupLogDirectory -Recurse -Force
     }
+}
+
+# EPIC 22 (ADR-032): Update-AgentUpdateStateCounters feeds the updater's rollback/confirm
+# decision. Must be a no-op on machines that never received an automatic update.
+$updateStateDirectory = Join-Path ([System.IO.Path]::GetTempPath()) "itcenter-agent-update-state-$([guid]::NewGuid().ToString('N'))"
+New-Item -ItemType Directory -Path $updateStateDirectory | Out-Null
+$previousConfigPathForUpdateState = $ConfigPath
+$ConfigPath = Join-Path $updateStateDirectory "config.json"
+$updateStateFilePath = Join-Path $updateStateDirectory "update-state.json"
+
+try {
+    Update-AgentUpdateStateCounters -Success $true
+    Assert-True -Condition (-not (Test-Path -LiteralPath $updateStateFilePath)) -Message "Update-AgentUpdateStateCounters must not create a state file on machines never auto-updated."
+
+    [ordered]@{
+        applied_version = "1.1.0"
+        previous_version = "1.0.0"
+        updated_at = "2026-08-19T00:00:00Z"
+        consecutive_checkin_failures = 2
+        consecutive_checkin_successes = 0
+        confirmed = $false
+    } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $updateStateFilePath -Encoding UTF8
+
+    Update-AgentUpdateStateCounters -Success $true
+    $stateAfterSuccess = Get-Content -LiteralPath $updateStateFilePath -Raw | ConvertFrom-Json
+    Assert-True -Condition ($stateAfterSuccess.consecutive_checkin_successes -eq 1) -Message "A successful check-in must increment consecutive_checkin_successes."
+    Assert-True -Condition ($stateAfterSuccess.consecutive_checkin_failures -eq 0) -Message "A successful check-in must reset consecutive_checkin_failures."
+
+    Update-AgentUpdateStateCounters -Success $false
+    $stateAfterFailure = Get-Content -LiteralPath $updateStateFilePath -Raw | ConvertFrom-Json
+    Assert-True -Condition ($stateAfterFailure.consecutive_checkin_failures -eq 1) -Message "A failed check-in must increment consecutive_checkin_failures."
+    Assert-True -Condition ($stateAfterFailure.consecutive_checkin_successes -eq 0) -Message "A failed check-in must reset consecutive_checkin_successes."
+
+    Set-Content -LiteralPath $updateStateFilePath -Value "{ not valid json" -Encoding UTF8
+    Update-AgentUpdateStateCounters -Success $true
+    Assert-True -Condition ((Get-Content -LiteralPath $updateStateFilePath -Raw).TrimEnd() -eq "{ not valid json") -Message "A corrupted state file must be left untouched, not overwritten or crash the agent."
+}
+finally {
+    $ConfigPath = $previousConfigPathForUpdateState
+    Remove-Item -LiteralPath $updateStateDirectory -Recurse -Force
 }
 
 Write-Output "Agent tests passed."

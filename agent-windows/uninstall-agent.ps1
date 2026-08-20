@@ -3,6 +3,8 @@ param(
 
     [string]$TaskName = "ITCenterAgent",
 
+    [string]$UpdaterTaskName = "ITCenterAgentUpdater",
+
     [switch]$RemoveFiles,
 
     [switch]$RemoveData
@@ -20,22 +22,27 @@ if (-not (Test-IsAdministrator)) {
     throw "Run this uninstaller from an elevated PowerShell session."
 }
 
-$task = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
-if ($null -ne $task) {
-    Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false
-    Write-Output "Scheduled task removed: $TaskName"
-}
-else {
-    Write-Output "Scheduled task not found: $TaskName"
+foreach ($scheduledTaskName in @($TaskName, $UpdaterTaskName)) {
+    $task = Get-ScheduledTask -TaskName $scheduledTaskName -ErrorAction SilentlyContinue
+    if ($null -ne $task) {
+        Unregister-ScheduledTask -TaskName $scheduledTaskName -Confirm:$false
+        Write-Output "Scheduled task removed: $scheduledTaskName"
+    }
+    else {
+        Write-Output "Scheduled task not found: $scheduledTaskName"
+    }
 }
 
 if ($RemoveFiles) {
     $agentScript = Join-Path $InstallPath "itcenter-agent.ps1"
+    $agentScriptPrevious = Join-Path $InstallPath "itcenter-agent.ps1.previous"
+    $updaterScript = Join-Path $InstallPath "itcenter-agent-updater.ps1"
     $installer = Join-Path $InstallPath "install-agent.ps1"
     $uninstaller = Join-Path $InstallPath "uninstall-agent.ps1"
     $config = Join-Path $InstallPath "config.json"
+    $updateState = Join-Path $InstallPath "update-state.json"
 
-    foreach ($file in @($agentScript, $installer, $uninstaller, $config)) {
+    foreach ($file in @($agentScript, $agentScriptPrevious, $updaterScript, $installer, $uninstaller, $config, $updateState)) {
         if (Test-Path -LiteralPath $file) {
             Remove-Item -LiteralPath $file -Force
         }

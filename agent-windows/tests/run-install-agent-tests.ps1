@@ -48,3 +48,19 @@ Assert-Equal -Expected $true -Actual ([regex]::IsMatch($installerContent, $sched
     -Message "Scheduled task action must use the `$executionPolicy variable, not a hardcoded ExecutionPolicy value"
 
 Write-Output "install-agent.ps1 execution policy tests passed."
+
+# EPIC 22 (ADR-032): the updater must be registered as its own scheduled task, signed and
+# validated the same way as the other 3 agent scripts, never with a hardcoded execution policy.
+Assert-Equal -Expected $true -Actual ($installerContent -match 'Assert-AgentScriptSignature\s+-Path\s+\$updaterSource') `
+    -Message "install-agent.ps1 must validate the updater script signature (Assert-AgentScriptSignature)"
+
+Assert-Equal -Expected $true -Actual ($installerContent -match 'Register-ScheduledTask\s+-TaskName\s+\$UpdaterTaskName') `
+    -Message "install-agent.ps1 must register the ITCenterAgentUpdater scheduled task"
+
+# Both the collector's and the updater's New-ScheduledTaskAction must reference $executionPolicy
+# (never a hardcoded value) - one match per scheduled task, so exactly 2 across the file.
+$scheduledTaskArgumentMatches = [regex]::Matches($installerContent, $scheduledTaskArgumentPattern)
+Assert-Equal -Expected 2 -Actual $scheduledTaskArgumentMatches.Count `
+    -Message "Both the collector and updater scheduled task actions must use the `$executionPolicy variable"
+
+Write-Output "install-agent.ps1 updater scheduled task tests passed."

@@ -7,9 +7,13 @@ param(
 
     [int]$CheckinIntervalMinutes = 5,
 
+    [int]$UpdaterIntervalHours = 24,
+
     [string]$InstallPath = "C:\Program Files\ITCenterAgent",
 
     [string]$TaskName = "ITCenterAgent",
+
+    [string]$UpdaterTaskName = "ITCenterAgentUpdater",
 
     [switch]$SkipConnectivityCheck,
 
@@ -51,6 +55,10 @@ function Assert-InstallInput {
 
     if ($CheckinIntervalMinutes -lt 1) {
         throw "CheckinIntervalMinutes must be greater than or equal to 1."
+    }
+
+    if ($UpdaterIntervalHours -lt 1) {
+        throw "UpdaterIntervalHours must be greater than or equal to 1."
     }
 
     $serverUri
@@ -213,11 +221,17 @@ if (-not (Test-Path -LiteralPath $agentSource)) {
 
 $installerSource = Join-Path $PSScriptRoot "install-agent.ps1"
 $uninstallerSource = Join-Path $PSScriptRoot "uninstall-agent.ps1"
+$updaterSource = Join-Path $PSScriptRoot "itcenter-agent-updater.ps1"
+if (-not (Test-Path -LiteralPath $updaterSource)) {
+    throw "Agent updater script not found: $updaterSource"
+}
+
 $signingCertPath = Join-Path $PSScriptRoot "itcenter-agent-signing.cer"
 $logsPath = Join-Path $InstallPath "logs"
 $cachePath = Join-Path $InstallPath "cache"
 $configPath = Join-Path $InstallPath "config.json"
 $agentTarget = Join-Path $InstallPath "itcenter-agent.ps1"
+$updaterTarget = Join-Path $InstallPath "itcenter-agent-updater.ps1"
 
 if ((Test-Path -LiteralPath $InstallPath) -and -not $Force) {
     throw "InstallPath already exists. Re-run with -Force to update files: $InstallPath"
@@ -236,6 +250,7 @@ else {
     Assert-AgentScriptSignature -Path $agentSource
     Assert-AgentScriptSignature -Path $installerSource
     Assert-AgentScriptSignature -Path $uninstallerSource
+    Assert-AgentScriptSignature -Path $updaterSource
 }
 
 New-Item -ItemType Directory -Path $InstallPath -Force | Out-Null
@@ -245,11 +260,13 @@ New-Item -ItemType Directory -Path $cachePath -Force | Out-Null
 Copy-Item -LiteralPath $agentSource -Destination $agentTarget -Force
 Copy-Item -LiteralPath $installerSource -Destination (Join-Path $InstallPath "install-agent.ps1") -Force
 Copy-Item -LiteralPath $uninstallerSource -Destination (Join-Path $InstallPath "uninstall-agent.ps1") -Force
+Copy-Item -LiteralPath $updaterSource -Destination $updaterTarget -Force
 
 $config = [ordered]@{
     server_url = $ServerUrl.TrimEnd("/")
     agent_api_key = $AgentApiKey
     checkin_interval_minutes = $CheckinIntervalMinutes
+    updater_interval_hours = $UpdaterIntervalHours
     retry_max_attempts = 3
     retry_initial_delay_seconds = 2
     retry_max_delay_seconds = 15
@@ -302,8 +319,21 @@ $settings = New-ScheduledTaskSettingsSet `
 $task = New-ScheduledTask -Action $action -Trigger $trigger -Principal $principal -Settings $settings
 Register-ScheduledTask -TaskName $TaskName -InputObject $task -Force | Out-Null
 
+$updaterAction = New-ScheduledTaskAction `
+    -Execute "powershell.exe" `
+    -Argument "-NoProfile -ExecutionPolicy $executionPolicy -File `"$updaterTarget`" -ConfigPath `"$configPath`""
+
+$updaterTrigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(5) `
+    -RepetitionInterval (New-TimeSpan -Hours $UpdaterIntervalHours) `
+    -RepetitionDuration (New-TimeSpan -Days 3650)
+
+$updaterTask = New-ScheduledTask -Action $updaterAction -Trigger $updaterTrigger -Principal $principal -Settings $settings
+Register-ScheduledTask -TaskName $UpdaterTaskName -InputObject $updaterTask -Force | Out-Null
+
 Write-Output "IT Center Agent installed."
 Write-Output "InstallPath: $InstallPath"
 Write-Output "ConfigPath: $configPath"
 Write-Output "TaskName: $TaskName"
+Write-Output "UpdaterTaskName: $UpdaterTaskName"
+Write-Output "UpdaterIntervalHours: $UpdaterIntervalHours"
 Write-Output "ExecutionPolicy: $executionPolicy"

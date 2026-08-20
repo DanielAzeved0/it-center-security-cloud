@@ -77,6 +77,28 @@ http://127.0.0.1:3000
 
 Em `/executive` e no detalhe de maquina (`/machines/[id]`), o botao "Exportar PDF" baixa um relatorio gerado pelo backend (`reportlab`) via `GET /api/v1/reports/executive.pdf` e `GET /api/v1/machines/{id}/report.pdf`.
 
+## Proxy /api/backend: allowlist e defesa contra path traversal
+
+`app/api/backend/[...path]/route.ts` so repassa para o backend paths que comecem por um destes prefixos (`ALLOWED_PATH_PREFIXES`):
+
+```text
+api/v1/health
+api/v1/auth/login, api/v1/auth/me, api/v1/auth/logout
+api/v1/machines
+api/v1/alerts
+api/v1/security-events
+api/v1/dashboard
+api/v1/reports
+```
+
+Qualquer path fora dessa lista recebe `404` antes de qualquer chamada ao backend real. Os endpoints do agente (`api/v1/agent/*`) nao estao nessa lista de proposito — o agente Windows fala direto com o backend, nunca atraves deste proxy do dashboard.
+
+Antes de checar a allowlist, `toSafeSegments()` rejeita com `404` qualquer segmento vazio, `.` ou `..` (incluindo `/`/`\` codificados dentro de um unico segmento, ex.: `machines%2f..%2f..%2f..%2fdocs`) — correcao de um bypass de path traversal real encontrado na auditoria de 2026-08-15 (EPIC 28-B): a checagem de allowlist rodava sobre o path ainda codificado, mas a URL final era montada depois com `new URL(...)`, que normaliza `..` nesse momento, permitindo escapar da allowlist. Ver `docs/security/SECURITY.md` para o achado completo.
+
+## middleware.ts: gate de sessao no edge
+
+`middleware.ts` roda no edge antes de renderizar `/`, `/machines`, `/machines/:path*`, `/alerts`, `/security` e `/executive` (`config.matcher`): se o cookie de sessao `itcenter_session` nao estiver presente, redireciona para `/login` sem sequer chegar a montar a pagina. E so uma checagem de presenca do cookie (rapida, no edge, sem round-trip ao backend) — a validacao de verdade do token (assinatura HMAC, expiracao, RBAC por rota) continua sendo feita pelo backend a cada chamada de API; o middleware existe para nao piscar conteudo protegido antes do redirect, nao para substituir a autorizacao real.
+
 ## Layout e autenticacao (EPIC 26)
 
 As 6 telas autenticadas vivem em `app/(authenticated)/` (route group — nao afeta a URL), com `app/(authenticated)/layout.tsx` montando `AuthProvider` (`components/AuthProvider.tsx`, busca `GET /api/v1/auth/me` uma unica vez por sessao e expõe `useAuth()`) e `AppShell` (`components/AppShell.tsx`, sidebar/nav persistente + chip do usuario/"Sair"). Isso existe para navegacao entre telas nao remontar a sidebar nem repetir o fetch de autenticacao a cada clique (antes, cada `*View.tsx` chamava seu proprio `<Shell>`, que desmontava e refazia o auth-check em toda troca de rota). Cada `*View.tsx` renderiza seu proprio `<header className="page-header">` (titulo/subtitulo/acoes) e le `currentUser`/`role` via `useAuth()` em vez de buscar `/auth/me` de novo.

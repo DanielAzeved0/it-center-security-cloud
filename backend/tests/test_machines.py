@@ -38,6 +38,23 @@ def test_list_machines_returns_checked_in_machine(monkeypatch, auth_headers):
     assert machines[0]["serial_number"] == "5M56TH4"
     assert machines[0]["status"] == "online"
     assert machines[0]["last_seen"]
+    assert machines[0]["agent_version"] is None
+    assert machines[0]["target_agent_version"] is None
+
+
+def test_list_machines_exposes_reported_agent_version(monkeypatch, auth_headers):
+    monkeypatch.setenv("AGENT_API_KEY", "test-key")
+    client = TestClient(app)
+
+    checkin_response = client.post(
+        "/api/v1/agent/checkin",
+        json={**VALID_PAYLOAD, "agent_version": "1.1.0"},
+        headers={"X-Agent-Api-Key": "test-key"},
+    )
+    machines_response = client.get("/api/v1/machines", headers=auth_headers)
+
+    assert checkin_response.status_code == 200
+    assert machines_response.json()[0]["agent_version"] == "1.1.0"
 
 
 def test_get_machine_returns_checked_in_machine_details(monkeypatch, auth_headers):
@@ -63,6 +80,8 @@ def test_get_machine_returns_checked_in_machine_details(monkeypatch, auth_header
     assert machine["os_version"] == "23H2"
     assert machine["status"] == "online"
     assert machine["last_seen"]
+    assert machine["agent_version"] is None
+    assert machine["target_agent_version"] is None
 
 
 def test_get_machine_returns_404_when_not_found(auth_headers):
@@ -103,6 +122,50 @@ def test_list_machine_metrics_returns_404_when_machine_not_found(auth_headers):
 
     assert response.status_code == 404
     assert response.json() == {"detail": "Machine not found"}
+
+
+def test_list_machine_metrics_respects_limit_and_offset(monkeypatch, auth_headers):
+    monkeypatch.setenv("AGENT_API_KEY", "test-key")
+    client = TestClient(app)
+
+    checkin_response = client.post(
+        "/api/v1/agent/checkin",
+        json=VALID_PAYLOAD,
+        headers={"X-Agent-Api-Key": "test-key"},
+    )
+    machine_id = checkin_response.json()["machine_id"]
+
+    with get_connection() as connection:
+        for cpu_usage in (10.0, 20.0):
+            connection.execute(
+                """
+                INSERT INTO metrics (machine_id, cpu_usage, ram_usage, disk_usage, uptime_seconds)
+                VALUES (%s, %s, 1, 1, 1)
+                """,
+                (machine_id, cpu_usage),
+            )
+
+    response = client.get(f"/api/v1/machines/{machine_id}/metrics?limit=1&offset=0", headers=auth_headers)
+
+    assert response.status_code == 200
+    metrics = response.json()
+    assert len(metrics) == 1
+    assert metrics[0]["cpu_usage"] == 20.0
+
+
+def test_list_machine_metrics_rejects_out_of_range_limit(monkeypatch, auth_headers):
+    monkeypatch.setenv("AGENT_API_KEY", "test-key")
+    client = TestClient(app)
+    checkin_response = client.post(
+        "/api/v1/agent/checkin",
+        json=VALID_PAYLOAD,
+        headers={"X-Agent-Api-Key": "test-key"},
+    )
+    machine_id = checkin_response.json()["machine_id"]
+
+    response = client.get(f"/api/v1/machines/{machine_id}/metrics?limit=0", headers=auth_headers)
+
+    assert response.status_code == 422
 
 
 def test_list_machine_programs_returns_checked_in_programs(monkeypatch, auth_headers):

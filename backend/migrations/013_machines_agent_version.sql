@@ -1,0 +1,6 @@
+BEGIN;
+
+ALTER TABLE machines ADD COLUMN IF NOT EXISTS agent_version VARCHAR(20) NULL;
+ALTER TABLE machines ADD COLUMN IF NOT EXISTS target_agent_version VARCHAR(20) NULL;
+
+COMMIT;
