@@ -1,5 +1,6 @@
 import io
 from datetime import datetime
+from xml.sax.saxutils import escape as xml_escape
 
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
@@ -116,7 +117,7 @@ def build_machine_report_pdf(
 
     story: list = [
         Paragraph("IT Center Security Cloud", _TITLE_STYLE),
-        Paragraph(f"Relatorio da maquina {machine.hostname}", _STYLES["Heading3"]),
+        Paragraph(f"Relatorio da maquina {xml_escape(str(machine.hostname))}", _STYLES["Heading3"]),
         Paragraph(_generated_at_label(), _STYLES["Normal"]),
         Spacer(1, 0.5 * cm),
         _table(
