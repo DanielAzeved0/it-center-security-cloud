@@ -112,21 +112,35 @@ jobs:
   scout:
     name: CVE gate (Docker Scout)
     runs-on: ubuntu-latest
-    # Roda so em push/merge para main com credenciais configuradas;
-    # PRs e forks externos passam sem o gate.
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && secrets.DOCKERHUB_TOKEN != ''
+    # Roda so em push/merge para main; PRs passam sem o gate para nao exigir
+    # credenciais de Docker Hub em forks externos.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
     steps:
       - name: Checkout
         uses: actions/checkout@v5
 
+      - name: Check Docker Hub credentials
+        id: check_creds
+        env:
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          if [ -z "$DOCKERHUB_TOKEN" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "DOCKERHUB_TOKEN is not configured; skipping Docker Scout gate."
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Log in to Docker Hub
+        if: steps.check_creds.outputs.skip != 'true'
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Prepare production env placeholders
+        if: steps.check_creds.outputs.skip != 'true'
         run: |
           cp .env.production.example .env.production
           sed -i 's/REPLACE_WITH_A_LONG_RANDOM_PASSWORD/ci-postgres-password/g' .env.production
@@ -136,10 +150,12 @@ jobs:
           printf 'admin:%s\n' 'ci-placeholder' > .secrets/dashboard.htpasswd
 
       - name: Build images
+        if: steps.check_creds.outputs.skip != 'true'
         run: |
           docker compose --env-file .env.production -f infra/docker-compose.production.yml build backend frontend
 
       - name: Run Docker Scout gate
+        if: steps.check_creds.outputs.skip != 'true'
         env:
           # Gate rigido apenas para as imagens que este projeto controla.
           # Imagens de terceiros (postgres, observabilidade) nao sao relevantes no CI:
