@@ -60,7 +60,7 @@ jobs:
           test -n "$PROD_SSH_USER"
           test -n "$GH_TOKEN"
 
-          ssh -i ~/.ssh/production_key -p "${PROD_SSH_PORT:-22}" "$PROD_SSH_USER@$PROD_SSH_HOST" \
+          ssh -o ServerAliveInterval=15 -o ServerAliveCountMax=120 -i ~/.ssh/production_key -p "${PROD_SSH_PORT:-22}" "$PROD_SSH_USER@$PROD_SSH_HOST" \
             "DEPLOY_REF='$DEPLOY_REF' GH_REPOSITORY='$GH_REPOSITORY' GH_TOKEN='$GH_TOKEN' PROD_APP_DIR='$PROD_APP_DIR' sh -s" <<'REMOTE'
           set -eu
 
