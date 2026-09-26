@@ -1,10 +1,24 @@
+import hashlib
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, Request, status
 from fastapi.exceptions import HTTPException
+from fastapi.security import HTTPAuthorizationCredentials
 
 from app.repositories.audit_logs import create_audit_log
+from app.repositories.revoked_tokens import revoke_token
 from app.repositories.users import get_user_by_email, mark_user_login
 from app.schemas.auth import AuthUser, CurrentUserResponse, LoginRequest, LoginResponse, LogoutResponse
-from app.services.auth import CurrentUser, create_access_token, get_current_user, hash_password, request_ip, verify_password
+from app.services.auth import (
+    CurrentUser,
+    bearer_scheme,
+    create_access_token,
+    decode_access_token,
+    get_current_user,
+    hash_password,
+    request_ip,
+    verify_password,
+)
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
@@ -84,7 +98,16 @@ def me(current_user: CurrentUser = Depends(get_current_user)) -> CurrentUserResp
 
 
 @router.post("/logout", response_model=LogoutResponse)
-def logout(request: Request, current_user: CurrentUser = Depends(get_current_user)) -> LogoutResponse:
+def logout(
+    request: Request,
+    current_user: CurrentUser = Depends(get_current_user),
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+) -> LogoutResponse:
+    if credentials:
+        payload = decode_access_token(credentials.credentials)
+        token_hash = hashlib.sha256(credentials.credentials.encode("ascii")).hexdigest()
+        revoke_token(token_hash, datetime.fromtimestamp(payload["exp"], timezone.utc))
+
     create_audit_log(
         actor_user_id=current_user.id,
         action="auth.logout",

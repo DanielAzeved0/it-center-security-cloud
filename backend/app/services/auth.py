@@ -12,6 +12,7 @@ from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.core.config import get_settings
+from app.repositories.revoked_tokens import is_token_revoked
 from app.repositories.users import get_user_by_id
 
 PASSWORD_ALGORITHM = "pbkdf2_sha256"
@@ -136,6 +137,10 @@ def get_current_user(
         payload = decode_access_token(credentials.credentials)
         user_id = int(payload["sub"])
     except (KeyError, TypeError, ValueError, json.JSONDecodeError):
+        raise authentication_error()
+
+    token_hash = hashlib.sha256(credentials.credentials.encode("ascii")).hexdigest()
+    if is_token_revoked(token_hash):
         raise authentication_error()
 
     user = get_user_by_id(user_id)
