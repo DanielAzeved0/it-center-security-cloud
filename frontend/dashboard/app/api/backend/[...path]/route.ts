@@ -102,6 +102,11 @@ function fetchUpstream(
     method: request.method,
     headers: {
       "Content-Type": request.headers.get("Content-Type") ?? "application/json",
+      "X-Real-IP":
+        request.headers.get("x-real-ip") ??
+        request.headers.get("x-forwarded-for")?.split(",")[0].trim() ??
+        "127.0.0.1",
+      "User-Agent": request.headers.get("user-agent") ?? "itcenter-dashboard",
       ...(sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {}),
     },
     body,
@@ -183,6 +188,18 @@ async function proxyRequest(request: NextRequest, rawSegments: string[]): Promis
 
   if (!isAllowedPath(joinedPath)) {
     return NextResponse.json({ detail: "Not found" }, { status: 404 });
+  }
+
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    const contentLength = request.headers.get("content-length");
+    if (contentLength && Number.parseInt(contentLength, 10) > 1048576) {
+      return NextResponse.json({ detail: "Payload too large" }, { status: 413 });
+    }
+
+    const contentType = request.headers.get("content-type");
+    if (!contentType || !contentType.toLowerCase().includes("application/json")) {
+      return NextResponse.json({ detail: "Unsupported Media Type" }, { status: 415 });
+    }
   }
 
   const body = request.method === "GET" || request.method === "HEAD" ? undefined : await request.text();

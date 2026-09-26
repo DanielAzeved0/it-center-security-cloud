@@ -62,7 +62,6 @@ services:
       - ../.env.production
     environment:
       ITCENTER_API_BASE_URL: http://backend:8000
-      NEXT_PUBLIC_API_BASE_URL: /api/backend
     depends_on:
       backend:
         condition: service_healthy
