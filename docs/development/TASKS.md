@@ -2067,98 +2067,56 @@ Corrigir achados de seguranca de uma segunda auditoria de qualidade (2026-08-20)
 
 ### Tarefas
 
-[ ] Adicionar rate limiting ao login (`backend/app/routes/auth.py:28`, severidade alta)
+[x] Adicionar rate limiting ao login (`backend/app/routes/auth.py:28`, severidade alta)
 
-    O endpoint POST /api/v1/auth/login nao tem nenhum limite de
-    tentativas por IP ou por e-mail, nem em codigo nem no Nginx
-    (infra/nginx/nginx.conf.template so aplica limit_req_zone na
-    location do check-in do agente, nunca em /api/backend/). O fix de
-    timing-safe da EPIC 28 elimina a enumeracao de e-mail por tempo de
-    resposta, mas nao impede um atacante de tentar milhares de senhas
-    contra um e-mail conhecido sem nenhum bloqueio. Direcao: limitador
-    simples em memoria no proprio endpoint (5 tentativas/60s por IP,
-    sem Redis/fila - cabe no MVP de 1 VM), complementado por
-    limit_req_zone no Nginx como defesa em profundidade.
+    Implementado em 2026-09-26: motor de score de risco em memoria (risk_engine.py)
+    com janela deslizante de 1h, avaliando tentativas consecutivas (+20), burst de
+    velocidade (+35), credential stuffing (+30/+50) e email inexistente (+15).
+    Ao atingir score >= 100, bloqueia com HTTP 429 e Retry-After: 900 (15 min),
+    sem disparar consulta de banco ou PBKDF2 pesado. Defesa em profundidade
+    complementar no Nginx via limit_req_zone (10r/m, burst=5 nodelay). Ver ADR-039.
 
-[ ] Validar tamanho minimo de AUTH_TOKEN_SECRET e AGENT_API_KEY em producao (`backend/app/core/config.py:27`, severidade alta)
+[x] Validar tamanho minimo de AUTH_TOKEN_SECRET e AGENT_API_KEY em producao (`backend/app/core/config.py:27`, severidade alta)
 
-    validate_runtime_configuration() so rejeita um conjunto fixo de
-    placeholders (None, "", "change-me" etc), sem checar comprimento
-    nem entropia. Um segredo curto passa a validacao de "producao
-    segura" mas deixa a assinatura HMAC-SHA256 dos tokens de sessao
-    vulneravel a forca bruta offline caso um token vaze, permitindo
-    forjar tokens com sub arbitrario (inclusive de um admin). Direcao:
-    exigir no minimo 32 caracteres para AUTH_TOKEN_SECRET e
-    AGENT_API_KEY dentro de validate_runtime_configuration(), com erro
-    explicito na inicializacao caso nao cumpram o minimo.
+    Implementado em 2026-09-26: validate_runtime_configuration() valida comprimento
+    minimo de 32 caracteres para ambos os segredos quando APP_ENV == "production",
+    levantando RuntimeError imediato na inicializacao caso nao cumpram o requisito.
 
-[ ] Escapar hostname antes de interpolar em Paragraph() do relatorio PDF (`backend/app/services/reports.py:119`, severidade alta)
+[x] Escapar hostname antes de interpolar em Paragraph() do relatorio PDF (`backend/app/services/reports.py:119`, severidade alta)
 
-    build_machine_report_pdf interpola machine.hostname direto num
-    f-string passado a Paragraph(), que faz parsing de pseudo-XML
-    (tags <b>, <i>, <a href>). hostname vem do check-in do agente sem
-    allowlist de caracteres; um hostname com tag malformada derruba a
-    geracao do PDF (ValueError), e um com tag bem formada injeta um
-    link clicavel num documento que aparenta ser um relatorio oficial,
-    distribuido a admin/analyst/viewer. Direcao: escapar qualquer
-    campo vindo de agente/usuario com xml.sax.saxutils.escape antes de
-    interpolar em Paragraph() (Table() ja e seguro, renderiza celulas
-    como texto literal).
+    Implementado em 2026-09-26: xml.sax.saxutils.escape aplicado a hostname,
+    username e campos de texto dinamico de maquinas e alertas antes da criacao de
+    elementos Paragraph(), prevenindo quebra de parse XML e injecao de pseudo-tags.
 
-[ ] Restringir o formato de rustdesk_id no schema do backend (`backend/app/schemas/machine.py:46`, severidade media)
+[x] Restringir o formato de rustdesk_id no schema do backend (`backend/app/schemas/machine.py:46`, severidade media)
 
-    MachineRustdeskUpdate.rustdesk_id so tem max_length=50, sem
-    regex/charset, apesar do PATCH ja ter RBAC correto
-    (admin/analyst). O valor gravado e depois usado no frontend para
-    montar o href do URI customizado rustdesk://connect?id=... sem
-    encoding - um valor com caracteres de controle, aspas ou "&"
-    fica persistido e e interpolado sem sanitizacao no link clicado
-    por outro operador. Direcao: Field(pattern=r"^\d{5,12}$") no
-    schema Pydantic (IDs do RustDesk sao numericos).
+    Implementado em 2026-09-26: Field(pattern=r"^\d{5,12}$") adicionado ao schema
+    Pydantic MachineRustdeskUpdate, rejeitando strings nao numericas ou fora de tamanho.
 
-[ ] Implementar revogacao real de token no logout (`backend/app/routes/auth.py:86`, severidade media)
+[x] Implementar revogacao real de token no logout (`backend/app/routes/auth.py:86`, severidade media)
 
-    O logout so grava audit log, mas o esquema de autenticacao e HMAC
-    stateless sem tabela de sessao/blacklist - um Bearer token exposto
-    (XSS, log, dispositivo compartilhado) continua valido por ate
-    AUTH_TOKEN_EXPIRATION_MINUTES mesmo apos o usuario clicar em
-    "Sair". Direcao: tabela revoked_tokens (token_hash, expires_at,
-    psycopg puro, sem ORM); logout grava o hash do token atual;
-    get_current_user() passa a checar essa tabela antes de aceitar o
-    token; job de limpeza periodico remove linhas expiradas.
+    Implementado em 2026-09-26: migration 014_create_revoked_tokens.sql cria tabela
+    revoked_tokens (token_hash PK, expires_at). POST /logout extrai o token Bearer,
+    calcula hash SHA-256 e persiste com exp do JWT. get_current_user consulta
+    repositorio revoked_tokens.py e rejeita tokens revogados com HTTP 401.
 
-[ ] Validar formato de rustdesk_id tambem no frontend antes de montar a URI (`frontend/dashboard/components/MachineDetailView.tsx:307`, severidade media)
+[x] Validar formato de rustdesk_id tambem no frontend antes de montar a URI (`frontend/dashboard/components/MachineDetailView.tsx:307`, severidade media)
 
-    O botao "Conectar" interpola detail.rustdesk_id direto em
-    href={`rustdesk://connect?id=${detail.rustdesk_id}`}, sem
-    encodeURIComponent e sem checar formato - defesa em profundidade
-    complementar a validacao de schema no backend (item acima), para
-    o caso de um valor antigo ja persistido antes da correcao.
-    Direcao: validar com o mesmo padrao /^\d{5,12}$/ antes de
-    renderizar o botao, e aplicar encodeURIComponent ao montar o href.
+    Implementado em 2026-09-26: validacao regex /^\d{5,12}$/ no componente React e
+    encodeURIComponent aplicado ao interpolar o rustdesk_id no link rustdesk://connect.
 
-[ ] Remover NEXT_PUBLIC_API_BASE_URL dos arquivos de infra/env (`infra/docker-compose.production.yml:52`, severidade baixa)
+[x] Remover NEXT_PUBLIC_API_BASE_URL dos arquivos de infra/env (`infra/docker-compose.production.yml:52`, severidade baixa)
 
-    O fallback NEXT_PUBLIC_API_BASE_URL ja foi removido do codigo do
-    proxy (EPIC 17), mas a variavel continua declarada em
-    docker-compose.production.yml, docker-compose.yml, .env.example e
-    .env.production.example. Hoje nao e lida por nenhum codigo, mas
-    reabre o footgun (vazar a topologia interna do backend no bundle
-    client-side) caso alguem reintroduza process.env.NEXT_PUBLIC_* no
-    futuro. Direcao: remover a variavel dos 4 arquivos, mantendo so
-    ITCENTER_API_BASE_URL.
+    Implementado em 2026-09-26: declaracoes de NEXT_PUBLIC_API_BASE_URL removidas de
+    docker-compose.production.yml, docker-compose.yml, .env.example e .env.production.example,
+    preservando exclusivamente ITCENTER_API_BASE_URL no proxy server-side.
 
-[ ] Validar Content-Type e tamanho de corpo no proxy do dashboard (`frontend/dashboard/app/api/backend/[...path]/route.ts:104`, severidade baixa)
+[x] Validar Content-Type e tamanho de corpo no proxy do dashboard (`frontend/dashboard/app/api/backend/[...path]/route.ts:104`, severidade baixa)
 
-    fetchUpstream repassa o Content-Type do cliente sem validar, e
-    proxyRequest le o corpo inteiro para memoria sem checar
-    Content-Length antes. Hoje isso so nao e um vetor de DoS por
-    causa do client_max_body_size 2m do Nginx em producao - uma
-    camada que o proprio codigo do proxy nao conhece nem depende, ao
-    contrario do que ja fez com o path traversal (toSafeSegments, nao
-    confiou so na infra). Direcao: rejeitar Content-Type != 
-    application/json e Content-Length > 1MB direto em proxyRequest,
-    antes de ler o corpo.
+    Implementado em 2026-09-26: proxyRequest valida Content-Length <= 1MB (retorna
+    HTTP 413 se exceder) e Content-Type application/json em metodos de escrita
+    (retorna HTTP 415 se invalido) antes de ler o corpo. Repassa X-Real-IP e
+    User-Agent do cliente original upstream para o FastAPI.
 
 ---
 

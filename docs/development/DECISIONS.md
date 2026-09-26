@@ -1423,3 +1423,53 @@ O piso de 256 MB é o limite crítico real que impede o esgotamento total, enqua
 ## Resultado
 
 Deploy estável na VM de 954 MB com proteção contra picos de memória, preservando os serviços essenciais e garantindo que o preflight valide limites realistas de hardware.
+
+---
+
+# ADR-039
+
+## Data
+
+2026-09-26
+
+## Decisão
+
+Implementar motor heurístico de score de risco para proteção contra força bruta no endpoint de login (`POST /api/v1/auth/login`) e revogação real de tokens JWT/Bearer no logout (`POST /api/v1/auth/logout`), somados ao endurecimento de segurança de APIs e relatórios (EPIC 38):
+
+1. **Motor de Risco no Login (`backend/app/services/risk_engine.py`)**:
+   - Janela deslizante em memória (1 hora TTL) associando IP de origem e fingerprint do cliente.
+   - Heurísticas aditivas de risco: falha consecutiva (+20), burst velocity > 3 req/10s (+35), credential stuffing visando múltiplos e-mails (+30 para >=3 e-mails, +50 para >=5 e-mails), e tentativa contra e-mail inexistente (+15).
+   - Ao atingir pontuação >= 100, bloqueio imediato por 15 minutos (900s) com HTTP 429 Too Many Requests e cabeçalho `Retry-After: 900`.
+   - Sob bloqueio, requisições são rejeitadas na entrada sem disparar consultas ao PostgreSQL nem executar o hash PBKDF2 intensivo em CPU.
+   - Registro em `audit_logs` com ação `auth.login_blocked_risk` ao efetuar o bloqueio.
+   - Defesa em profundidade no Nginx via `limit_req_zone` (10r/m, burst=5 nodelay).
+2. **Revogação Real de Tokens no Logout**:
+   - Criação da tabela PostgreSQL `revoked_tokens` (`token_hash VARCHAR(64) PRIMARY KEY`, `expires_at TIMESTAMPTZ NOT NULL`) via migration `014_create_revoked_tokens.sql`.
+   - No logout (`POST /api/v1/auth/logout`), o hash SHA-256 do token Bearer é persistido junto com a data de expiração do JWT.
+   - Validação em `get_current_user`: rejeita imediatamente qualquer requisição autenticada cujo token esteja revogado com HTTP 401 Unauthorized.
+3. **Validação de Segredos em Produção**:
+   - `validate_runtime_configuration()` rejeita com erro fatal (`RuntimeError`) segredos `AUTH_TOKEN_SECRET` e `AGENT_API_KEY` com menos de 32 caracteres quando `APP_ENV == "production"`.
+4. **Sanitização de Relatório PDF**:
+   - `xml.sax.saxutils.escape` aplicado em todos os textos dinâmicos (hostnames, usernames, títulos de alertas) antes da criação de elementos ReportLab `Paragraph()`, impedindo quebra de parse XML e injeção de tags.
+5. **Restrição de Formato de `rustdesk_id`**:
+   - Validação estrita via regex `^\d{5,12}$` tanto no schema backend (`MachineRustdeskUpdate`) quanto no componente de frontend (`MachineDetailView.tsx`), com encoding de URI no link.
+6. **Hardening do Proxy Next.js**:
+   - Limite de payload de 1MB (HTTP 413) e validação de `Content-Type: application/json` (HTTP 415) em `frontend/dashboard/app/api/backend/[...path]/route.ts`.
+   - Repasse transparente de `X-Real-IP` e `User-Agent` upstream para o FastAPI.
+
+## Motivo
+
+O endpoint de autenticação anterior operava de forma timing-safe contra enumeração (EPIC 28), porém permitia ataques contínuos de dicionário ou credential stuffing sem qualquer limitação em código ou infraestrutura. Um atacante poderia esgotar a CPU da VM de 1GB através do hashing PBKDF2 ou tentar senhas arbitrariamente.
+Além disso, o logout era puramente cosmético (stateless), mantendo o token exposto válido até a sua expiração natural.
+A abordagem em memória para o score de risco garante latência mínima (<1ms) e zero carga ao PostgreSQL durante tentativas normais ou sob ataque, persistindo no banco apenas tokens revogados e logs de auditoria de bloqueio.
+
+## Alternativas Avaliadas
+
+* **Redis para Rate Limiting e Blacklist**: Descartado devido à restrição severa de memória física da VM (954 MB). Adicionar um container Redis aumentaria o footprint de RAM desnecessariamente para uma arquitetura de nó único.
+* **Rate Limiting puramente no Nginx**: Insuficiente. O Nginx atua apenas por IP binário fixo, sem visibilidade das credenciais ou padrões heurísticos comportamentais (como credential stuffing entre diferentes e-mails ou detecção de bursts).
+* **Manter tokens sem revogação**: Inaceitável para segurança corporativa; dispositivos compartilhados ou tokens vazados continuariam com acesso ativo mesmo após encerramento explícito da sessão.
+
+## Resultado
+
+Superfície de autenticação e APIs protegidas contra força bruta e DoS de CPU, com suporte completo a cancelamento de sessão e integridade de relatórios, mantendo conformidade com os requisitos de auditoria e consumo enxuto de recursos.
+
