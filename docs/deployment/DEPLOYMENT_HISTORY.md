@@ -2,6 +2,24 @@
 
 Este documento registra o processo real de implantacao do IT Center Security Cloud na Oracle Cloud.
 
+## 2026-09-26 - Deploy em producao com sucesso via GitHub Actions (EPIC 38 e correcao de build Next.js com Webpack)
+
+Contexto: deploy automatizado via workflow `Deploy Production` do GitHub Actions (run `36270276634`, 9m56s) executado com sucesso e 100% healthy apos a implementacao da EPIC 38 (Seguranca da Aplicacao e Motor de Risco no Login), resolucao de CVEs do frontend (`next@16.3.6`, `sharp@0.35.4`) e otimizacao do build com Webpack e keepalive SSH.
+
+1. `backup.sh` executou com sucesso gerando snapshot do banco PostgreSQL.
+2. `preflight-production.sh` aprovou todos os checks de producao com seguranca.
+3. Build sequencial do Docker:
+   - Backend construiu e aplicou migration `014_create_revoked_tokens.sql`.
+   - Frontend compilou via Webpack (`next build --webpack`), consumindo menos memoria e evitando o travamento do Turbopack em VM de 1GB.
+4. Conexao SSH protegida contra timeout de firewall por `-o ServerAliveInterval=15 -o ServerAliveCountMax=120`.
+5. Tabela `revoked_tokens` persistida e indexada com sucesso no PostgreSQL de producao.
+6. Containers `itcenter-postgres`, `itcenter-backend`, `itcenter-frontend` e `itcenter-nginx` ativos e saudaveis.
+7. Commit em producao alcancou `95c6d9a`, encerrando formalmente a EPIC 38 em ambiente produtivo.
+
+Resultado:
+
+* EPIC 38 aplicada em producao com protecao ativa contra forca bruta e credential stuffing (HTTP 429), revogacao real de tokens Bearer no logout, ReportLab com escape XML e headers de seguranca endurecidos.
+
 ## 2026-09-26 - Deploy em producao com sucesso via GitHub Actions (EPIC 36 e EPIC 39 concluidas)
 
 Contexto: deploy automatizado via workflow `Deploy Production` do GitHub Actions executado com sucesso apos a implementacao da EPIC 36 (gate de CVE para imagens locais migrado para o CI) e da EPIC 39 (mitigacoes de memoria e calibracao de preflight para VM de 1GB).
