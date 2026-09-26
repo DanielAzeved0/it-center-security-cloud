@@ -2,6 +2,25 @@
 
 Este documento registra o processo real de implantacao do IT Center Security Cloud na Oracle Cloud.
 
+## 2026-09-26 - Deploy em producao com sucesso via GitHub Actions (EPIC 36 e EPIC 39 concluidas)
+
+Contexto: deploy automatizado via workflow `Deploy Production` do GitHub Actions executado com sucesso apos a implementacao da EPIC 36 (gate de CVE para imagens locais migrado para o CI) e da EPIC 39 (mitigacoes de memoria e calibracao de preflight para VM de 1GB).
+
+1. `backup.sh` executado com sucesso gerando snapshot compactado do PostgreSQL (`itcenter-postgres-20260926T164024Z.sql.gz`).
+2. `preflight-production.sh` executado e aprovado com sucesso sob o piso calibrado de `MIN_MEM_MB=256` (MemAvailable medida em ~354MB, compativel com o limite critico da VM de 954MB).
+3. Build sequencial (`COMPOSE_BAKE=false` build backend, seguido de build frontend) executou sem concorrencia e sem quebrar o pipe SSH.
+4. `docker compose up -d` recriou os containers `itcenter-backend` e `itcenter-frontend` com as novas imagens (`infra-backend:latest` e `infra-frontend:latest`), mantendo limites de memoria configurados (`mem_limit`) e rotacao de logs (`x-logging`).
+5. Containers `itcenter-postgres`, `itcenter-backend`, `itcenter-frontend` e `itcenter-nginx` ativos e healthy.
+6. Smoke tests de producao executados e aprovados:
+   - `GET http://127.0.0.1:8000/api/v1/health` retornou 200 OK.
+   - `GET http://127.0.0.1/healthz` no Nginx retornou 200 OK.
+   - `GET http://frontend:3000/` retornou 200 OK.
+7. Commit em producao alcancou `eb21dde`, encerrando formalmente as EPICs 36 e 39.
+
+Resultado:
+
+* Resolvido o travamento recorrente do INCIDENTE 023. Pipeline de deploy de producao via GitHub Actions funcionando de ponta a ponta sem intervencao manual.
+
 ## 2026-08-20 - Segunda tentativa de deploy falha de novo por memoria, agora antes mesmo do gate de CVE (recorrencia do INCIDENTE 023)
 
 Contexto: apos a correcao do gate de CVE (entrada seguinte, mesmo dia), uma nova tentativa de `Deploy Production` via GitHub Actions foi disparada com o gate ja corrigido. O job falhou de novo, mas antes de chegar no gate - durante o proprio `docker compose build` do frontend.
