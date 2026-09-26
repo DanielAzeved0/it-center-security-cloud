@@ -112,9 +112,9 @@ jobs:
   scout:
     name: CVE gate (Docker Scout)
     runs-on: ubuntu-latest
-    # Roda so em push/merge para main; PRs passam sem o gate para nao exigir
-    # credenciais de Docker Hub em forks externos.
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # Roda so em push/merge para main com credenciais configuradas;
+    # PRs e forks externos passam sem o gate.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && secrets.DOCKERHUB_TOKEN != ''
 
     steps:
       - name: Checkout
