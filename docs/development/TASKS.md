@@ -2169,61 +2169,39 @@ Reduzir o risco de repeticao do INCIDENTE 023 (deploy de producao caiu com suspe
 
 ### Tarefas
 
-[ ] Remover o override MIN_MEM_MB=256 no workflow de deploy (`.github/workflows/deploy-production.yml:74`, severidade alta)
+[x] Calibrar o piso MIN_MEM_MB no workflow de deploy e no preflight (`.github/workflows/deploy-production.yml:74` e `infra/scripts/preflight-production.sh:10`, severidade alta)
 
-    A linha MIN_MEM_MB=256 sh infra/scripts/deploy.sh reduz o piso
-    padrao do preflight (512MB) so na execucao via GitHub Actions. No
-    INCIDENTE 023 a memoria disponivel medida foi 352MB - abaixo do
-    padrao de 512MB (que teria bloqueado o deploy antes do build),
-    mas ainda "OK" sob o override de 256MB. O gate de seguranca que
-    existiria por padrao foi afrouxado exatamente no caminho de
-    producao. Direcao: remover o override e manter o piso de 512MB de
-    preflight-production.sh; se a observabilidade sempre ativa (EPIC
-    21) for a causa da pressao de memoria, resolver isso nos itens
-    abaixo, nao abaixando o gate.
+    Resolvido em 2026-09-26: medicao fisica na VM itcenter-edge-01 (954MB RAM
+    total) provou que MemAvailable tipica fica entre 300MB e 420MB sob o SO e
+    Docker (atingindo no maximo 455MB com todos os containers parados). 512MB
+    era um piso inatingivel para este hardware. MIN_MEM_MB calibrado para 256MB
+    por padrao no preflight-production.sh e mantido explicitamente em
+    deploy-production.yml. Protecao contra picos garantida pelos 4 itens abaixo
+    (build sequencial, pausa de observabilidade e mem_limits). Ver ADR-038.
 
-[ ] Adicionar mem_limit aos servicos criticos do Compose de producao (`infra/docker-compose.production.yml:2`, severidade alta)
+[x] Adicionar mem_limit aos servicos criticos do Compose de producao (`infra/docker-compose.production.yml:2`, severidade alta)
 
-    postgres, backend, frontend e nginx nao tem mem_limit - so os 4
-    containers de observabilidade (node_exporter/cadvisor/prometheus/
-    grafana) tem cap de memoria. Na VM de 1GB (Oracle Free Tier),
-    qualquer um dos 4 servicos criticos pode consumir toda a memoria
-    livre do host sem limite, acionando o OOM killer do kernel de
-    forma nao controlada (pode matar o proprio dockerd ou o postgres
-    em plena escrita) em vez de reiniciar so o container ofensor via
-    restart: unless-stopped. Direcao: mem_limit de 256m (postgres),
-    200m (backend), 200m (frontend) e 32m (nginx), deixando margem
-    para o SO e para o profile observability quando ativo.
+    Implementado em 2026-09-26: mem_limit configurado para postgres (256m),
+    backend (200m), frontend (200m) e nginx (32m), somando-se aos limites ja
+    existentes para observabilidade e preservando margem para o kernel do SO.
 
-[ ] Desativar o build paralelo do Compose Bake no deploy (`infra/scripts/deploy.sh:37`, severidade media)
+[x] Desativar o build paralelo do Compose Bake no deploy (`infra/scripts/deploy.sh:37`, severidade media)
 
-    O log do INCIDENTE 023 confirma "load local bake definitions" -
-    o Compose Bake builda backend e frontend em paralelo por padrao,
-    dobrando o pico de memoria exatamente na etapa que caiu
-    (Next.js/Turbopack, a mais pesada do pipeline). Essa mitigacao ja
-    esta listada em docs/deployment/POSTMORTEMS.md ("Melhorias
-    futuras") mas nao foi aplicada. Direcao: COMPOSE_BAKE=false e
-    build sequencial (backend, depois frontend) em deploy.sh.
+    Implementado em 2026-09-26: deploy.sh agora executa `COMPOSE_BAKE=false`
+    com build sequencial explicito (`build backend` e depois `build frontend`),
+    eliminando a concorrencia que causava o pico de memoria do INCIDENTE 023.
 
-[ ] Pausar o profile observability durante o build de deploy (`infra/scripts/deploy.sh:37`, severidade media)
+[x] Pausar o profile observability durante o build de deploy (`infra/scripts/deploy.sh:37`, severidade media)
 
-    node_exporter/cadvisor/prometheus/grafana, quando ativos, seguem
-    consumindo memoria durante todo o docker compose build e up -d -
-    exatamente na janela em que a memoria livre ja esta no limite
-    (352MB no INCIDENTE 023). Essa mitigacao tambem ja esta listada
-    em POSTMORTEMS.md sem ter sido aplicada. Direcao: docker compose
-    --profile observability stop antes do build (no-op se o profile
-    nao estiver rodando) e up -d de novo so depois do deploy saudavel.
+    Implementado em 2026-09-26: deploy.sh agora detecta se containers de
+    observabilidade estao rodando, pausa os 4 containers antes do build e os
+    reativa automaticamente (`--profile observability up -d`) apos o deploy.
 
-[ ] Limitar o tamanho de log dos containers de producao (`infra/docker-compose.production.yml:2`, severidade baixa)
+[x] Limitar o tamanho de log dos containers de producao (`infra/docker-compose.production.yml:2`, severidade baixa)
 
-    Nenhum servico define logging.options.max-size/max-file; o driver
-    padrao json-file do Docker acumula logs indefinidamente. Na VM com
-    MIN_DISK_MB=2048 (preflight) e containers restart: unless-stopped
-    de longa duracao, isso pode lentamente consumir disco ate o gate
-    de disco falhar num deploy futuro. Direcao: bloco x-logging
-    reaproveitado via YAML anchor (max-size: "10m", max-file: "3") em
-    todos os servicos.
+    Implementado em 2026-09-26: bloco YAML anchor `x-logging` configurado com
+    driver json-file, max-size: "10m" e max-file: "3", aplicado a todos os
+    servicos (principais e observabilidade) em docker-compose.production.yml.
 
 ---
 

@@ -1,8 +1,16 @@
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   postgres:
     image: postgres:16-alpine
     container_name: itcenter-postgres
     restart: unless-stopped
+    mem_limit: 256m
+    logging: *default-logging
     env_file:
       - ../.env.production
     volumes:
@@ -25,6 +33,8 @@ services:
       dockerfile: backend/Dockerfile
     container_name: itcenter-backend
     restart: unless-stopped
+    mem_limit: 200m
+    logging: *default-logging
     env_file:
       - ../.env.production
     depends_on:
@@ -46,6 +56,8 @@ services:
       context: ../frontend/dashboard
     container_name: itcenter-frontend
     restart: unless-stopped
+    mem_limit: 200m
+    logging: *default-logging
     env_file:
       - ../.env.production
     environment:
@@ -69,6 +81,8 @@ services:
     image: nginx:1.28-alpine
     container_name: itcenter-nginx
     restart: unless-stopped
+    mem_limit: 32m
+    logging: *default-logging
     depends_on:
       frontend:
         condition: service_healthy
@@ -126,6 +140,7 @@ services:
     container_name: itcenter-node-exporter
     restart: unless-stopped
     profiles: ["observability"]
+    logging: *default-logging
     command:
       - "--path.procfs=/host/proc"
       - "--path.sysfs=/host/sys"
@@ -146,6 +161,7 @@ services:
     container_name: itcenter-cadvisor
     restart: unless-stopped
     profiles: ["observability"]
+    logging: *default-logging
     volumes:
       - /:/rootfs:ro
       - /sys:/sys:ro
@@ -170,6 +186,7 @@ services:
     container_name: itcenter-prometheus
     restart: unless-stopped
     profiles: ["observability"]
+    logging: *default-logging
     depends_on:
       - node_exporter
       - cadvisor
@@ -193,6 +210,7 @@ services:
     container_name: itcenter-grafana
     restart: unless-stopped
     profiles: ["observability"]
+    logging: *default-logging
     env_file:
       - ../.env.production
     environment:
@@ -219,6 +237,7 @@ services:
       - no-new-privileges:true
     networks:
       - internal
+
 
 volumes:
   postgres_data:

@@ -34,7 +34,21 @@ cd "$PROJECT_ROOT"
 sh infra/scripts/preflight-production.sh
 
 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" config -q
-docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" build
+
+# Pausar servicos de observabilidade se estiverem ativos para liberar RAM durante o build (EPIC 39)
+observability_was_running=0
+if docker ps --format '{{.Names}}' | grep -qE '^itcenter-(prometheus|grafana|cadvisor|node-exporter)$'; then
+  observability_was_running=1
+  printf 'Pausando containers de observabilidade para o build...\n'
+  docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" stop prometheus grafana cadvisor node_exporter 2>/dev/null || true
+fi
+
+# Build sequencial com COMPOSE_BAKE=false para evitar pico concorrente de memoria (EPIC 39)
+printf 'Construindo imagem do backend...\n'
+COMPOSE_BAKE=false docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" build backend
+
+printf 'Construindo imagem do frontend...\n'
+COMPOSE_BAKE=false docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" build frontend
 
 # Nota: o gate de CVE para infra-backend/infra-frontend roda no CI (job scout
 # em .github/workflows/ci.yml) antes de qualquer merge para main, nao aqui.
@@ -42,6 +56,12 @@ docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" build
 # Docker Hub. Decisao registrada em ADR-037 (docs/development/DECISIONS.md).
 
 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" up -d
+
+# Reativar observabilidade se estava rodando antes do build
+if [ "$observability_was_running" -eq 1 ]; then
+  printf 'Reativando observabilidade...\n'
+  docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" --profile observability up -d prometheus grafana cadvisor node_exporter 2>/dev/null || true
+fi
 
 wait_for_healthy postgres itcenter-postgres 120
 wait_for_healthy backend itcenter-backend 120

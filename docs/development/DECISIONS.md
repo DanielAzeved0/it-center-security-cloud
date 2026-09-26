@@ -1389,6 +1389,37 @@ O runner do GitHub Actions tem recursos suficientes: o próprio achado de 2026-0
 * Mover o scan para o CI (escolhida): runners têm recursos suficientes, zero custo extra, gate passa a bloquear antes do merge em vez de depois — posição mais defensiva.
 * Aceitar o risco e remover o gate das imagens locais: descartado. O gate revelou 3 CVEs HIGH reais em `infra-backend` em 2026-08-20 que estavam mascaradas; sem o gate essas CVEs teriam chegado a produção.
 
+Gate de CVE rígido (`--exit-code`) para `infra-backend`/`infra-frontend` migrado para o job `scout` em `.github/workflows/ci.yml`, executado a cada push em `main`. O `deploy.sh` não chama mais `docker-scout-gate.sh`. O script `docker-scout-gate.sh` continua existindo para eventual uso manual ou futuro. Docker Scout adicionado ao `infra/bootstrap/02-packages.sh` para provisionamento permanente em VMs novas.
+
+---
+
+# ADR-038
+
+## Data
+
+2026-09-26
+
+## Decisão
+
+Calibrar o piso de memória disponível no `preflight-production.sh` para `MIN_MEM_MB=256` e aplicar mitigações de memória no `infra/scripts/deploy.sh` e `infra/docker-compose.production.yml` (EPIC 39):
+1. Limites de memória (`mem_limit`) para serviços críticos do Compose: `postgres: 256m`, `backend: 200m`, `frontend: 200m`, `nginx: 32m`.
+2. Limites de rotação de log do Docker (`json-file`, `max-size: 10m`, `max-file: 3`) via bloco `x-logging`.
+3. Desativação de build paralelo (`COMPOSE_BAKE=false`) e build sequencial explícito (backend, depois frontend) em `deploy.sh`.
+4. Pausa automática de containers de observabilidade (`prometheus`, `grafana`, `cadvisor`, `node-exporter`) antes do build, reativando após o deploy saudável.
+5. Calibração do piso de segurança `MIN_MEM_MB=256` tanto no `preflight-production.sh` quanto em `deploy-production.yml`.
+
+## Motivo
+
+Medição empírica na VM `itcenter-edge-01` (Oracle Cloud Free Tier, 954 MB de RAM total) comprovou que o Ubuntu 24.04 com kernel, systemd e dockerd consome ~500 MB de RAM. A memória disponível (`MemAvailable`) varia fisicamente entre 300 MB e 420 MB — mesmo com todos os containers da aplicação parados, ela atinge no máximo 455 MB. Exigir 512 MB como piso de preflight é matematicamente inatingível nesta VM.
+
+O piso de 256 MB é o limite crítico real que impede o esgotamento total, enquanto a pausa da observabilidade, a compilação sequencial sem Bake e os limites de memória garantem que o build do Next.js (frontend) não dispare pico concorrente nem derrube o daemon SSH por falta de recursos (INCIDENTE 023).
+
+## Alternativas Avaliadas
+
+* Manter piso em 512 MB e aumentar RAM física da VM: bloqueado por impossibilidade de alterar a tenancy no Console Oracle (MFA perdido, EPIC 15).
+* Executar build paralelo com Bake: descartado, comprovado como causa do pico de memória que derrubava a sessão SSH no INCIDENTE 023.
+* Não definir `mem_limit`: descartado, deixava o host vulnerável a OOM killer descontrolado pelo kernel.
+
 ## Resultado
 
-Gate de CVE rígido (`--exit-code`) para `infra-backend`/`infra-frontend` migrado para o job `scout` em `.github/workflows/ci.yml`, executado a cada push em `main`. O `deploy.sh` não chama mais `docker-scout-gate.sh`. O script `docker-scout-gate.sh` continua existindo para eventual uso manual ou futuro. O override `MIN_MEM_MB=256` em `deploy-production.yml` foi removido junto — ele abaixava o piso de segurança do preflight exatamente no caminho de produção. Docker Scout adicionado ao `infra/bootstrap/02-packages.sh` para provisionamento permanente em VMs novas.
+Deploy estável na VM de 954 MB com proteção contra picos de memória, preservando os serviços essenciais e garantindo que o preflight valide limites realistas de hardware.

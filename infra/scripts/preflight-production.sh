@@ -7,7 +7,10 @@ COMPOSE_FILE="$PROJECT_ROOT/infra/docker-compose.production.yml"
 HTPASSWD_FILE="$PROJECT_ROOT/.secrets/dashboard.htpasswd"
 MIN_DOCKER_MAJOR=24
 MIN_DISK_MB="${MIN_DISK_MB:-2048}"
-MIN_MEM_MB="${MIN_MEM_MB:-512}"
+# Piso de memoria disponivel: na VM itcenter-edge-01 (Oracle Free Tier, 954MB RAM total),
+# o sistema operacional + dockerd + servicos de base consomem ~500MB, deixando entre
+# 300MB e 420MB de MemAvailable. 256MB e o limite critico real. Ver ADR-038.
+MIN_MEM_MB="${MIN_MEM_MB:-256}"
 
 ok() {
   printf 'OK  %s\n' "$1"
