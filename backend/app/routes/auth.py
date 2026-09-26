@@ -19,6 +19,7 @@ from app.services.auth import (
     request_ip,
     verify_password,
 )
+from app.services.risk_engine import get_risk_engine
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
@@ -41,9 +42,30 @@ def _auth_user_from_current_user(user: CurrentUser) -> AuthUser:
 
 @router.post("/login", response_model=LoginResponse)
 def login(payload: LoginRequest, request: Request) -> LoginResponse:
-    user = get_user_by_email(payload.email.strip())
     user_agent = request.headers.get("User-Agent")
     ip_address = request_ip(request)
+    accept_language = request.headers.get("Accept-Language", "")
+    fingerprint = hashlib.sha256(f"{user_agent or ''}|{accept_language}".encode("utf-8")).hexdigest()
+
+    risk_engine = get_risk_engine()
+    is_blocked, score, retry_after = risk_engine.inspect_client(ip_address, fingerprint)
+    if is_blocked:
+        create_audit_log(
+            actor_user_id=None,
+            action="auth.login_blocked_risk",
+            entity_type="auth",
+            entity_id=None,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            metadata={"email": payload.email.strip().lower(), "risk_score": score, "retry_after": retry_after},
+        )
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many attempts. Account locked temporarily.",
+            headers={"Retry-After": str(retry_after)},
+        )
+
+    user = get_user_by_email(payload.email.strip())
 
     # verify_password roda sempre, mesmo quando o usuario nao existe (contra
     # o hash dummy), para que o tempo de resposta nao revele se o e-mail
@@ -53,6 +75,13 @@ def login(payload: LoginRequest, request: Request) -> LoginResponse:
     password_is_valid = verify_password(payload.password, password_hash)
 
     if user is None or user["status"] != "active" or not password_is_valid:
+        risk_engine.record_attempt(
+            ip=ip_address,
+            fingerprint=fingerprint,
+            email=payload.email.strip().lower(),
+            success=False,
+            user_exists=(user is not None),
+        )
         create_audit_log(
             actor_user_id=None,
             action="auth.login_failed",
@@ -67,6 +96,7 @@ def login(payload: LoginRequest, request: Request) -> LoginResponse:
             detail="Invalid credentials",
         )
 
+    risk_engine.reset_client(ip_address, fingerprint)
     token, expires_in = create_access_token(user_id=user["id"])
     mark_user_login(user["id"])
     create_audit_log(
