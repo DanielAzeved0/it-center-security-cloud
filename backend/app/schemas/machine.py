@@ -43,7 +43,7 @@ class MachineLocalAdmin(BaseModel):
 
 
 class MachineRustdeskUpdate(BaseModel):
-    rustdesk_id: str | None = Field(default=None, max_length=50)
+    rustdesk_id: str | None = Field(default=None, pattern=r"^\d{5,12}$")
 
 
 class MachineRustdeskUpdateResponse(BaseModel):

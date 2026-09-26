@@ -301,10 +301,10 @@ export function MachineDetailView({ machineId }: { machineId: string }) {
             <div className="integrations-grid">
               <div className="integration-block">
                 <span className="eyebrow">RustDesk</span>
-                {detail.rustdesk_id && canManageRustdesk ? (
+                {detail.rustdesk_id && /^\d{5,12}$/.test(detail.rustdesk_id) && canManageRustdesk ? (
                   <a
                     className="secondary-button compact-button"
-                    href={`rustdesk://connect?id=${detail.rustdesk_id}`}
+                    href={`rustdesk://connect?id=${encodeURIComponent(detail.rustdesk_id)}`}
                   >
                     Conectar
                   </a>
@@ -312,7 +312,11 @@ export function MachineDetailView({ machineId }: { machineId: string }) {
                   <span
                     className="secondary-button compact-button"
                     aria-disabled="true"
-                    title="Seu perfil nao pode conectar via RustDesk"
+                    title={
+                      !canManageRustdesk
+                        ? "Seu perfil nao pode conectar via RustDesk"
+                        : "ID do RustDesk invalido"
+                    }
                   >
                     Conectar
                   </span>
