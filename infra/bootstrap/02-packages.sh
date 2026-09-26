@@ -19,4 +19,11 @@ apt-get install -y \
   ufw \
   openssl
 
+echo "02-packages.sh: instalando Docker Scout CLI"
+# Necessario para o gate de CVE (infra/scripts/docker-scout-gate.sh).
+# A autenticacao no Docker Hub (docker login) e um passo manual pos-provisionamento
+# que requer credenciais — nao automatizavel aqui sem expor secrets.
+curl -sSfL https://raw.githubusercontent.com/docker/scout-cli/main/install.sh | sh -s -- -b /usr/local/bin
+docker scout version
+
 echo "02-packages.sh: concluido"

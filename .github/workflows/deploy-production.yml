@@ -71,5 +71,5 @@ jobs:
           git checkout --force FETCH_HEAD
 
           sh infra/scripts/backup.sh
-          MIN_MEM_MB=256 sh infra/scripts/deploy.sh
+          sh infra/scripts/deploy.sh
           REMOTE

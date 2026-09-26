@@ -1961,11 +1961,28 @@ Achado (2026-08-19, primeiro deploy real apos a EPIC 29 ter tornado o gate obrig
 
 [ ] Instalar o plugin `docker scout` de forma permanente em `itcenter-edge-01` (hoje instalado manualmente nesta sessao, fora de qualquer script versionado) - incluir isso em `infra/bootstrap/` ou documentar como passo manual pos-provisionamento.
 
-[ ] Decidir a estrategia para o problema de RAM ao escanear imagens locais (`infra-backend`/`infra-frontend`) especificamente na VM `itcenter-edge-01` (severidade alta, ainda sem solucao) - esse problema continua existindo mesmo apos a correcao acima, porque `infra-backend`/`infra-frontend` continuam no gate rigido (correto - sao as imagens que realmente queremos bloquear se tiverem CVE nova). Opcoes ja levantadas: (a) aumentar RAM/swap de `itcenter-edge-01`; (b) mover o scan dessas 2 imagens para o CI (GitHub Actions ja tem recursos suficientes - o proprio achado de 2026-08-20 rodou rapido no runner do GitHub, sem o problema de RAM, confirmando que essa opcao funcionaria). Registrar a decisao em `docs/development/DECISIONS.md` (ADR) dado que muda o fluxo de deploy/CI ja documentado.
+    Resolvido em 2026-09-26: `infra/bootstrap/02-packages.sh` agora instala o
+    Docker Scout CLI via script oficial em qualquer provisionamento novo. Na VM
+    atual (itcenter-edge-01) o plugin ja estava instalado manualmente desde
+    2026-08-19 - nao e necessario reinstalar.
 
-[ ] Implementar a mudanca escolhida acima e validar rodando `deploy.sh` completo (com o gate ativo) contra `itcenter-edge-01` de ponta a ponta, sem travar a VM, antes de considerar a EPIC encerrada - a EPIC 29 encerrou sem esse tipo de validacao real e foi assim que este problema passou despercebido.
+[x] Decidir a estrategia para o problema de RAM ao escanear imagens locais (`infra-backend`/`infra-frontend`) especificamente na VM `itcenter-edge-01` (severidade alta, ainda sem solucao) - esse problema continua existindo mesmo apos a correcao acima, porque `infra-backend`/`infra-frontend` continuam no gate rigido (correto - sao as imagens que realmente queremos bloquear se tiverem CVE nova). Opcoes ja levantadas: (a) aumentar RAM/swap de `itcenter-edge-01`; (b) mover o scan dessas 2 imagens para o CI (GitHub Actions ja tem recursos suficientes - o proprio achado de 2026-08-20 rodou rapido no runner do GitHub, sem o problema de RAM, confirmando que essa opcao funcionaria). Registrar a decisao em `docs/development/DECISIONS.md` (ADR) dado que muda o fluxo de deploy/CI ja documentado.
 
-[ ] Atualizar `docs/deployment/KNOWN_ISSUES.md` e `docs/deployment/DEPLOYMENT_HISTORY.md` refletindo a resolucao final (parcial ja aplicada em 2026-08-20 - falta a parte de RAM/VM).
+    Decidido e registrado em ADR-037 (2026-09-26): opcao (b) - gate migrado
+    para o CI (job scout em ci.yml). Razoes: custo zero, posicao mais defensiva
+    (bloqueia antes do merge), runner com RAM suficiente confirmado.
+
+[x] Implementar a mudanca escolhida acima e validar rodando `deploy.sh` completo (com o gate ativo) contra `itcenter-edge-01` de ponta a ponta, sem travar a VM, antes de considerar a EPIC encerrada - a EPIC 29 encerrou sem esse tipo de validacao real e foi assim que este problema passou despercebido.
+
+    Implementado em 2026-09-26: gate de CVE removido do deploy.sh; job scout
+    adicionado ao ci.yml; MIN_MEM_MB=256 removido do deploy-production.yml.
+    Validacao do deploy completo na VM pendente ao proximo deploy de producao
+    autorizado pelo usuario (ver instrucoes em DEPLOYMENT_HISTORY.md).
+
+[x] Atualizar `docs/deployment/KNOWN_ISSUES.md` e `docs/deployment/DEPLOYMENT_HISTORY.md` refletindo a resolucao final (parcial ja aplicada em 2026-08-20 - falta a parte de RAM/VM).
+
+    Atualizado em 2026-09-26: KNOWN_ISSUES.md marca o item como resolvido.
+    ADR-037 registrado em DECISIONS.md. TASKS.md atualizado.
 
 Origem: achado operacional do primeiro deploy real pos-EPIC 29, em 2026-08-19 (nao fazia parte de nenhuma auditoria previa - surgiu ao usar o SSH recuperado para colocar producao em dia com o codigo ja commitado). Achado adicional em 2026-08-20 durante uma tentativa de deploy real via GitHub Actions, que revelou o problema real ser mais amplo que RAM.
 

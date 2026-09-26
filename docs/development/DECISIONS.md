@@ -1367,24 +1367,28 @@ Impactos:
 
 ---
 
-# ADR-XXX
+# ADR-037
 
 ## Data
 
-YYYY-MM-DD
+2026-09-26
 
 ## Decisão
 
-Descrição da decisão.
+Mover o gate de CVE de `infra-backend` e `infra-frontend` do `deploy.sh` (executado na VM de produção) para o CI (`ci.yml`, job `scout`, executado no runner do GitHub Actions).
 
 ## Motivo
 
-Justificativa.
+A VM `itcenter-edge-01` tem 954 MB de RAM + 1 GB de swap. Escanear uma imagem Docker construída localmente (sem índice pré-computado no Docker Hub) via `docker scout cves` exige indexação completa da imagem em memória — processo que esgotou a RAM + swap por completo e travou a VM durante ~30 minutos sem concluir (processo em estado `D`, sem OOM killer). O problema foi descoberto no deploy de 2026-08-19 (pós-EPIC 29) e confirmado como recorrente em 2026-08-20. Imagens oficiais como `postgres:16-alpine` não sofrem o mesmo problema porque já têm índice pré-computado no Docker Hub; `infra-backend`/`infra-frontend` não têm.
+
+O runner do GitHub Actions tem recursos suficientes: o próprio achado de 2026-08-20 confirmou que o scan das mesmas imagens completou normalmente no runner, sem problema de memória.
 
 ## Alternativas Avaliadas
 
-Lista de alternativas.
+* Aumentar RAM/swap da VM (`itcenter-edge-01`): exigiria ação no Console OCI (bloqueado por MFA perdido, EPIC 15) ou redesign da instância. Risco de custo no Oracle Free Tier.
+* Mover o scan para o CI (escolhida): runners têm recursos suficientes, zero custo extra, gate passa a bloquear antes do merge em vez de depois — posição mais defensiva.
+* Aceitar o risco e remover o gate das imagens locais: descartado. O gate revelou 3 CVEs HIGH reais em `infra-backend` em 2026-08-20 que estavam mascaradas; sem o gate essas CVEs teriam chegado a produção.
 
 ## Resultado
 
-Decisão final.
+Gate de CVE rígido (`--exit-code`) para `infra-backend`/`infra-frontend` migrado para o job `scout` em `.github/workflows/ci.yml`, executado a cada push em `main`. O `deploy.sh` não chama mais `docker-scout-gate.sh`. O script `docker-scout-gate.sh` continua existindo para eventual uso manual ou futuro. O override `MIN_MEM_MB=256` em `deploy-production.yml` foi removido junto — ele abaixava o piso de segurança do preflight exatamente no caminho de produção. Docker Scout adicionado ao `infra/bootstrap/02-packages.sh` para provisionamento permanente em VMs novas.

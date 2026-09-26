@@ -9,6 +9,10 @@ on:
 permissions:
   contents: read
 
+# Gate de CVE (Docker Scout) roda aqui no CI, nao na VM de producao (1GB RAM).
+# A VM trava ao indexar imagens locais sem indice pre-computado no Docker Hub.
+# Decisao registrada em ADR-037 (docs/development/DECISIONS.md).
+
 jobs:
   backend:
     name: Backend tests
@@ -104,3 +108,42 @@ jobs:
 
       - name: Validate production Docker Compose
         run: docker compose --env-file .env.production -f infra/docker-compose.production.yml config -q
+
+  scout:
+    name: CVE gate (Docker Scout)
+    runs-on: ubuntu-latest
+    # Roda so em push/merge para main; PRs passam sem o gate para nao exigir
+    # credenciais de Docker Hub em forks externos.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Prepare production env placeholders
+        run: |
+          cp .env.production.example .env.production
+          sed -i 's/REPLACE_WITH_A_LONG_RANDOM_PASSWORD/ci-postgres-password/g' .env.production
+          sed -i 's/REPLACE_WITH_A_LONG_RANDOM_API_KEY/ci-agent-api-key/g' .env.production
+          sed -i 's/monitor.example.com/ci.example.com/g' .env.production
+          mkdir -p .secrets
+          printf 'admin:%s\n' 'ci-placeholder' > .secrets/dashboard.htpasswd
+
+      - name: Build images
+        run: |
+          docker compose --env-file .env.production -f infra/docker-compose.production.yml build backend frontend
+
+      - name: Run Docker Scout gate
+        env:
+          # Gate rigido apenas para as imagens que este projeto controla.
+          # Imagens de terceiros (postgres, observabilidade) nao sao relevantes no CI:
+          # os riscos residuais ja estao aceitos e documentados em docs/security/SECURITY.md.
+          ITCENTER_SCOUT_IMAGES: infra-backend:latest infra-frontend:latest
+          ITCENTER_SCOUT_ACCEPTED_RISK_IMAGES: ""
+        run: sh infra/scripts/docker-scout-gate.sh

@@ -36,7 +36,10 @@ sh infra/scripts/preflight-production.sh
 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" config -q
 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" build
 
-sh infra/scripts/docker-scout-gate.sh
+# Nota: o gate de CVE para infra-backend/infra-frontend roda no CI (job scout
+# em .github/workflows/ci.yml) antes de qualquer merge para main, nao aqui.
+# A VM de 1GB trava ao indexar imagens locais sem indice pre-computado no
+# Docker Hub. Decisao registrada em ADR-037 (docs/development/DECISIONS.md).
 
 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" up -d
 

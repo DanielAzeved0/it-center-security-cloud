@@ -46,29 +46,14 @@ Risco aceito:
 
 * Uso de swap ja presente pode degradar latencia de Postgres/backend sob carga. Monitorar ao longo do tempo; se piorar ou os 4 servicos principais comecarem a degradar, revisitar (candidatos ja identificados: remover `cadvisor` do profile, ou ativar `observability` so sob demanda em vez de continuamente).
 
-## Docker Scout gate (EPIC 29) impraticavel em itcenter-edge-01 para imagens locais
+## Docker Scout gate (EPIC 29/36) migrado para o CI — resolvido em 2026-09-26
 
-Descoberto em 2026-08-19 no primeiro deploy real apos a EPIC 29 ter cablado `infra/scripts/docker-scout-gate.sh` em `deploy.sh` (o gate so tinha sido validado por um harness local ate entao, nunca contra a VM real). Dois problemas, nesta ordem:
+Descoberto em 2026-08-19 no primeiro deploy real apos a EPIC 29 ter cablado `infra/scripts/docker-scout-gate.sh` em `deploy.sh`. Dois problemas em sequencia:
 
-1. O plugin `docker scout` nao estava instalado em `itcenter-edge-01` — corrigido instalando o CLI oficial (`docker/scout-cli`) e fazendo `docker login` manual (Docker Hub) como o usuario `ubuntu`.
-2. Com o login feito, `docker scout cves infra-backend:latest` (imagem construida localmente — sem indice pre-computado no Docker Hub, ao contrario de imagens oficiais como `postgres:16-alpine`) esgotou por completo os 954MB de RAM + 1GB de swap da VM so indexando o backend. O processo entrou em estado `D` (uninterruptible sleep), o SSH ficou instavel, e o processo morreu sozinho apos ~30 minutos sem terminar (sem OOM killer disparado, mas efetivamente travado). Nenhum container de producao foi afetado (o `up -d` nunca foi alcancado por esse caminho).
+1. O plugin `docker scout` nao estava instalado em `itcenter-edge-01` — corrigido instalando o CLI oficial em 2026-08-19.
+2. Com o login feito, `docker scout cves infra-backend:latest` esgotou por completo os 954MB de RAM + 1GB de swap da VM so indexando o backend (imagem local sem indice pre-computado no Docker Hub). O processo travou ~30 minutos. Nenhum container de producao foi afetado.
 
-Classificacao:
-
-```text
-Risco operacional real, nao teorico - bloqueia deploy.sh completo
-```
-
-Mitigacao aplicada nesse deploy (2026-08-19):
-
-* `docker compose up -d` executado manualmente, pulando `docker-scout-gate.sh` so nessa execucao — as imagens ja estavam construidas e o codigo ja tinha passado por revisao normal antes do commit.
-
-**Achado adicional e correcao parcial em 2026-08-20:** uma tentativa de deploy real via GitHub Actions (`Deploy Production #22`) travou no gate de novo, mas por um motivo diferente e mais fundamental - `postgres:16-alpine` tem CVEs critical/high conhecidas (golang/stdlib) e o gate original nao tinha NENHUM mecanismo de excecao para risco ja aceito. Investigacao revelou que as 4 imagens de observabilidade da EPIC 21 (`node-exporter`, `cadvisor`, `prometheus`, `grafana-oss`) tem o mesmo problema, em volume maior (43 a 84 vulnerabilidades cada). Ou seja, o gate nunca poderia ter passado desde a EPIC 21 (2026-08-15), independente do problema de RAM. Corrigido: `infra/scripts/docker-scout-gate.sh` reescrito com 2 grupos - gate rigido (`--exit-code`) so para `infra-backend`/`infra-frontend` (as imagens que este projeto controla), e as 5 imagens de terceiros passam a ser reportadas sem bloquear (`docs/security/SECURITY.md` atualizado). No processo, 3 CVEs HIGH reais e corrigiveis em `infra-backend` (mascaradas ate entao pelo gate sempre falhar antes em `postgres`) foram encontradas e corrigidas (remocao de `pip`/`setuptools`/`wheel` da imagem final - ver `docs/security/SECURITY.md`). Gate completo validado localmente com exit code 0.
-
-Risco aceito / pendente (so a parte de RAM, nao mais o resto):
-
-* O problema de RAM ao escanear `infra-backend`/`infra-frontend` **na VM real** continua sem solucao - essas 2 imagens continuam no gate rigido (corretamente), entao `deploy.sh` completo ainda pode travar em `itcenter-edge-01` especificamente por falta de RAM, mesmo com o resto do gate corrigido. Opcoes ainda nao decididas: aumentar RAM/swap da VM; mover o scan dessas 2 imagens para o CI (GitHub Actions ja demonstrou ter recursos suficientes).
-* Ver `docs/deployment/DEPLOYMENT_HISTORY.md` (entradas de 2026-08-19 e 2026-08-20) para o relato completo. Correcao rastreada na EPIC 36 (`docs/development/TASKS.md`).
+**Corrigido em 2026-09-26 (EPIC 36, ADR-037):** gate de CVE rigido (`--exit-code`) para `infra-backend`/`infra-frontend` migrado para o CI (job `scout` em `.github/workflows/ci.yml`, runner com RAM suficiente). O `deploy.sh` nao chama mais `docker-scout-gate.sh`. O override `MIN_MEM_MB=256` em `deploy-production.yml` foi removido (piso de 512MB do preflight restaurado). Docker Scout adicionado ao `infra/bootstrap/02-packages.sh` para provisionamento permanente. Pendente apenas: `docker login` manual na VM apos qualquer novo provisionamento (nao automatizavel sem expor credenciais).
 
 ## Nginx nao libera GET /api/v1/agent/manifest e /agent/download do Basic Auth (EPIC 22) — corrigido no codigo em 2026-08-19, aguardando deploy
 
