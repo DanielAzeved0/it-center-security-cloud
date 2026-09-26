@@ -24,11 +24,15 @@ class Settings:
         database_url = os.getenv("DATABASE_URL")
         insecure_values = {None, "", "change-me", "CHANGE_ME", "replace-me"}
 
-        if self.agent_api_key in insecure_values:
-            raise RuntimeError("AGENT_API_KEY must be configured with a non-default value in production")
+        if self.agent_api_key in insecure_values or len(self.agent_api_key) < 32:
+            raise RuntimeError(
+                "AGENT_API_KEY must be configured with a non-default value of at least 32 characters in production"
+            )
 
-        if self.auth_token_secret in insecure_values:
-            raise RuntimeError("AUTH_TOKEN_SECRET must be configured with a non-default value in production")
+        if self.auth_token_secret in insecure_values or len(self.auth_token_secret) < 32:
+            raise RuntimeError(
+                "AUTH_TOKEN_SECRET must be configured with a non-default value of at least 32 characters in production"
+            )
 
         if not database_url:
             raise RuntimeError("DATABASE_URL must be configured in production")
