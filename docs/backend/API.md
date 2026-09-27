@@ -181,9 +181,10 @@ Efeitos de persistência:
 ```text
 Cria ou atualiza a máquina em machines.
 Registra uma nova linha em metrics.
-Substitui o snapshot atual de installed_programs da máquina.
+Calcula o hash SHA-256 (installed_programs_hash) dos programas instalados: se o hash for idêntico ao já persistido em machines, pula a remoção e reinserção (evitando centenas de DELETEs e INSERTs a cada ciclo; EPIC 40, migração 015). Caso contrário, atualiza o snapshot.
 Cria agent_configs padrão para a máquina quando ainda não existir.
-Sincroniza machine_local_admins com o baseline recebido em security.local_admins, registrando novos administradores.
+Sincroniza machine_local_admins com o baseline recebido em security.local_admins via inserção em lote com executemany (EPIC 40), registrando novos administradores.
+Persiste eventos de segurança/USB recebidos via inserção atômica em lote com executemany (EPIC 40).
 Atualiza last_seen e status online da máquina.
 Emite ou adota agent_secret_hash (EPIC 28-A, ADR-036) quando aplicavel.
 Persiste agent_version quando enviado (EPIC 22, ADR-032).
@@ -330,6 +331,8 @@ Resposta:
 POST /api/v1/auth/logout
 Authorization: Bearer <access_token>
 ```
+
+Invalida o token Bearer no servidor inserindo seu hash na tabela `revoked_tokens` (EPIC 38, ADR-039). Qualquer requisição subsequente com este token responderá `401 Unauthorized`.
 
 Resposta:
 
@@ -746,13 +749,14 @@ Header oficial:
 X-Agent-Api-Key
 ```
 
-Estado atual (EPIC 12/13):
+Estado atual (EPIC 38/39/40):
 
 ```text
-Autenticação no dashboard: implementada (Bearer token HMAC SHA-256, ver docs/security/AUTH.md).
+Autenticação no dashboard: implementada (Bearer token HMAC SHA-256 com revogação no servidor em revoked_tokens via POST /auth/logout, ver docs/security/AUTH.md).
 HTTPS: implementado (Nginx em produção).
-Logs de auditoria: implementados (audit_logs — login, falha de login, logout, resolução de alerta, atualização do RustDesk ID via `machine.rustdesk_update`).
-Rate limit implementado no check-in do agente (Nginx, `limit_req_zone ... zone=agent_checkins`, validado em produção); rate limit geral nas demais rotas ainda não implementado.
+Logs de auditoria: implementados (audit_logs — login, falha de login, logout, resolução de alerta, atualização do RustDesk ID via `machine.rustdesk_update`, bloqueio por risco via `auth.login_blocked_risk`).
+Rate limit e proteção contra força bruta: implementados no check-in do agente (Nginx `agent_checkins`, 60r/m) e no login administrativo (Nginx `admin_login`, 10r/m burst=5, e motor heurístico de risco `risk_engine.py` bloqueando por 15m com HTTP 429).
+Pool de conexões: implementado via psycopg_pool (min_size=1, max_size=5) para otimização de latência e contenção de recursos.
 ```
 
 ---
@@ -770,6 +774,8 @@ Se last_seen for maior que 10 minutos:
 ```
 
 **Atenção — a transição para offline acontece dentro de uma leitura, não em um job de background.** `GET /api/v1/machines`, `GET /api/v1/machines/{machine_id}` e `GET /api/v1/dashboard/summary` chamam `mark_stale_machines_offline()` antes de responder. Essa função faz um `UPDATE` em `machines.status` para `offline` em qualquer máquina cujo `last_seen` esteja além de `OFFLINE_THRESHOLD_MINUTES` (10 minutos) e, para cada máquina que transicionar, insere um `security_events` do tipo `machine_offline`. Ou seja, consultar essas três rotas pode gravar dados como efeito colateral de uma requisição GET — não existe hoje um worker separado que marque máquinas como offline.
+
+**Throttle global de 30 segundos (EPIC 40):** quando `mark_stale_machines_offline(machine_id=None)` é invocado na listagem geral ou no resumo do dashboard, sua execução real no banco de dados é limitada a no máximo uma vez a cada 30 segundos usando amostragem atômica com `time.monotonic()`, evitando contenção de locks e escritas redundantes causadas por requisições concorrentes ou polling contínuo. Invocações direcionadas a uma máquina específica (`machine_id` fornecido) continuam imediatas.
 
 Os dois endpoints de exportação em PDF (EPIC 20) reaproveitam os mesmos services e têm o mesmo efeito colateral: `GET /api/v1/machines/{machine_id}/report.pdf` chama `get_registered_machine()` (mesmo caminho de `GET /api/v1/machines/{machine_id}`) e `GET /api/v1/reports/executive.pdf` chama `get_registered_dashboard_summary()` (mesmo caminho de `GET /api/v1/dashboard/summary`) — ou seja, baixar um relatório em PDF também pode gravar `machines.status`/`security_events` como efeito colateral, mesmo sendo uma exportação.
 

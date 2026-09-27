@@ -2051,13 +2051,11 @@ Corrigir os 3 achados que uma auditoria de lacunas de documentacao (2026-08-19, 
 
 [x] Validar as 3 correcoes acima e atualizar `docs/deployment/KNOWN_ISSUES.md`/`docs/security/ASSET_POLICY.md`/`docs/architecture/SECURITY.md`/`docs/security/AUTH.md`/`docs/security/SECURITY.md` removendo as notas de "gap conhecido" conforme cada uma for corrigida
 
-    Todos os 5 docs atualizados. Cuidado especial: a Trilha 1 (Nginx) esta
-    corrigida no codigo/checkout e validada localmente, mas **nao deployada em
-    producao** - os docs foram redigidos para deixar essa distincao explicita
-    (nunca afirmando que a VM real ja tem a correcao), evitando o mesmo tipo de
-    lacuna entre "commitado" e "rodando de fato" que originou a EPIC 37.
+    Todos os 5 docs atualizados. Trilha 1 (Nginx) foi deployada e validada
+    em producao em `itcenter-edge-01` em 2026-09-26 (commit `95c6d9a`, run
+    `36270276634`), liberando a auto-atualizacao do agente atras do Nginx real.
 
-Origem: achados de uma auditoria de lacunas de documentacao pedida explicitamente pelo usuario em 2026-08-19 (nao fazia parte de nenhuma auditoria tecnica previa) - a auditoria revelou que 3 das divergencias entre documentacao e codigo eram, na verdade, bugs/gaps reais no lado do codigo/infra, nao erros de texto. Relatorio completo apresentado na mesma sessao (4 agentes em paralelo cobrindo arquitetura, seguranca, deployment e meta-docs/frontend, mais achados diretos). EPIC 37 encerrada em 2026-08-19 (correcao de codigo/config; deploy em producao fica para quando o usuario autorizar tocar na VM real).
+Origem: achados de uma auditoria de lacunas de documentacao pedida explicitamente pelo usuario em 2026-08-19 (nao fazia parte de nenhuma auditoria tecnica previa) - a auditoria revelou que 3 das divergencias entre documentacao e codigo eram, na verdade, bugs/gaps reais no lado do codigo/infra, nao erros de texto. Relatorio completo apresentado na mesma sessao (4 agentes em paralelo cobrindo arquitetura, seguranca, deployment e meta-docs/frontend, mais achados diretos). EPIC 37 concluida e deployada em producao em 2026-09-26.
 
 # EPIC 38 - Seguranca (Auditoria de Qualidade 2026-08-20)
 

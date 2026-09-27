@@ -191,14 +191,16 @@ Regras:
 * Senha nao trafega ou e armazenada em texto puro.
 * Senhas sao verificadas contra `password_hash` PBKDF2-SHA256.
 * Rotas administrativas validam usuario ativo e permissao.
-* Logout registra auditoria; o token expira naturalmente.
+* Logout registra auditoria e revoga o Bearer token ativamente no banco (tabela `revoked_tokens`, migration `014`, EPIC 38, ADR-039); tokens revogados são rejeitados com HTTP 401 Unauthorized imediatamente.
 * Erros de login sao genericos para nao enumerar usuarios. Desde a EPIC 28 (2026-08-17), isso vale tambem para o tempo de resposta: `POST /api/v1/auth/login` (`backend/app/routes/auth.py`) sempre roda `verify_password` (PBKDF2, 210.000 iteracoes) — contra o hash real quando o e-mail existe (ativo ou nao) ou contra um hash dummy pre-computado no modulo quando nao existe — antes de decidir se a requisicao falha, eliminando a diferenca de latencia que antes distinguia conta cadastrada de inexistente.
+* Proteção contra força bruta e credential stuffing (EPIC 38, ADR-039): motor heurístico de risco em memória (`risk_engine.py`) avalia falhas consecutivas, burst velocity e múltiplos alvos. Ao atingir score >= 100, bloqueia o atacante por 15 minutos com HTTP 429 Too Many Requests (`Retry-After: 900`) e registra `auth.login_blocked_risk` em `audit_logs`. O Nginx também aplica rate limit de borda via `limit_req_zone ... zone=admin_login` (10r/m, burst=5 nodelay).
 
-### Fallback de desenvolvimento do `AUTH_TOKEN_SECRET`
+### Validação de segredos em produção e fallback de desenvolvimento do `AUTH_TOKEN_SECRET`
 
 O código (`backend/app/services/auth.py`) tem um fallback hardcoded, `DEFAULT_DEVELOPMENT_SECRET = "development-auth-secret-change-in-production"`, usado quando a variável de ambiente `AUTH_TOKEN_SECRET` não está definida. Isso existe para permitir rodar o backend localmente sem configurar `.env` na primeira vez.
 
-A única proteção real contra esse fallback vazar para produção é a validação de startup `validate_runtime_configuration()` (`backend/app/core/config.py`), chamada no evento `startup` do FastAPI (`backend/app/main.py`): se `APP_ENV=production` e `AUTH_TOKEN_SECRET` estiver ausente ou for um dos valores considerados inseguros (`None`, vazio, `change-me`, `CHANGE_ME`, `replace-me`), a API falha ao subir (`RuntimeError`) em vez de servir tráfego assinando tokens com o segredo de desenvolvimento.
+A proteção real contra esse fallback vazar para produção é a validação de inicialização `validate_runtime_configuration()` (`backend/app/core/config.py`), chamada no `lifespan` do FastAPI (`backend/app/main.py`): se `APP_ENV=production`, `AUTH_TOKEN_SECRET` e `AGENT_API_KEY` são obrigatórios, não podem ser valores padrão/inseguros e devem possuir no mínimo 32 caracteres (EPIC 38); caso contrário, a API falha ao subir (`RuntimeError`) em vez de servir tráfego assinando tokens com o segredo de desenvolvimento.
+
 
 Essa validação é a última linha de defesa contra esse risco específico — não deve ser removida, enfraquecida ou contornada sem substituí-la por um controle equivalente (ex.: exigir `AUTH_TOKEN_SECRET` de um secret manager antes mesmo do container subir).
 
@@ -270,9 +272,7 @@ Acoes auditaveis minimas:
 Não confundir os dois eventos, apesar do nome parecido:
 
 * A Regra 1 de `SOC_RULES.md` (evento `failed_login`) mede falhas de **logon local do Windows**, reportadas pelo agente no campo `security.failed_logins_last_hour` do payload de check-in (ver `docs/agent/CHECKIN.md`) — é sobre a máquina monitorada, não sobre o dashboard.
-* A auditoria `auth.login_failed` (tabela `audit_logs`, listada acima) registra tentativas malsucedidas de login **no dashboard** (`POST /api/v1/auth/login`), mas hoje é apenas um registro de auditoria — não existe regra SOC, alerta ou telemetria de brute-force olhando para esse evento.
-
-Ou seja: hoje não existe alerta cobrindo múltiplas tentativas de login incorretas contra `/api/v1/auth/login` — apenas o log de auditoria. Ver risco aceito relacionado em `docs/security/SECURITY.md` (seção "OWASP Top 10 — Controles Reais Aplicados").
+* A auditoria `auth.login_failed` (tabela `audit_logs`, listada acima) registra tentativas malsucedidas de login **no dashboard** (`POST /api/v1/auth/login`). Desde a EPIC 38 (ADR-039), essas falhas alimentam o motor de risco (`risk_engine.py`): tentativas repetidas ou credential stuffing acumulam score e, ao atingir >= 100, ativam bloqueio por 15 minutos com HTTP 429 e auditoria `auth.login_blocked_risk`.
 
 ## Rotas Protegidas
 
@@ -308,7 +308,7 @@ GET /api/v1/agent/manifest
 GET /api/v1/agent/download
 ```
 
-`POST /api/v1/agent/checkin`, `GET /api/v1/agent/manifest` e `GET /api/v1/agent/download` (EPIC 22, ADR-032) devem continuar protegidos por `X-Agent-Api-Key`, nao por login humano — sao autenticacao de classe do agente, nao identidade individual (o `agent_secret` do ADR-036 e especifico do check-in, `manifest`/`download` nao carregam dado por maquina alem do `target_agent_version` opcional via query `hostname`). `infra/nginx/nginx.conf.template` isenta os 3 do Basic Auth — a isencao de `manifest`/`download` foi corrigida em 2026-08-19 (EPIC 37, blocos `location =` dedicados), validada localmente ponta a ponta contra o backend real. **Ainda nao deployado em `itcenter-edge-01`** (ver `docs/deployment/KNOWN_ISSUES.md`) — ate o proximo deploy de producao, a VM real continua sem essa isencao para `manifest`/`download`.
+`POST /api/v1/agent/checkin`, `GET /api/v1/agent/manifest` e `GET /api/v1/agent/download` (EPIC 22, ADR-032) devem continuar protegidos por `X-Agent-Api-Key`, nao por login humano — sao autenticacao de classe do agente, nao identidade individual (o `agent_secret` do ADR-036 e especifico do check-in, `manifest`/`download` nao carregam dado por maquina alem do `target_agent_version` opcional via query `hostname`). `infra/nginx/nginx.conf.template` isenta os 3 do Basic Auth — a isencao de `manifest`/`download` (EPIC 37, blocos `location =` dedicados) foi **deployada e validada em produção em `itcenter-edge-01` em 2026-09-26**.
 
 ## API Key por Agente
 
@@ -341,10 +341,9 @@ Planejamento futuro (evolucao completa do modelo de credencial, alem da correcao
 Ainda nao existe:
 
 * CRUD administrativo de usuarios;
-* revogacao server-side de token antes da expiracao;
 * API Key individual por agente;
 * auditoria de todas as acoes futuras ainda nao implementadas;
-* rate limit ou lockout de conta apos multiplas falhas de login humano em `POST /api/v1/auth/login` — nem o Nginx (so existe `limit_req_zone` para a zona `agent_checkins`, `infra/nginx/nginx.conf.template`) nem a aplicacao aplicam esse controle hoje; risco aceito conhecido, detalhado em `docs/security/SECURITY.md`;
 * politica minima de senha (comprimento, complexidade) na criacao de usuario — `backend/create_admin.py` exige apenas que `ADMIN_PASSWORD` nao seja vazio, sem validar comprimento ou complexidade.
 
 Esses controles pertencem a proximas etapas de governanca.
+

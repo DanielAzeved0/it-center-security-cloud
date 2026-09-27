@@ -12,6 +12,12 @@ Migrations SQL do PostgreSQL, aplicadas em ordem:
 007_machines_mac_address.sql     tabela machines ganha mac_address (coleta no check-in do agente)
 008_machines_serial_number.sql   tabela machines ganha serial_number (coleta no check-in do agente — EPIC 27)
 009_machines_agent_secret.sql    tabela machines ganha agent_secret_hash (identidade por maquina no check-in — EPIC 28-A, ADR-036)
+010_alerts_open_unique_index.sql índice parcial único em alerts para (machine_id, alert_type) com status open/investigating (EPIC 31, ADR-035)
+011_installed_programs_publisher_unique.sql constraint única em installed_programs incluindo publisher para evitar colisões
+012_machine_local_admins_case_insensitive.sql índice único em machine_local_admins com lower(admin_name) para unicidade case-insensitive
+013_machines_agent_version.sql   tabela machines ganha agent_version e target_agent_version (auto-atualização do agente — EPIC 22, ADR-032)
+014_create_revoked_tokens.sql    tabela revoked_tokens para revogação server-side de tokens Bearer no logout (EPIC 38, ADR-039)
+015_add_installed_programs_hash.sql tabela machines ganha installed_programs_hash para fingerprinting de programas instalados (EPIC 40)
 ```
 
 Em execução normal (Docker Compose ou `python apply_migrations.py`), todas as migrations são aplicadas automaticamente antes da API iniciar.

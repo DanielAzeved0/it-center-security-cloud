@@ -2,7 +2,8 @@
 
 > Plataforma full stack para monitoramento, inventário, observabilidade e segurança de máquinas Windows, com agente PowerShell, API FastAPI, PostgreSQL, dashboard web e práticas iniciais de SOC/Blue Team.
 
-Status resumido: Fases 0 a 9 concluídas (governança/autenticação e operação/segurança de produção validadas em produção real) | Fase 12 (Terraform/IaC) quase concluída — 4 pendências de infraestrutura | Fases 13 a 17 concluídas (hardening do agente Windows, incluindo assinatura de código; hardening do dashboard; orquestração de agentes de IA; hub de integração RustDesk — Snipe-IT foi implementado e revertido, ver ADR-033; relatórios/dashboard executivo) | Fase 18 (observabilidade de infraestrutura) e Fase 19 (auto-atualização do agente) com planejamento e ADRs concluídos, implementação pendente | Fase 20 (auto-detecção do ID do RustDesk) planejada (ADR-034) | Fase 21 (polimento visual com GSAP) concluída, pendente revisão visual manual em navegador | Ambiente local Docker operacional | Produção publicada na Oracle Cloud | Agente Windows integrado ao check-in. Progresso detalhado por EPIC está em `docs/development/TASKS.md` (backlog oficial, sempre atualizado); fases, matriz de rastreabilidade e ADRs relacionados estão em `docs/development/ROADMAP.md`.
+Status resumido: Fases 0 a 9 concluídas (governança/autenticação e operação/segurança de produção validadas em produção real) | Fase 12 (Terraform/IaC) quase concluída — 4 pendências de infraestrutura | Fases 13 a 19 concluídas (hardening do agente Windows com assinatura Authenticode; hardening do dashboard; orquestração de IA; hub RustDesk; relatórios PDF/Dashboard executivo; observabilidade com Prometheus/Grafana — EPIC 21; auto-atualização do agente — EPIC 22) | Fase 20 (auto-detecção do ID do RustDesk) planejada (ADR-034) | Fase 21 (polimento visual com GSAP) concluída | Fases recentes concluídas: EPIC 28/29 (hardening/backup), EPIC 36 (Docker Scout no CI), EPIC 38/39 (motor de risco, revogação de tokens e calibração de memória) e EPIC 40 (desempenho do check-in com connection pool psycopg_pool, sweep throttling, fingerprinting SHA-256 e batching) | Ambiente local Docker operacional | Produção publicada na Oracle Cloud com CI/CD verde. Progresso detalhado por EPIC está em `docs/development/TASKS.md`; decisões arquiteturais em `docs/development/DECISIONS.md`.
+
 
 ---
 
@@ -284,10 +285,14 @@ Visão resumida por fase. Entregas detalhadas, critérios de conclusão e o stat
 | 15 | Orquestração de Agentes de IA (ADR-026) | Concluída |
 | 16 | Hub de Integração: RustDesk (ADR-027). Snipe-IT (ADR-028) implementado e revertido, ver ADR-033 | Concluída |
 | 17 | Relatórios PDF e Dashboard Executivo (ADR-029) | Concluída |
-| 18 | Observabilidade de Infraestrutura — Prometheus + Grafana (ADR-030) | Planejamento concluído, implementação pendente |
-| 19 | Auto-atualização do Agente Windows (ADR-032) | Planejamento concluído, implementação pendente |
-| 20 | Auto-detecção do ID do RustDesk no Agente (ADR-034) | Planejamento concluído, implementação pendente |
-| 21 | Polimento Visual do Dashboard — GSAP (ADR-035) | Concluída (pendente revisão visual manual) |
+| 18 | Observabilidade de Infraestrutura — Prometheus + Grafana (ADR-030, EPIC 21) | Concluída (validada em produção) |
+| 19 | Auto-atualização do Agente Windows (ADR-032, EPIC 22) | Concluída |
+| 20 | Auto-detecção do ID do RustDesk no Agente (ADR-034, EPIC 23) | Planejamento concluído, implementação pendente |
+| 21 | Polimento Visual do Dashboard — GSAP (ADR-035, EPIC 24) | Concluída |
+| 22-26 | Hardening de Aplicação e Auditorias Técnicas (EPIC 28-36) | Concluídas |
+| 27 | Segurança e Motor de Risco no Login (ADR-039, EPIC 38/39) | Concluída (em produção) |
+| 28 | Desempenho do Backend no Check-in (ADR-040, EPIC 40) | Concluída (connection pool, throttle, fingerprint, batching) |
+
 
 ---
 

@@ -55,15 +55,13 @@ Descoberto em 2026-08-19 no primeiro deploy real apos a EPIC 29 ter cablado `inf
 
 **Corrigido em 2026-09-26 (EPIC 36, ADR-037):** gate de CVE rigido (`--exit-code`) para `infra-backend`/`infra-frontend` migrado para o CI (job `scout` em `.github/workflows/ci.yml`, runner com RAM suficiente). O `deploy.sh` nao chama mais `docker-scout-gate.sh`. O override `MIN_MEM_MB=256` em `deploy-production.yml` foi removido (piso de 512MB do preflight restaurado). Docker Scout adicionado ao `infra/bootstrap/02-packages.sh` para provisionamento permanente. Pendente apenas: `docker login` manual na VM apos qualquer novo provisionamento (nao automatizavel sem expor credenciais).
 
-## Nginx nao libera GET /api/v1/agent/manifest e /agent/download do Basic Auth (EPIC 22) — corrigido no codigo em 2026-08-19, aguardando deploy
+## Nginx nao libera GET /api/v1/agent/manifest e /agent/download do Basic Auth (EPIC 22) — resolvido em 2026-09-26
 
 Descoberto em 2026-08-19 durante uma auditoria de lacunas de documentacao (nao durante deploy - a EPIC 22 ainda nao foi commitada/deployada). `infra/nginx/nginx.conf.template` so tinha `location = /api/v1/agent/checkin` isenta de `auth_basic`; os 2 endpoints novos da EPIC 22 caiam no bloco geral que exige Basic Auth.
 
-**Corrigido em 2026-08-19 (EPIC 37):** 2 blocos `location =` dedicados adicionados para `/api/v1/agent/manifest` e `/api/v1/agent/download`, espelhando o de `/api/v1/agent/checkin` (sem `auth_basic`, sem `limit_req` proprio — volume esperado baixo, 1x/dia por maquina). Validado localmente ponta a ponta: Nginx real (imagem oficial) + backend real na mesma rede Docker, confirmando via headers de resposta que os 2 endpoints novos retornam o 401 do FastAPI (sem `www-authenticate`) quando sem `X-Agent-Api-Key`, e 200 com a chave correta — e que o dashboard/demais rotas continuam exigindo Basic Auth normalmente (401 com `www-authenticate: Basic`).
+**Corrigido no codigo em 2026-08-19 (EPIC 37):** 2 blocos `location =` dedicados adicionados para `/api/v1/agent/manifest` e `/api/v1/agent/download`, espelhando o de `/api/v1/agent/checkin` (sem `auth_basic`, sem `limit_req` proprio — volume esperado baixo, 1x/dia por maquina). Validado localmente ponta a ponta: Nginx real (imagem oficial) + backend real na mesma rede Docker, confirmando via headers de resposta que os 2 endpoints novos retornam o 401 do FastAPI (sem `www-authenticate`) quando sem `X-Agent-Api-Key`, e 200 com a chave correta — e que o dashboard/demais rotas continuam exigindo Basic Auth normalmente (401 com `www-authenticate: Basic`).
 
-**Pendente:** esta correcao existe no codigo/checkout, mas **ainda nao foi deployada em `itcenter-edge-01`** — a VM real continua rodando o `nginx.conf.template` antigo (sem os blocos novos) ate o proximo deploy de producao incluir este commit. Ate la, a auto-atualizacao do agente (EPIC 22) continua sem funcionar atras do Nginx real.
-
-Rastreado na EPIC 37 (`docs/development/TASKS.md`).
+**Deployado em producao em 2026-09-26:** deploy realizado com sucesso na VM `itcenter-edge-01` (commit `95c6d9a`, workflow run `36270276634`). A auto-atualizacao do agente opera normalmente com o Nginx em producao. Concluido na EPIC 37 (`docs/development/TASKS.md`).
 
 ## VM com pouca memoria
 

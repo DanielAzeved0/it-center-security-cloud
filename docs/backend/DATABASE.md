@@ -126,6 +126,7 @@ updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 
 * `agent_version` (migration `013_machines_agent_version.sql`, EPIC 22, ADR-032) é opcional, informada pelo próprio agente a cada check-in (`$script:AgentVersion` de `itcenter-agent.ps1`). Usada só para observabilidade (exibida no dashboard) e pelo updater dedicado para decidir se atualiza uma máquina — nenhuma regra SOC depende dela. `NULL` até o primeiro check-in que a informe.
 * `target_agent_version` (migration `013_machines_agent_version.sql`, EPIC 22, ADR-032) é uma trava opcional de "não atualizar": quando preenchida e diferente da versão publicada pelo backend (`GET /api/v1/agent/manifest`), o updater da máquina correspondente não aplica a atualização (hold-back). Como o backend só guarda o release do agente atualmente publicado (embutido na própria imagem Docker, sem histórico de versões antigas — ver "Origem do release do agente" abaixo), esta coluna **não** permite mandar uma máquina para uma versão arbitrária do passado, só segurá-la na versão que já tem instalada. Sem endpoint de escrita nesta EPIC — preenchida manualmente via SQL pelo operador.
+* `installed_programs_hash` (migration `015_add_installed_programs_hash.sql`, EPIC 40) armazena o hash SHA-256 do inventário de softwares da máquina. Se o hash do payload coincidir com o valor armazenado, o backend pula o ciclo DELETE + INSERT de centenas de registros em `installed_programs`.
 
 Origem do release do agente servido por `GET /api/v1/agent/manifest`/`GET /api/v1/agent/download` (EPIC 22, ADR-032): o backend não lê `agent-windows/` do repositório em tempo de execução — `backend/Dockerfile` copia `agent-windows/itcenter-agent.ps1` (já assinado, ver ADR-031) para dentro da própria imagem do backend em build-time (`AGENT_RELEASE_PATH`, variável de ambiente com um caminho padrão de container). A versão publicada é extraída por regex do `$script:AgentVersion` desse mesmo arquivo (fonte única de verdade — nunca um número declarado em outro lugar) e o hash SHA-256 é calculado sobre os bytes exatos desse arquivo. **Publicar uma nova versão do agente exige um deploy de backend** (editar `$script:AgentVersion`, assinar com `Sign-AgentScripts.ps1`, redeploy) — decisão consciente para não introduzir armazenamento de binário novo (bucket, tabela); ver `docs/specs/epic-22-agent-auto-update/spec.md` (seção Assumptions) para o raciocínio completo.
 
@@ -488,6 +489,26 @@ CHECK entity_type <> ''
 
 ---
 
+# Tabela: revoked_tokens
+
+Armazena hashes de Bearer tokens revogados explicitamente via logout administrativo (EPIC 38, ADR-039).
+
+## Campos
+
+```text
+token_hash VARCHAR(64) PRIMARY KEY
+expires_at TIMESTAMPTZ NOT NULL
+```
+
+## Regras
+
+* `token_hash` armazena o digest SHA-256 do token invalidado, nunca o token em texto puro.
+* `expires_at` reflete a data/hora original de expiração do JWT/Bearer token.
+* A autenticação verifica a existência do hash nesta tabela a cada request protegido, rejeitando com 401 caso encontrado.
+* Índice: `idx_revoked_tokens_expires_at ON revoked_tokens (expires_at)`.
+
+---
+
 # Relacionamentos
 
 ## machines → metrics
@@ -587,11 +608,10 @@ Quando `POST /api/v1/agent/checkin` recebe payload válido:
 4. Define status como online.
 5. Atualiza last_seen com now().
 6. Insere uma nova coleta em metrics.
-7. Remove os programas anteriores da máquina em installed_programs.
-8. Insere o snapshot atual de installed_programs recebido no payload.
-9. Cria agent_configs padrão para a máquina quando ainda não existir (`INSERT ... ON CONFLICT (machine_id) DO NOTHING`).
-10. Sincroniza machine_local_admins para detectar novos administradores locais.
-11. Gera security_events e alerts conforme SOC_RULES.md.
+7. Calcula o hash SHA-256 do payload de programas instalados e compara com machines.installed_programs_hash (EPIC 40, migração 015): se idêntico, pula a remoção e reinserção; se diferente ou nulo, remove programas anteriores, insere os novos e atualiza o hash em machines.
+8. Cria agent_configs padrão para a máquina quando ainda não existir (`INSERT ... ON CONFLICT (machine_id) DO NOTHING`).
+9. Sincroniza machine_local_admins via inserção em lote com executemany (EPIC 40) para detectar novos administradores locais.
+10. Persiste security_events (incluindo eventos USB) via inserção em lote com executemany (EPIC 40) e gera alerts conforme SOC_RULES.md.
 ```
 
 ## Consultas
