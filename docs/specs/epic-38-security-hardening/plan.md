@@ -1,37 +1,37 @@
-# EPIC 38: Security Hardening & Login Risk Engine Implementation Plan
+# Plano de Implementação: EPIC 38 - Hardening de Segurança e Motor de Risco no Login
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **Para agentes executores:** SUB-SKILL OBRIGATÓRIA: Use superpowers:subagent-driven-development (recomendado) ou superpowers:executing-plans para implementar este plano tarefa por tarefa. As etapas usam sintaxe de checkbox (`- [ ]`) para rastreamento.
 
-**Goal:** Implement comprehensive security hardening across the IT Center Security Cloud platform: a risk-based login rate limiting engine with HTTP 429 blocking, real token revocation on logout via PostgreSQL, strict production secret length validation, XML escaping in ReportLab PDF generation, strict regex validation for `rustdesk_id` on both ends, and payload/header hardening on the Next.js proxy.
+**Objetivo:** Implementar o hardening abrangente de segurança na plataforma IT Center Security Cloud: motor de rate limiting e avaliação de risco no login com bloqueio HTTP 429, revogação real de tokens no logout via PostgreSQL, validação estrita de comprimento mínimo de segredos em produção, escape de XML na geração de relatórios PDF com ReportLab, validação estrita por regex para `rustdesk_id` em ambas as pontas, e proteção de cabeçalhos/payload no proxy Next.js.
 
-**Architecture:** A lightweight in-memory sliding-window risk engine (`LoginRiskEngine`) evaluates client IP, device fingerprint, burst velocity, and credential-stuffing patterns without overloading PostgreSQL. Exceeded thresholds trigger an immediate HTTP 429 response. Token revocation persists token SHA-256 hashes in an idempotent `revoked_tokens` PostgreSQL table checked at `get_current_user`. All dynamic inputs into ReportLab `Paragraph()` are escaped with `xml.sax.saxutils.escape`. Next.js proxy validates `Content-Type` and enforces a 1MB payload ceiling while forwarding `X-Real-IP` and `User-Agent`.
+**Arquitetura:** Um motor leve em memória com janela deslizante (`LoginRiskEngine`) avalia IP do cliente, fingerprint de dispositivo, velocidade de rajada (burst) e padrões de credential stuffing sem sobrecarregar o PostgreSQL. Limiares excedidos acionam resposta imediata HTTP 429. A revogação de tokens persiste hashes SHA-256 em uma tabela idempotente `revoked_tokens` no PostgreSQL, consultada em `get_current_user`. Todas as entradas dinâmicas em `Paragraph()` do ReportLab são sanitizadas com `xml.sax.saxutils.escape`. O proxy Next.js valida `Content-Type` e impõe limite de 1MB no corpo da requisição, repassando `X-Real-IP` e `User-Agent`.
 
-**Tech Stack:** Python 3.13, FastAPI, PostgreSQL (psycopg 3 raw SQL), Next.js 16 (App Router / TypeScript), ReportLab, Nginx.
+**Stack Técnica:** Python 3.13, FastAPI, PostgreSQL (psycopg 3 raw SQL), Next.js 16 (App Router / TypeScript), ReportLab, Nginx.
 
-**Spec:** [`docs/specs/epic-38-security-hardening/spec.md`](file:///C:/Users/gizad/it-center-security-cloud/docs/specs/epic-38-security-hardening/spec.md)
+**Especificação:** [`docs/specs/epic-38-security-hardening/spec.md`](file:///C:/Users/gizad/it-center-security-cloud/docs/specs/epic-38-security-hardening/spec.md)
 
-## Global Constraints
+## Restrições Globais
 
-- No external caching/message queuing servers (no Redis, Memcached, RabbitMQ) — runs fully contained in Python memory + PostgreSQL on the 1GB RAM VM.
-- All PostgreSQL operations use raw `psycopg` queries; no ORM.
-- Zero breaking changes to existing agent check-in routes or existing user session tokens.
-- Strict TDD: tests written and confirmed failing before writing minimal implementation.
+- Sem servidores de cache externo ou filas de mensagens (sem Redis, Memcached, RabbitMQ) — execução contida na memória Python + PostgreSQL na VM de 1GB de RAM.
+- Todas as operações no PostgreSQL usam queries brutas com `psycopg`; zero ORM.
+- Zero quebras de compatibilidade nas rotas existentes de check-in do agente ou nos tokens de sessão ativos de usuários.
+- TDD estrito: testes escritos e confirmados falhando antes de implementar o código mínimo.
 
 ---
 
-### Task 1: Secret Length Validation in Production Configuration
+### Tarefa 1: Validação de Comprimento de Segredos na Configuração de Produção
 
-**Files:**
-- Modify: `backend/app/core/config.py:19-38`
-- Test: `backend/tests/test_config.py`
+**Arquivos:**
+- Modificar: `backend/app/core/config.py:19-38`
+- Testar: `backend/tests/test_config.py`
 
 **Interfaces:**
-- Consumes: `Settings.validate_runtime_configuration()`
-- Produces: `RuntimeError` if `AUTH_TOKEN_SECRET` or `AGENT_API_KEY` has length < 32 in `app_env == "production"`.
+- Consome: `Settings.validate_runtime_configuration()`
+- Produz: `RuntimeError` se `AUTH_TOKEN_SECRET` ou `AGENT_API_KEY` tiver comprimento < 32 quando `app_env == "production"`.
 
-- [ ] **Step 1: Write the failing test**
+- [ ] **Passo 1: Escrever o teste que falha**
 
-Create/update `backend/tests/test_config.py`:
+Criar/atualizar `backend/tests/test_config.py`:
 ```python
 import pytest
 from app.core.config import Settings
@@ -53,14 +53,14 @@ def test_validate_runtime_configuration_rejects_short_secrets(monkeypatch):
         settings.validate_runtime_configuration()
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [ ] **Passo 2: Executar o teste para verificar a falha**
 
-Run: `pytest backend/tests/test_config.py -q`
-Expected: FAIL with `Failed: DID NOT RAISE <class 'RuntimeError'>`
+Comando: `pytest backend/tests/test_config.py -q`
+Esperado: FAIL com `Failed: DID NOT RAISE <class 'RuntimeError'>`
 
-- [ ] **Step 3: Implement secret length validation**
+- [ ] **Passo 3: Implementar a validação de comprimento de segredos**
 
-Modify `backend/app/core/config.py`:
+Modificar `backend/app/core/config.py`:
 ```python
         if self.agent_api_key in insecure_values or len(self.agent_api_key or "") < 32:
             raise RuntimeError("AGENT_API_KEY must be configured with a non-default value of at least 32 characters in production")
@@ -69,12 +69,12 @@ Modify `backend/app/core/config.py`:
             raise RuntimeError("AUTH_TOKEN_SECRET must be configured with a non-default value of at least 32 characters in production")
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [ ] **Passo 4: Executar o teste para verificar aprovação**
 
-Run: `pytest backend/tests/test_config.py -q`
-Expected: PASS
+Comando: `pytest backend/tests/test_config.py -q`
+Esperado: PASS
 
-- [ ] **Step 5: Commit**
+- [ ] **Passo 5: Commit**
 
 ```bash
 git add backend/app/core/config.py backend/tests/test_config.py
@@ -83,19 +83,19 @@ git commit -m "feat(security): enforce minimum 32 chars for production secrets i
 
 ---
 
-### Task 2: XML Escaping for Dynamic Values in ReportLab PDF Generation
+### Tarefa 2: Escape de XML para Valores Dinâmicos na Geração de PDF com ReportLab
 
-**Files:**
-- Modify: `backend/app/services/reports.py:114-140`
-- Test: `backend/tests/test_reports.py`
+**Arquivos:**
+- Modificar: `backend/app/services/reports.py:114-140`
+- Testar: `backend/tests/test_reports.py`
 
 **Interfaces:**
-- Consumes: `xml.sax.saxutils.escape`
-- Produces: Sanitized `Paragraph` elements in `build_machine_report_pdf` that never raise `ValueError` on XML entities or tags.
+- Consome: `xml.sax.saxutils.escape`
+- Produz: Elementos `Paragraph` sanitizados em `build_machine_report_pdf` que nunca disparam `ValueError` por entidades ou tags XML malformadas.
 
-- [ ] **Step 1: Write the failing test**
+- [ ] **Passo 1: Escrever o teste que falha**
 
-In `backend/tests/test_reports.py`:
+Em `backend/tests/test_reports.py`:
 ```python
 from datetime import datetime, timezone
 from app.schemas.machine import MachineDetail
@@ -115,7 +115,6 @@ def test_build_machine_report_pdf_escapes_xml_tags_in_hostname():
         agent_version="1.0.0",
         rustdesk_id=None,
     )
-    # Should build PDF without XML parsing errors
     pdf_bytes = build_machine_report_pdf(
         machine=machine,
         metrics=[],
@@ -128,24 +127,24 @@ def test_build_machine_report_pdf_escapes_xml_tags_in_hostname():
     assert pdf_bytes.startswith(b"%PDF")
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [ ] **Passo 2: Executar o teste para verificar a falha**
 
-Run: `pytest backend/tests/test_reports.py::test_build_machine_report_pdf_escapes_xml_tags_in_hostname -q`
-Expected: FAIL or raise XML parsing exception from ReportLab.
+Comando: `pytest backend/tests/test_reports.py::test_build_machine_report_pdf_escapes_xml_tags_in_hostname -q`
+Esperado: FAIL ou exceção de parsing de XML do ReportLab.
 
-- [ ] **Step 3: Implement escaping in reports.py**
+- [ ] **Passo 3: Implementar o escape em reports.py**
 
-Modify `backend/app/services/reports.py`:
-Import `from xml.sax.saxutils import escape as xml_escape`.
-In `build_machine_report_pdf`:
-Escape `machine.hostname`, `machine.username`, and any dynamic string passed to `Paragraph(...)`.
+Modificar `backend/app/services/reports.py`:
+Importar `from xml.sax.saxutils import escape as xml_escape`.
+Em `build_machine_report_pdf`:
+Escapar `machine.hostname`, `machine.username` e qualquer string dinâmica passada a `Paragraph(...)`.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [ ] **Passo 4: Executar o teste para verificar aprovação**
 
-Run: `pytest backend/tests/test_reports.py -q`
-Expected: PASS
+Comando: `pytest backend/tests/test_reports.py -q`
+Esperado: PASS
 
-- [ ] **Step 5: Commit**
+- [ ] **Passo 5: Commit**
 
 ```bash
 git add backend/app/services/reports.py backend/tests/test_reports.py
@@ -154,21 +153,21 @@ git commit -m "fix(reports): escape dynamic text in ReportLab Paragraph elements
 
 ---
 
-### Task 3: Backend Schema Pattern & Frontend Sanitization for `rustdesk_id`
+### Tarefa 3: Validação de Formato de `rustdesk_id` no Backend e Sanitização no Frontend
 
-**Files:**
-- Modify: `backend/app/schemas/machine.py:45-48`
-- Modify: `frontend/dashboard/components/MachineDetailView.tsx:300-320`
-- Test: `backend/tests/test_machine_schemas.py`
-- Test: `frontend/dashboard/__tests__/rustdesk_validation.test.ts`
+**Arquivos:**
+- Modificar: `backend/app/schemas/machine.py:45-48`
+- Modificar: `frontend/dashboard/components/MachineDetailView.tsx:300-320`
+- Testar: `backend/tests/test_machine_schemas.py`
+- Testar: `frontend/dashboard/__tests__/rustdesk_validation.test.ts`
 
 **Interfaces:**
-- Consumes: Pydantic `Field(pattern=r"^\d{5,12}$")`
-- Produces: Validated `rustdesk_id` in `MachineRustdeskUpdate`; safe URI `rustdesk://connect?id=...` in UI.
+- Consome: Pydantic `Field(pattern=r"^\d{5,12}$")`
+- Produz: `rustdesk_id` validado em `MachineRustdeskUpdate`; URI segura `rustdesk://connect?id=...` na interface.
 
-- [ ] **Step 1: Write the failing backend test**
+- [ ] **Passo 1: Escrever o teste que falha no backend**
 
-Create `backend/tests/test_machine_schemas.py`:
+Criar `backend/tests/test_machine_schemas.py`:
 ```python
 import pytest
 from pydantic import ValidationError
@@ -186,41 +185,41 @@ def test_machine_rustdesk_update_validates_numeric_format():
         MachineRustdeskUpdate(rustdesk_id="invalid-id")
 
     with pytest.raises(ValidationError):
-        MachineRustdeskUpdate(rustdesk_id="123")  # too short (< 5)
+        MachineRustdeskUpdate(rustdesk_id="123")
 
     with pytest.raises(ValidationError):
-        MachineRustdeskUpdate(rustdesk_id="1234567890123")  # too long (> 12)
+        MachineRustdeskUpdate(rustdesk_id="1234567890123")
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [ ] **Passo 2: Executar o teste para verificar a falha**
 
-Run: `pytest backend/tests/test_machine_schemas.py -q`
-Expected: FAIL
+Comando: `pytest backend/tests/test_machine_schemas.py -q`
+Esperado: FAIL
 
-- [ ] **Step 3: Update schema and frontend**
+- [ ] **Passo 3: Atualizar schema e frontend**
 
-In `backend/app/schemas/machine.py`:
+Em `backend/app/schemas/machine.py`:
 ```python
 class MachineRustdeskUpdate(BaseModel):
     rustdesk_id: str | None = Field(default=None, pattern=r"^\d{5,12}$")
 ```
 
-In `frontend/dashboard/components/MachineDetailView.tsx`:
-Add regex guard:
+Em `frontend/dashboard/components/MachineDetailView.tsx`:
+Adicionar guarda com regex:
 ```tsx
 const isValidRustdeskId = detail.rustdesk_id ? /^\d{5,12}$/.test(detail.rustdesk_id) : false;
 ```
-Render active connect link only if `isValidRustdeskId && canManageRustdesk`, and encode:
+Renderizar o link ativo de conexão apenas se `isValidRustdeskId && canManageRustdesk`, aplicando escape:
 ```tsx
 href={`rustdesk://connect?id=${encodeURIComponent(detail.rustdesk_id)}`}
 ```
 
-- [ ] **Step 4: Run backend tests**
+- [ ] **Passo 4: Executar os testes do backend**
 
-Run: `pytest backend/tests/test_machine_schemas.py -q`
-Expected: PASS
+Comando: `pytest backend/tests/test_machine_schemas.py -q`
+Esperado: PASS
 
-- [ ] **Step 5: Commit**
+- [ ] **Passo 5: Commit**
 
 ```bash
 git add backend/app/schemas/machine.py backend/tests/test_machine_schemas.py frontend/dashboard/components/MachineDetailView.tsx
@@ -229,24 +228,24 @@ git commit -m "feat(security): enforce numeric format for rustdesk_id on backend
 
 ---
 
-### Task 4: Next.js Proxy Hardening & Env Cleanup
+### Tarefa 4: Hardening do Proxy Next.js e Limpeza de Variáveis de Ambiente
 
-**Files:**
-- Modify: `frontend/dashboard/app/api/backend/[...path]/route.ts:90-110, 175-200`
-- Modify: `infra/docker-compose.production.yml`
-- Modify: `infra/docker-compose.yml`
-- Modify: `.env.example`
-- Modify: `.env.production.example`
+**Arquivos:**
+- Modificar: `frontend/dashboard/app/api/backend/[...path]/route.ts:90-110, 175-200`
+- Modificar: `infra/docker-compose.production.yml`
+- Modificar: `infra/docker-compose.yml`
+- Modificar: `.env.example`
+- Modificar: `.env.production.example`
 
 **Interfaces:**
-- Consumes: Next.js Request headers
-- Produces: Proxied requests carrying `X-Real-IP` and `User-Agent`; rejects >1MB with 413, invalid Content-Type with 415.
+- Consome: Cabeçalhos da requisição no Next.js
+- Produz: Requisições repassadas com `X-Real-IP` e `User-Agent`; rejeita payloads > 1MB com status 413, e Content-Type inválido com status 415.
 
-- [ ] **Step 1: Implement proxy payload size and Content-Type checks**
+- [ ] **Passo 1: Implementar checagem de tamanho de payload e Content-Type no proxy**
 
-In `frontend/dashboard/app/api/backend/[...path]/route.ts`:
-In `fetchUpstream`:
-Add forwarding for `X-Real-IP` and `User-Agent`:
+Em `frontend/dashboard/app/api/backend/[...path]/route.ts`:
+Em `fetchUpstream`:
+Adicionar repasse de `X-Real-IP` e `User-Agent`:
 ```ts
     headers: {
       "Content-Type": request.headers.get("Content-Type") ?? "application/json",
@@ -255,8 +254,8 @@ Add forwarding for `X-Real-IP` and `User-Agent`:
       ...(sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {}),
     },
 ```
-In `proxyRequest`:
-Before reading body:
+Em `proxyRequest`:
+Antes de ler o corpo:
 ```ts
   if (request.method !== "GET" && request.method !== "HEAD") {
     const contentLength = request.headers.get("content-length");
@@ -270,20 +269,20 @@ Before reading body:
   }
 ```
 
-- [ ] **Step 2: Clean up obsolete `NEXT_PUBLIC_API_BASE_URL`**
+- [ ] **Passo 2: Limpar a variável obsoleta `NEXT_PUBLIC_API_BASE_URL`**
 
-Remove `NEXT_PUBLIC_API_BASE_URL` from:
+Remover `NEXT_PUBLIC_API_BASE_URL` de:
 - `infra/docker-compose.production.yml`
 - `infra/docker-compose.yml`
 - `.env.example`
 - `.env.production.example`
 
-- [ ] **Step 3: Run compose config check**
+- [ ] **Passo 3: Executar validação de configuração do Docker Compose**
 
-Run: `docker compose -f infra/docker-compose.yml config -q`
-Expected: PASS (exit code 0)
+Comando: `docker compose -f infra/docker-compose.yml config -q`
+Esperado: PASS (código de saída 0)
 
-- [ ] **Step 4: Commit**
+- [ ] **Passo 4: Commit**
 
 ```bash
 git add frontend/dashboard/app/api/backend/[...path]/route.ts infra/docker-compose.production.yml infra/docker-compose.yml .env.example .env.production.example
@@ -292,22 +291,22 @@ git commit -m "feat(proxy): harden request proxying with size and content-type v
 
 ---
 
-### Task 5: Migration 014 & Revoked Tokens Repository
+### Tarefa 5: Migração 014 e Repositório de Tokens Revogados
 
-**Files:**
-- Create: `backend/migrations/014_create_revoked_tokens.sql`
-- Create: `backend/app/repositories/revoked_tokens.py`
-- Test: `backend/tests/test_revoked_tokens_repo.py`
+**Arquivos:**
+- Criar: `backend/migrations/014_create_revoked_tokens.sql`
+- Criar: `backend/app/repositories/revoked_tokens.py`
+- Testar: `backend/tests/test_revoked_tokens_repo.py`
 
 **Interfaces:**
-- Produces:
+- Produz:
   - `revoke_token(token_hash: str, expires_at: datetime) -> None`
   - `is_token_revoked(token_hash: str) -> bool`
   - `purge_expired_revoked_tokens() -> int`
 
-- [ ] **Step 1: Write migration `014`**
+- [ ] **Passo 1: Escrever a migração `014`**
 
-Create `backend/migrations/014_create_revoked_tokens.sql`:
+Criar `backend/migrations/014_create_revoked_tokens.sql`:
 ```sql
 CREATE TABLE IF NOT EXISTS revoked_tokens (
     token_hash VARCHAR(64) PRIMARY KEY,
@@ -317,9 +316,9 @@ CREATE TABLE IF NOT EXISTS revoked_tokens (
 CREATE INDEX IF NOT EXISTS idx_revoked_tokens_expires_at ON revoked_tokens (expires_at);
 ```
 
-- [ ] **Step 2: Write repository tests**
+- [ ] **Passo 2: Escrever testes do repositório**
 
-Create `backend/tests/test_revoked_tokens_repo.py`:
+Criar `backend/tests/test_revoked_tokens_repo.py`:
 ```python
 from datetime import datetime, timedelta, timezone
 from app.repositories.revoked_tokens import is_token_revoked, purge_expired_revoked_tokens, revoke_token
@@ -334,20 +333,20 @@ def test_revoke_token_and_check():
     assert is_token_revoked(token_hash)
 ```
 
-- [ ] **Step 3: Implement `backend/app/repositories/revoked_tokens.py`**
+- [ ] **Passo 3: Implementar `backend/app/repositories/revoked_tokens.py`**
 
-Implement `revoke_token`, `is_token_revoked` (with ON CONFLICT DO NOTHING), and `purge_expired_revoked_tokens` using `get_connection()`.
+Implementar `revoke_token`, `is_token_revoked` (com `ON CONFLICT DO NOTHING`) e `purge_expired_revoked_tokens` utilizando `get_connection()`.
 
-- [ ] **Step 4: Run migration and test repository**
+- [ ] **Passo 4: Aplicar migração e testar repositório**
 
-Run:
+Comando:
 ```bash
 python backend/apply_migrations.py
 pytest backend/tests/test_revoked_tokens_repo.py -q
 ```
-Expected: PASS
+Esperado: PASS
 
-- [ ] **Step 5: Commit**
+- [ ] **Passo 5: Commit**
 
 ```bash
 git add backend/migrations/014_create_revoked_tokens.sql backend/app/repositories/revoked_tokens.py backend/tests/test_revoked_tokens_repo.py
@@ -356,57 +355,55 @@ git commit -m "feat(auth): create revoked_tokens table and repository"
 
 ---
 
-### Task 6: Token Revocation in Auth Service and Logout Endpoint
+### Tarefa 6: Revogação de Tokens no Serviço de Autenticação e Endpoint de Logout
 
-**Files:**
-- Modify: `backend/app/services/auth.py:125-145`
-- Modify: `backend/app/routes/auth.py:85-99`
-- Test: `backend/tests/test_auth_logout_revocation.py`
+**Arquivos:**
+- Modificar: `backend/app/services/auth.py:125-145`
+- Modificar: `backend/app/routes/auth.py:85-99`
+- Testar: `backend/tests/test_auth_logout_revocation.py`
 
 **Interfaces:**
-- Consumes: `revoke_token`, `is_token_revoked`
-- Produces: `get_current_user` checking revocation; `POST /logout` revoking the caller's active bearer token.
+- Consome: `revoke_token`, `is_token_revoked`
+- Produz: `get_current_user` validando revogação; `POST /logout` revogando o Bearer token ativo de quem chamou.
 
-- [ ] **Step 1: Write failing integration test for logout token revocation**
+- [ ] **Passo 1: Escrever teste de integração que falha para revogação no logout**
 
-Create `backend/tests/test_auth_logout_revocation.py`:
+Criar `backend/tests/test_auth_logout_revocation.py`:
 ```python
 def test_logout_revokes_token_immediately(client, auth_headers):
-    # auth_headers gives a valid token
     me_resp = client.get("/api/v1/auth/me", headers=auth_headers)
     assert me_resp.status_code == 200
 
     logout_resp = client.post("/api/v1/auth/logout", headers=auth_headers)
     assert logout_resp.status_code == 200
 
-    # Same token must now be rejected
     second_me = client.get("/api/v1/auth/me", headers=auth_headers)
     assert second_me.status_code == 401
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [ ] **Passo 2: Executar o teste para verificar a falha**
 
-Run: `pytest backend/tests/test_auth_logout_revocation.py -q`
-Expected: FAIL (second_me returns 200 instead of 401)
+Comando: `pytest backend/tests/test_auth_logout_revocation.py -q`
+Esperado: FAIL (segunda chamada a `/me` retorna 200 em vez de 401)
 
-- [ ] **Step 3: Implement revocation check in `get_current_user` and record in `logout`**
+- [ ] **Passo 3: Implementar checagem de revogação em `get_current_user` e gravação no `logout`**
 
-In `backend/app/services/auth.py`:
-In `get_current_user`:
-Compute `token_hash = hashlib.sha256(credentials.credentials.encode("ascii")).hexdigest()`.
-Check `if is_token_revoked(token_hash): raise authentication_error()`.
+Em `backend/app/services/auth.py`:
+Em `get_current_user`:
+Calcular `token_hash = hashlib.sha256(credentials.credentials.encode("ascii")).hexdigest()`.
+Checar `if is_token_revoked(token_hash): raise authentication_error()`.
 
-In `backend/app/routes/auth.py`:
-In `logout`:
-Extract token from `credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme)`.
-Decode payload to get `exp`, compute `token_hash`, and call `revoke_token(token_hash, datetime.fromtimestamp(exp, timezone.utc))`.
+Em `backend/app/routes/auth.py`:
+Em `logout`:
+Extrair o token de `credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme)`.
+Decodificar payload para obter `exp`, calcular `token_hash` e chamar `revoke_token(token_hash, datetime.fromtimestamp(exp, timezone.utc))`.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [ ] **Passo 4: Executar o teste para verificar aprovação**
 
-Run: `pytest backend/tests/test_auth_logout_revocation.py -q`
-Expected: PASS
+Comando: `pytest backend/tests/test_auth_logout_revocation.py -q`
+Esperado: PASS
 
-- [ ] **Step 5: Commit**
+- [ ] **Passo 5: Commit**
 
 ```bash
 git add backend/app/services/auth.py backend/app/routes/auth.py backend/tests/test_auth_logout_revocation.py
@@ -415,23 +412,23 @@ git commit -m "feat(auth): enforce immediate token invalidation upon logout"
 
 ---
 
-### Task 7: Login Risk Engine with Sliding Window & Rate Limiting
+### Tarefa 7: Motor de Risco de Login com Janela Deslizante e Rate Limiting
 
-**Files:**
-- Create: `backend/app/services/risk_engine.py`
-- Modify: `backend/app/routes/auth.py:25-60`
-- Test: `backend/tests/test_risk_engine.py`
-- Test: `backend/tests/test_auth_risk_login.py`
+**Arquivos:**
+- Criar: `backend/app/services/risk_engine.py`
+- Modificar: `backend/app/routes/auth.py:25-60`
+- Testar: `backend/tests/test_risk_engine.py`
+- Testar: `backend/tests/test_auth_risk_login.py`
 
 **Interfaces:**
-- Produces:
+- Produz:
   - `LoginRiskEngine.inspect_client(ip: str, fingerprint: str) -> tuple[bool, int, int]`
   - `LoginRiskEngine.record_attempt(ip: str, fingerprint: str, email: str, success: bool, user_exists: bool) -> int`
-- Consumes: `request_ip(request)`
+- Consome: `request_ip(request)`
 
-- [ ] **Step 1: Write unit tests for `LoginRiskEngine`**
+- [ ] **Passo 1: Escrever testes unitários para `LoginRiskEngine`**
 
-Create `backend/tests/test_risk_engine.py`:
+Criar `backend/tests/test_risk_engine.py`:
 ```python
 from app.services.risk_engine import LoginRiskEngine
 
@@ -441,12 +438,10 @@ def test_risk_engine_accumulates_score_and_blocks():
     ip = "198.51.100.1"
     fp = "device-fingerprint-1"
 
-    # Initial state
     is_blocked, score, _ = engine.inspect_client(ip, fp)
     assert not is_blocked
     assert score == 0
 
-    # Record 5 consecutive failed attempts
     for _ in range(5):
         engine.record_attempt(ip=ip, fingerprint=fp, email="admin@example.com", success=False, user_exists=True)
 
@@ -469,40 +464,40 @@ def test_risk_engine_detects_credential_stuffing_multiple_emails():
     assert score >= 100
 ```
 
-- [ ] **Step 2: Implement `LoginRiskEngine`**
+- [ ] **Passo 2: Implementar `LoginRiskEngine`**
 
-Create `backend/app/services/risk_engine.py`:
+Criar `backend/app/services/risk_engine.py`:
 - Dataclass `AttemptRecord(timestamp, email, success, user_exists)`
-- Class `LoginRiskEngine`:
-  - Thread-safe with `threading.Lock()`
-  - Sliding window: 3600 seconds (1 hour)
-  - Scores: +20 consecutive failure, +35 burst (>3 in 10s), +30 for >=3 distinct emails, +50 for >=5 distinct emails, +15 for non-existing email.
-  - Threshold: >= 100 blocks key for 900 seconds (15 min).
+- Classe `LoginRiskEngine`:
+  - Thread-safe com `threading.Lock()`
+  - Janela deslizante: 3600 segundos (1 hora)
+  - Pontuações: +20 por falha consecutiva, +35 por rajada (> 3 em 10s), +30 para >= 3 emails distintos, +50 para >= 5 emails distintos, +15 para email inexistente.
+  - Limiar: >= 100 bloqueia a chave por 900 segundos (15 minutos).
   - Singleton `get_risk_engine()`.
 
-- [ ] **Step 3: Integrate `LoginRiskEngine` into `backend/app/routes/auth.py`**
+- [ ] **Passo 3: Integrar `LoginRiskEngine` em `backend/app/routes/auth.py`**
 
-In `backend/app/routes/auth.py` `login`:
-1. Check `is_blocked, score, retry_after = risk_engine.inspect_client(ip, fingerprint)`.
-2. If `is_blocked`:
-   - Log audit `auth.login_blocked_risk`.
-   - Raise `HTTPException(status_code=429, detail="Too many attempts. Account locked temporarily.", headers={"Retry-After": str(retry_after)})`.
-3. If credentials valid:
+Em `backend/app/routes/auth.py` na rota `login`:
+1. Verificar `is_blocked, score, retry_after = risk_engine.inspect_client(ip, fingerprint)`.
+2. Se `is_blocked`:
+   - Gravar log de auditoria `auth.login_blocked_risk`.
+   - Lançar `HTTPException(status_code=429, detail="Too many attempts. Account locked temporarily.", headers={"Retry-After": str(retry_after)})`.
+3. Se credenciais válidas:
    - `risk_engine.record_attempt(..., success=True)`.
-4. If credentials invalid:
+4. Se credenciais inválidas:
    - `risk_engine.record_attempt(..., success=False, user_exists=(user is not None))`.
 
-- [ ] **Step 4: Run unit and integration tests**
+- [ ] **Passo 4: Executar testes unitários e de integração**
 
-Create `backend/tests/test_auth_risk_login.py`:
-Test that 5 invalid logins from same IP trigger HTTP 429 on the 6th attempt with header `Retry-After`.
-Run:
+Criar `backend/tests/test_auth_risk_login.py`:
+Testar que 5 logins inválidos vindos do mesmo IP disparam HTTP 429 na tentativa subsequente com cabeçalho `Retry-After`.
+Comando:
 ```bash
 pytest backend/tests/test_risk_engine.py backend/tests/test_auth_risk_login.py -q
 ```
-Expected: PASS
+Esperado: PASS
 
-- [ ] **Step 5: Commit**
+- [ ] **Passo 5: Commit**
 
 ```bash
 git add backend/app/services/risk_engine.py backend/app/routes/auth.py backend/tests/test_risk_engine.py backend/tests/test_auth_risk_login.py
@@ -511,35 +506,35 @@ git commit -m "feat(auth): implement risk score engine and HTTP 429 brute force 
 
 ---
 
-### Task 8: Nginx Defense-in-Depth & Full Verification Suite
+### Tarefa 8: Defesa em Profundidade no Nginx e Suíte Completa de Verificação
 
-**Files:**
-- Modify: `infra/nginx/nginx.conf.template`
-- Verification: run all backend tests, lint, and build.
+**Arquivos:**
+- Modificar: `infra/nginx/nginx.conf.template`
+- Verificação: rodar todos os testes de backend, lint e build.
 
 **Interfaces:**
-- Nginx `limit_req_zone` for `/api/backend/api/v1/auth/login`.
+- Nginx `limit_req_zone` para `/api/backend/api/v1/auth/login`.
 
-- [ ] **Step 1: Add login rate limiting in Nginx**
+- [ ] **Passo 1: Adicionar rate limiting de login no Nginx**
 
-In `infra/nginx/nginx.conf.template`:
-Define zone:
+Em `infra/nginx/nginx.conf.template`:
+Definir zona:
 ```nginx
 limit_req_zone $binary_remote_addr zone=login_limit:10m rate=10r/m;
 ```
-Apply inside `location = /api/backend/api/v1/auth/login` with burst 5 nodelay.
+Aplicar dentro de `location = /api/backend/api/v1/auth/login` com burst 5 nodelay.
 
-- [ ] **Step 2: Run full backend test suite**
+- [ ] **Passo 2: Executar suíte completa de testes de backend**
 
-Run: `pytest backend/tests -q`
-Expected: 100% PASS with 0 failures or errors.
+Comando: `pytest backend/tests -q`
+Esperado: 100% PASS com 0 falhas ou erros.
 
-- [ ] **Step 3: Run frontend build**
+- [ ] **Passo 3: Executar build do frontend**
 
-Run: `cd frontend/dashboard && npm run build`
-Expected: Successful build.
+Comando: `cd frontend/dashboard && npm run build`
+Esperado: Build concluído com sucesso.
 
-- [ ] **Step 4: Commit**
+- [ ] **Passo 4: Commit**
 
 ```bash
 git add infra/nginx/nginx.conf.template

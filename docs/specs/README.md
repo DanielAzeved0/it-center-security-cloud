@@ -11,6 +11,8 @@ Convencao: `docs/specs/<feature-name>/{research.md,spec.md,plan.md,verification.
 | `epic-22-agent-auto-update/` | EPIC 22 — Auto-atualizacao do Agente Windows (ADR-032) | VERIFIED (ver `verification.md`) |
 | `epic-31-agent-windows-resilience/` | EPIC 31 — Resiliencia do Agente Windows | SPECIFIED, aguardando aprovacao (2 perguntas em aberto no proprio `spec.md`) |
 | `epic-37-documentation-audit-fixes/` | EPIC 37 — Correcao de Achados da Auditoria de Documentacao | VERIFIED (Trilha 1/Nginx so localmente, nao deployada em producao) |
+| `epic-38-security-hardening/` | EPIC 38 — Seguranca da Aplicacao e Motor de Risco no Login | VERIFIED (ver `verification.md`) |
+| `epic-40-backend-checkin-performance/` | EPIC 40 — Desempenho do Backend no Check-in (Pool, Throttle, Batch) | VERIFIED (ver `verification.md`) |
 
 Cada spec tem seu proprio campo `Status` no cabecalho (`DRAFT -> RESEARCHED -> SPECIFIED -> REVIEWED -> APPROVED -> IMPLEMENTING -> VERIFIED -> COMPLETED`) — essa tabela e so um atalho, o estado oficial de cada uma vive no arquivo `spec.md` correspondente.
 
