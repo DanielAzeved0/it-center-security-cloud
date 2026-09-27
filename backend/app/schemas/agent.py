@@ -10,6 +10,9 @@ class InstalledProgram(BaseModel):
     publisher: str | None = Field(default=None, max_length=255)
 
 
+InstalledProgramPayload = InstalledProgram
+
+
 class SecurityPayload(BaseModel):
     firewall_enabled: bool
     defender_enabled: bool

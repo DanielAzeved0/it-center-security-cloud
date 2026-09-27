@@ -1,10 +1,11 @@
 import hashlib
 import hmac
+import json
 import secrets
 import threading
 import time
 
-from app.schemas.agent import AgentCheckinRequest
+from app.schemas.agent import AgentCheckinRequest, InstalledProgram, InstalledProgramPayload
 from app.schemas.machine import MachineDetail, MachineLocalAdmin, MachineMetric, MachineProgram, MachineSummary
 from app.database import get_connection
 from psycopg.types.json import Jsonb
@@ -26,6 +27,89 @@ def _generate_agent_secret() -> str:
 
 def _hash_agent_secret(secret: str) -> str:
     return hashlib.sha256(secret.encode("utf-8")).hexdigest()
+
+
+def compute_installed_programs_hash(
+    programs: list[InstalledProgram] | list[InstalledProgramPayload] | None,
+) -> str:
+    normalized = sorted(
+        (
+            ((p.name if hasattr(p, "name") else p.get("name")) or "").strip().lower(),
+            ((p.version if hasattr(p, "version") else p.get("version")) or "").strip(),
+            ((p.publisher if hasattr(p, "publisher") else p.get("publisher")) or "").strip(),
+        )
+        for p in (programs or [])
+    )
+    raw = json.dumps(normalized, ensure_ascii=True, separators=(",", ":"))
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+calculate_installed_programs_hash = compute_installed_programs_hash
+
+
+def update_machine_installed_programs(
+    arg1,
+    arg2=None,
+    arg3=None,
+    arg4=None,
+    connection=None,
+    machine_id: int | None = None,
+    programs=None,
+    new_hash: str | None = None,
+) -> None:
+    if hasattr(arg1, "execute"):
+        conn = arg1
+        m_id = arg2 if arg2 is not None else machine_id
+        progs = arg3 if arg3 is not None else programs
+        h = arg4 if arg4 is not None else new_hash
+    else:
+        conn = connection
+        m_id = arg1 if arg1 is not None else machine_id
+        progs = arg2 if arg2 is not None else programs
+        h = arg3 if arg3 is not None else new_hash
+
+    if h is None:
+        h = compute_installed_programs_hash(progs)
+
+    def _do_update(target_conn):
+        target_conn.execute(
+            "DELETE FROM installed_programs WHERE machine_id = %s",
+            (m_id,),
+        )
+        if progs:
+            with target_conn.cursor() as cursor:
+                cursor.executemany(
+                    """
+                    INSERT INTO installed_programs (
+                        machine_id,
+                        name,
+                        version,
+                        publisher
+                    )
+                    VALUES (%s, %s, %s, %s)
+                    ON CONFLICT (machine_id, name, version, publisher) DO NOTHING
+                    """,
+                    [
+                        (
+                            m_id,
+                            p.name if hasattr(p, "name") else p.get("name"),
+                            p.version if hasattr(p, "version") else p.get("version"),
+                            p.publisher if hasattr(p, "publisher") else p.get("publisher"),
+                        )
+                        for p in progs
+                    ],
+                )
+        target_conn.execute(
+            "UPDATE machines SET installed_programs_hash = %s WHERE id = %s",
+            (h, m_id),
+        )
+
+    if conn is not None:
+        _do_update(conn)
+    else:
+        with get_connection() as target_conn:
+            with target_conn.transaction():
+                _do_update(target_conn)
 
 
 def save_machine_checkin(payload: AgentCheckinRequest) -> tuple[MachineSummary, str | None]:
@@ -79,7 +163,7 @@ def save_machine_checkin(payload: AgentCheckinRequest) -> tuple[MachineSummary, 
                     last_seen = now(),
                     agent_secret_hash = EXCLUDED.agent_secret_hash,
                     agent_version = EXCLUDED.agent_version
-                RETURNING id, hostname, username, host(ip_address) AS ip_address, mac_address, serial_number, status, last_seen, agent_version, target_agent_version
+                RETURNING id, hostname, username, host(ip_address) AS ip_address, mac_address, serial_number, status, last_seen, agent_version, target_agent_version, installed_programs_hash
                 """,
                 (
                     hostname,
@@ -114,34 +198,14 @@ def save_machine_checkin(payload: AgentCheckinRequest) -> tuple[MachineSummary, 
                 ),
             )
 
-            connection.execute(
-                "DELETE FROM installed_programs WHERE machine_id = %s",
-                (machine_row["id"],),
-            )
-
-            if payload.installed_programs:
-                with connection.cursor() as cursor:
-                    cursor.executemany(
-                        """
-                        INSERT INTO installed_programs (
-                            machine_id,
-                            name,
-                            version,
-                            publisher
-                        )
-                        VALUES (%s, %s, %s, %s)
-                        ON CONFLICT (machine_id, name, version, publisher) DO NOTHING
-                        """,
-                        [
-                            (
-                                machine_row["id"],
-                                program.name,
-                                program.version,
-                                program.publisher,
-                            )
-                            for program in payload.installed_programs
-                        ],
-                    )
+            current_programs_hash = compute_installed_programs_hash(payload.installed_programs)
+            if machine_row.get("installed_programs_hash") != current_programs_hash:
+                update_machine_installed_programs(
+                    connection,
+                    machine_row["id"],
+                    payload.installed_programs,
+                    current_programs_hash,
+                )
 
             connection.execute(
                 """
