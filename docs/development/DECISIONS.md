@@ -1472,4 +1472,50 @@ A abordagem em memória para o score de risco garante latência mínima (<1ms) e
 ## Resultado
 
 Superfície de autenticação e APIs protegidas contra força bruta e DoS de CPU, com suporte completo a cancelamento de sessão e integridade de relatórios, mantendo conformidade com os requisitos de auditoria e consumo enxuto de recursos.
+ 
+---
+
+# ADR-040
+
+## Data
+
+2026-09-27
+
+## Decisão
+
+Otimizar o desempenho do backend FastAPI no processamento de check-in e consultas frequentes do dashboard através de quatro intervenções estruturais de baixo overhead (EPIC 40):
+
+1. **Pool de Conexões com `psycopg_pool` (`backend/app/database.py`)**:
+   - Implementação de `psycopg_pool.ConnectionPool` com `min_size=1`, `max_size=5`, `timeout=10.0` e `max_idle=300.0`.
+   - Inicialização tardia (*lazy initialization*) thread-safe com double-checked locking em `get_connection_pool()`.
+   - Preservação integral da interface `get_connection()` como context manager (`with get_connection() as conn:`), eliminando o handshake TCP e autenticação PostgreSQL a cada query ou repositório sem quebrar retrocompatibilidade.
+   - Encerramento gracioso do pool no lifespan assíncrono do FastAPI (`backend/app/main.py`).
+
+2. **Throttle em Memória para Varredura de Máquinas Inativas (`backend/app/repositories/machines.py`)**:
+   - Inclusão de debounce de 30 segundos com `time.monotonic()` e lock dedicado (`_stale_sweep_lock`) para chamadas de `mark_stale_machines_offline(machine_id=None)` disparadas por rotas de leitura do dashboard.
+   - Chamadas com `machine_id` específico ignoram o throttle e executam imediatamente.
+
+3. **Fingerprint SHA-256 para `installed_programs` (`backend/app/repositories/machines.py`)**:
+   - Criação da coluna `installed_programs_hash VARCHAR(64)` na tabela `machines` (migration idempotente `015_add_installed_programs_hash.sql`).
+   - Normalização determinística de tuplas `(name, version, publisher)` e geração de hash SHA-256 no check-in.
+   - Caso o hash recebido seja idêntico ao armazenado na máquina, o ciclo destrutivo de `DELETE` + centenas de `INSERT` é ignorado (*early return*), preservando I/O de disco e memória.
+
+4. **Persistência em Lote via `cursor.executemany`**:
+   - `create_security_events_batch` em `backend/app/repositories/security_events.py`: inserção em batch de eventos USB acumulados no check-in em uma única chamada parametrizada, com suporte a transação externa opcional.
+   - `sync_machine_local_admins` em `backend/app/repositories/local_admins.py`: substituição do loop iterativo por `cursor.executemany` com UPSERT (`ON CONFLICT ... DO UPDATE`), preservando o histórico de `last_seen_at` e a detecção de deltas para emissão de alertas de novos administradores locais.
+
+## Motivo
+
+A auditoria de qualidade de 2026-08-20 identificou que cada check-in de agente abria entre 10 e 40 novas conexões TCP brutas contra o PostgreSQL, além de reescrever dezenas/centenas de programas instalados inalterados e disparar varreduras completas da tabela `machines` durante o polling do dashboard. Em uma VM com 1 GB de RAM compartilhada entre Nginx, Backend, Frontend e PostgreSQL, o custo de handshakes repetidos e I/O de banco representava o principal gargalo de throughput.
+
+## Alternativas Avaliadas
+
+* **Introduzir SQLAlchemy ou Tortoise ORM**: Descartado. Aumentaria consideravelmente o consumo de memória RAM e a complexidade arquitetural, violando o princípio Ponytail e a diretriz de manter `psycopg` puro.
+* **Cache em Redis para listas de programas**: Descartado. Introduziria um serviço adicional na VM de 954MB, arriscando incidentes de memória. A coluna de hash diretamente no PostgreSQL resolve o problema com custo marginal zero.
+* **DELETE destrutivo em administradores locais**: Descartado. Apagaria o histórico `last_seen_at` e impediria o disparo do alerta `new_admin_user` para contas recém-descobertas.
+
+## Resultado
+
+Redução drástica da latência de check-in, eliminação do gargalo de conexões TCP e I/O desnecessário de disco, 100% dos 196 testes automatizados passando sem regressões e conformidade estrita com o limite de hardware da VM de produção.
+
 

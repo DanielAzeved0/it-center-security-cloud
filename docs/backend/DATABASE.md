@@ -104,6 +104,8 @@ rustdesk_id VARCHAR(50) NULL
 agent_secret_hash VARCHAR(64) NULL
 agent_version VARCHAR(20) NULL
 target_agent_version VARCHAR(20) NULL
+installed_programs_hash VARCHAR(64) NULL
+
 created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 ```

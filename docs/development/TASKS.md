@@ -2172,7 +2172,7 @@ Reduzir o custo por requisicao do fluxo de check-in do agente e das leituras mai
 
 ### Tarefas
 
-[ ] Adicionar pool de conexoes ao psycopg (`backend/app/database.py:20`, severidade alta)
+[x] Adicionar pool de conexoes ao psycopg (`backend/app/database.py:20`, severidade alta)
 
     get_connection() chama psycopg.connect() isoladamente a cada
     chamada de repositorio, sem pool (requirements.txt so tem
@@ -2188,7 +2188,7 @@ Reduzir o custo por requisicao do fluxo de check-in do agente e das leituras mai
     min_size=1/max_size=5), sem mudar a assinatura de get_connection()
     usada pelos repositorios.
 
-[ ] Limitar a frequencia de mark_stale_machines_offline nas rotas de leitura (`backend/app/repositories/machines.py:157`, severidade media)
+[x] Limitar a frequencia de mark_stale_machines_offline nas rotas de leitura (`backend/app/repositories/machines.py:157`, severidade media)
 
     list_machines(), get_machine() e get_dashboard_summary() chamam
     mark_stale_machines_offline() antes de qualquer SELECT - um
@@ -2200,7 +2200,7 @@ Reduzir o custo por requisicao do fluxo de check-in do agente e das leituras mai
     de uma vez por N segundos quando chamada sem machine_id
     especifico).
 
-[ ] Evitar reescrever installed_programs quando a lista nao mudou (`backend/app/repositories/machines.py:116`, severidade media)
+[x] Evitar reescrever installed_programs quando a lista nao mudou (`backend/app/repositories/machines.py:116`, severidade media)
 
     save_machine_checkin apaga e reinsere 100% das linhas de
     installed_programs a cada check-in (padrao 5 min), mesmo numa
@@ -2209,7 +2209,7 @@ Reduzir o custo por requisicao do fluxo de check-in do agente e das leituras mai
     fingerprint (hash) da lista normalizada numa coluna nova de
     machines; so apagar/reinserir quando o hash mudar.
 
-[ ] Agrupar em lote a criacao de eventos de USB (`backend/app/services/agent.py:148`, severidade media)
+[x] Agrupar em lote a criacao de eventos de USB (`backend/app/services/agent.py:148`, severidade media)
 
     process_usb_devices cria um security_event por dispositivo com
     round-trips separados (create_security_event abre conexao propria
@@ -2219,7 +2219,7 @@ Reduzir o custo por requisicao do fluxo de check-in do agente e das leituras mai
     executemany, chamada uma vez por check-in com a lista completa de
     eventos de USB.
 
-[ ] Trocar o loop de insercao de administradores locais por executemany (`backend/app/repositories/local_admins.py:31`, severidade baixa)
+[x] Trocar o loop de insercao de administradores locais por executemany (`backend/app/repositories/local_admins.py:31`, severidade baixa)
 
     sync_machine_local_admins insere um administrador por vez via
     connection.execute() sequencial, mesmo dentro da mesma
@@ -2227,6 +2227,7 @@ Reduzir o custo por requisicao do fluxo de check-in do agente e das leituras mai
     save_machine_checkin ja resolve com executemany para
     installed_programs. Direcao: executemany com a lista completa de
     administradores normalizados.
+
 
 ---
 
