@@ -34,6 +34,38 @@ def create_security_event(
         )
 
 
+def create_security_events_batch(events: list[dict]) -> None:
+    if not events:
+        return
+
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.executemany(
+                """
+                INSERT INTO security_events (
+                    machine_id,
+                    event_type,
+                    severity,
+                    source,
+                    description,
+                    raw_data
+                )
+                VALUES (%s, %s, %s, %s, %s, %s)
+                """,
+                [
+                    (
+                        e["machine_id"],
+                        e["event_type"],
+                        e["severity"],
+                        e.get("source", "agent"),
+                        e["description"],
+                        Jsonb(e["raw_data"]) if e.get("raw_data") is not None else None,
+                    )
+                    for e in events
+                ],
+            )
+
+
 def list_security_events(
     machine_id: int | None = None,
     limit: int = 100,

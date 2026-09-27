@@ -4,7 +4,10 @@ from app.schemas.agent import AgentCheckinRequest, AgentCheckinResponse
 from app.repositories.alerts import create_open_alert_once
 from app.repositories.local_admins import sync_machine_local_admins
 from app.repositories.machines import MachineIdentityMismatch, save_machine_checkin
-from app.repositories.security_events import create_security_event
+from app.repositories.security_events import (
+    create_security_event,
+    create_security_events_batch,
+)
 
 # Espelhos temporarios de ASSET_POLICY.md ate existir politica em banco/dashboard.
 KNOWN_ASSET_HOSTNAMES = {"NOTE-DANIEL", "PC-TI-01", "PC-TI-02", "PC-FINANCEIRO-01"}
@@ -146,15 +149,19 @@ def process_unknown_asset(payload: AgentCheckinRequest, machine_id: int) -> None
 
 
 def process_usb_devices(payload: AgentCheckinRequest, machine_id: int) -> None:
-    for device in payload.security.usb_devices:
-        name = str(device.get("name") or "USB device")
-        _record_security_event_only(
-            machine_id=machine_id,
-            event_type="usb_detected",
-            severity="low",
-            description=f"Dispositivo USB detectado na maquina {_hostname(payload)}: {name}.",
-            raw_data=device,
-        )
+    events = [
+        {
+            "machine_id": machine_id,
+            "event_type": "usb_detected",
+            "severity": "low",
+            "source": "agent",
+            "description": f"Dispositivo USB detectado na maquina {_hostname(payload)}: {str(device.get('name') or 'USB device')}.",
+            "raw_data": device,
+        }
+        for device in payload.security.usb_devices
+    ]
+    if events:
+        create_security_events_batch(events)
 
 
 def process_failed_logins(payload: AgentCheckinRequest, machine_id: int) -> None:
