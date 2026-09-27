@@ -47,10 +47,12 @@ def test_agent_checkin_accepts_valid_payload(monkeypatch):
     assert response.status_code == 200
     body = response.json()
     agent_secret = body.pop("agent_secret", None)
+    machine_id = body.pop("machine_id", None)
+    assert isinstance(machine_id, int)
+    assert machine_id > 0
     assert body == {
         "status": "success",
         "message": "Check-in received",
-        "machine_id": 1,
     }
     assert agent_secret
 

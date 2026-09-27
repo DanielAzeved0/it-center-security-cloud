@@ -13,6 +13,7 @@ def clean_database():
             connection.execute(
                 """
                 TRUNCATE TABLE
+                    revoked_tokens,
                     audit_logs,
                     users,
                     machine_local_admins,

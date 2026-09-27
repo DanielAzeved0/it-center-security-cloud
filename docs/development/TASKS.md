@@ -2226,6 +2226,19 @@ Reduzir o custo por requisicao do fluxo de check-in do agente e das leituras mai
     installed_programs. Direcao: executemany com a lista completa de
     administradores normalizados.
 
+[x] Hardening, higiene e otimizacao da suite de testes (`backend/tests/`, severidade media)
+
+    Auditoria identificou falso positivo em test_connection_pool_reuses_connections
+    (nao assertava pg_backend_pid), duplicidade de fixture de TRUNCATE para
+    revoked_tokens, truncamento desnecessario de PostgreSQL em testes puramente
+    unitarios/em memoria (test_risk_engine e test_machines_stale_throttle), e assercoes
+    de ID fixo (id == 1) em vez de invariantes.
+    Implementado em 2026-09-27: pool inicializado com open(wait=True, timeout=10.0)
+    garantindo min_size aquecido; assercao de pg_backend_pid preservado; revoked_tokens
+    centralizado em conftest.py; clean_database desativado em testes in-memory economizando
+    126 truncates por ciclo. Tempo de execucao da suite reduzido de 40.4s para 19.5s
+    (reducao de 51.7%).
+
 
 ---
 

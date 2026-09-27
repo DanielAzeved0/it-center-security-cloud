@@ -1,19 +1,8 @@
-import pytest
 from fastapi.testclient import TestClient
 
-from app.database import get_connection
 from app.main import app
 from app.services.auth import create_access_token
 from tests.conftest import create_test_user
-
-
-@pytest.fixture(autouse=True)
-def clean_revoked_tokens():
-    with get_connection() as conn:
-        conn.execute("TRUNCATE TABLE revoked_tokens")
-    yield
-    with get_connection() as conn:
-        conn.execute("TRUNCATE TABLE revoked_tokens")
 
 
 def test_logout_invalidates_token_immediately():

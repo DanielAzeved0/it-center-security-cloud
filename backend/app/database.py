@@ -27,15 +27,17 @@ def get_connection_pool() -> ConnectionPool:
     if _pool is None or _pool.closed:
         with _pool_lock:
             if _pool is None or _pool.closed:
-                _pool = ConnectionPool(
+                pool = ConnectionPool(
                     conninfo=get_database_url(),
                     min_size=1,
                     max_size=5,
                     timeout=10.0,
                     max_idle=300.0,
                     kwargs={"row_factory": dict_row},
-                    open=True,
+                    open=False,
                 )
+                pool.open(wait=True, timeout=10.0)
+                _pool = pool
     return _pool
 
 

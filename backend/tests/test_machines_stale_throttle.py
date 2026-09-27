@@ -1,11 +1,18 @@
 import time
 from unittest.mock import patch
+import pytest
 
 from app.repositories.machines import (
     STALE_THROTTLE_SECONDS,
     mark_stale_machines_offline,
     reset_stale_throttle_for_testing,
 )
+
+
+@pytest.fixture(autouse=True)
+def clean_database():
+    """No database needed for mock-based stale throttle tests."""
+    reset_stale_throttle_for_testing()
 
 
 def test_mark_stale_machines_offline_throttled_for_global_calls():

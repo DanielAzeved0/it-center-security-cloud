@@ -80,7 +80,8 @@ def test_audit_logs_table_accepts_user_actor():
         metadata={"status": "resolved"},
     )
 
-    assert audit_log["id"] == 1
+    assert isinstance(audit_log["id"], int)
+    assert audit_log["id"] > 0
     assert audit_log["actor_user_id"] == user_id
     assert audit_log["action"] == "alert.resolve"
     assert audit_log["entity_type"] == "alert"

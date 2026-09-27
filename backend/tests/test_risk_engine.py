@@ -1,6 +1,13 @@
 import threading
 import time
+import pytest
 from app.services.risk_engine import AttemptRecord, LoginRiskEngine, get_risk_engine
+
+
+@pytest.fixture(autouse=True)
+def clean_database():
+    """No database needed for pure in-memory risk engine unit tests."""
+    pass
 
 
 def test_initial_client_not_blocked():

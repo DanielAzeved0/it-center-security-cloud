@@ -1,22 +1,10 @@
 from datetime import datetime, timedelta, timezone
 
-import pytest
-
-from app.database import get_connection
 from app.repositories.revoked_tokens import (
     is_token_revoked,
     purge_expired_revoked_tokens,
     revoke_token,
 )
-
-
-@pytest.fixture(autouse=True)
-def clean_revoked_tokens():
-    with get_connection() as conn:
-        conn.execute("TRUNCATE TABLE revoked_tokens")
-    yield
-    with get_connection() as conn:
-        conn.execute("TRUNCATE TABLE revoked_tokens")
 
 
 def test_is_token_revoked_returns_false_for_non_revoked_token():

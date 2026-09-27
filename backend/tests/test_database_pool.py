@@ -11,12 +11,17 @@ def test_connection_pool_reuses_connections():
     assert pool.max_size == 5
 
     with get_connection() as conn1:
-        row1 = conn1.execute("SELECT 1 AS alive").fetchone()
+        row1 = conn1.execute("SELECT 1 AS alive, pg_backend_pid() AS pid").fetchone()
         assert row1["alive"] == 1
+        pid1 = row1["pid"]
 
     with get_connection() as conn2:
-        row2 = conn2.execute("SELECT 2 AS alive").fetchone()
+        row2 = conn2.execute("SELECT 2 AS alive, pg_backend_pid() AS pid").fetchone()
         assert row2["alive"] == 2
+        pid2 = row2["pid"]
+
+    # Verifica que a mesma conexao ativa do PostgreSQL foi reaproveitada pelo pool
+    assert pid1 == pid2
 
     # Verifica que o pool continua ativo e funcional
     assert pool.get_stats()["pool_available"] >= 1

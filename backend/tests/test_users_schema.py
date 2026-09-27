@@ -35,7 +35,8 @@ def insert_user(
 def test_users_table_accepts_valid_admin_user():
     user = insert_user()
 
-    assert user["id"] == 1
+    assert isinstance(user["id"], int)
+    assert user["id"] > 0
     assert user["email"] == "admin@example.com"
     assert user["name"] == "Admin User"
     assert user["password_hash"] == "hash-value"
