@@ -1,3 +1,5 @@
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 import os
 
 from fastapi import FastAPI
@@ -17,11 +19,30 @@ from app.routes.security_events import router as security_events_router
 # /openapi.json diretamente).
 _IS_PRODUCTION = os.getenv("APP_ENV", "development").lower() == "production"
 
+
+def validate_runtime_configuration() -> None:
+    from app.core.config import get_settings
+
+    get_settings().validate_runtime_configuration()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    from app.database import close_connection_pool
+
+    validate_runtime_configuration()
+    try:
+        yield
+    finally:
+        close_connection_pool()
+
+
 app = FastAPI(
     title="IT Center Security Cloud API",
     docs_url=None if _IS_PRODUCTION else "/docs",
     redoc_url=None if _IS_PRODUCTION else "/redoc",
     openapi_url=None if _IS_PRODUCTION else "/openapi.json",
+    lifespan=lifespan,
 )
 
 app.include_router(agent_router)
@@ -31,13 +52,6 @@ app.include_router(machines_router)
 app.include_router(security_events_router)
 app.include_router(dashboard_router)
 app.include_router(reports_router)
-
-
-@app.on_event("startup")
-def validate_runtime_configuration() -> None:
-    from app.core.config import get_settings
-
-    get_settings().validate_runtime_configuration()
 
 
 @app.get("/api/v1/health")

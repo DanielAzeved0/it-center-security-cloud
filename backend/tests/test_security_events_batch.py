@@ -81,3 +81,38 @@ def test_process_usb_devices_batches_insert():
     events = list_security_events(limit=10)
     usb_events = [e for e in events if e.event_type == "usb_detected" and e.machine_id == summary.id]
     assert len(usb_events) == 2
+
+
+def test_create_security_events_batch_with_connection():
+    payload = AgentCheckinRequest(
+        hostname="CONN-BATCH-01",
+        ip_address="10.0.0.9",
+        mac_address="00:11:22:33:44:99",
+        os_version="Windows 11",
+        cpu_usage=15.0,
+        ram_usage=25.0,
+        disk_usage=35.0,
+        uptime_seconds=1200,
+        security={"firewall_enabled": True, "defender_enabled": True, "rdp_enabled": False},
+    )
+    summary, _ = save_machine_checkin(payload)
+
+    raw_events = [
+        {
+            "machine_id": summary.id,
+            "event_type": "custom_audit",
+            "severity": "medium",
+            "source": "agent",
+            "description": "Custom audit event via explicit connection.",
+            "raw_data": {"action": "audit"},
+        }
+    ]
+
+    with get_connection() as conn:
+        with conn.transaction():
+            create_security_events_batch(raw_events, connection=conn)
+
+    events = list_security_events(machine_id=summary.id, limit=10)
+    assert len(events) == 1
+    assert events[0].description == "Custom audit event via explicit connection."
+

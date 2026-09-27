@@ -1,3 +1,5 @@
+from typing import Any
+
 from app.database import get_connection
 from app.schemas.security_event import SecurityEventSummary
 from psycopg.types.json import Jsonb
@@ -34,12 +36,16 @@ def create_security_event(
         )
 
 
-def create_security_events_batch(events: list[dict]) -> None:
+def create_security_events_batch(
+    events: list[dict[str, Any]],
+    *,
+    connection: Any | None = None,
+) -> None:
     if not events:
         return
 
-    with get_connection() as connection:
-        with connection.cursor() as cursor:
+    def _execute(target_conn: Any) -> None:
+        with target_conn.cursor() as cursor:
             cursor.executemany(
                 """
                 INSERT INTO security_events (
@@ -64,6 +70,13 @@ def create_security_events_batch(events: list[dict]) -> None:
                     for e in events
                 ],
             )
+
+    if connection is not None:
+        _execute(connection)
+    else:
+        with get_connection() as conn:
+            with conn.transaction():
+                _execute(conn)
 
 
 def list_security_events(

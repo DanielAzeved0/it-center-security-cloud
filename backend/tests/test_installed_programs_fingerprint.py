@@ -135,3 +135,21 @@ def test_update_machine_installed_programs_direct():
         progs = conn.execute("SELECT name FROM installed_programs WHERE machine_id = %s", (summary.id,)).fetchall()
         assert len(progs) == 1
         assert progs[0]["name"] == "Standalone App"
+
+
+def test_update_machine_installed_programs_with_connection():
+    payload = _make_payload("FP-TEST-04", "10.0.0.4", "00:11:22:33:44:88", [])
+    summary, _ = save_machine_checkin(payload)
+
+    new_progs = [InstalledProgramPayload(name="Explicit Conn App", version="2.0", publisher="Explicit Pub")]
+    with get_connection() as conn:
+        with conn.transaction():
+            update_machine_installed_programs(summary.id, new_progs, connection=conn)
+
+    with get_connection() as conn:
+        row = conn.execute("SELECT installed_programs_hash FROM machines WHERE id = %s", (summary.id,)).fetchone()
+        assert row["installed_programs_hash"] == compute_installed_programs_hash(new_progs)
+        progs = conn.execute("SELECT name FROM installed_programs WHERE machine_id = %s", (summary.id,)).fetchall()
+        assert len(progs) == 1
+        assert progs[0]["name"] == "Explicit Conn App"
+

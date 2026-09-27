@@ -4,6 +4,7 @@ import json
 import secrets
 import threading
 import time
+from typing import Any
 
 from app.schemas.agent import AgentCheckinRequest, InstalledProgram, InstalledProgramPayload
 from app.schemas.machine import MachineDetail, MachineLocalAdmin, MachineMetric, MachineProgram, MachineSummary
@@ -48,35 +49,21 @@ calculate_installed_programs_hash = compute_installed_programs_hash
 
 
 def update_machine_installed_programs(
-    arg1,
-    arg2=None,
-    arg3=None,
-    arg4=None,
-    connection=None,
-    machine_id: int | None = None,
-    programs=None,
+    machine_id: int,
+    programs: list[Any],
     new_hash: str | None = None,
+    *,
+    connection: Any | None = None,
 ) -> None:
-    if hasattr(arg1, "execute"):
-        conn = arg1
-        m_id = arg2 if arg2 is not None else machine_id
-        progs = arg3 if arg3 is not None else programs
-        h = arg4 if arg4 is not None else new_hash
-    else:
-        conn = connection
-        m_id = arg1 if arg1 is not None else machine_id
-        progs = arg2 if arg2 is not None else programs
-        h = arg3 if arg3 is not None else new_hash
+    if new_hash is None:
+        new_hash = compute_installed_programs_hash(programs)
 
-    if h is None:
-        h = compute_installed_programs_hash(progs)
-
-    def _do_update(target_conn):
+    def _do_update(target_conn: Any) -> None:
         target_conn.execute(
             "DELETE FROM installed_programs WHERE machine_id = %s",
-            (m_id,),
+            (machine_id,),
         )
-        if progs:
+        if programs:
             with target_conn.cursor() as cursor:
                 cursor.executemany(
                     """
@@ -91,21 +78,21 @@ def update_machine_installed_programs(
                     """,
                     [
                         (
-                            m_id,
+                            machine_id,
                             p.name if hasattr(p, "name") else p.get("name"),
                             p.version if hasattr(p, "version") else p.get("version"),
                             p.publisher if hasattr(p, "publisher") else p.get("publisher"),
                         )
-                        for p in progs
+                        for p in programs
                     ],
                 )
         target_conn.execute(
             "UPDATE machines SET installed_programs_hash = %s WHERE id = %s",
-            (h, m_id),
+            (new_hash, machine_id),
         )
 
-    if conn is not None:
-        _do_update(conn)
+    if connection is not None:
+        _do_update(connection)
     else:
         with get_connection() as target_conn:
             with target_conn.transaction():
@@ -201,10 +188,10 @@ def save_machine_checkin(payload: AgentCheckinRequest) -> tuple[MachineSummary, 
             current_programs_hash = compute_installed_programs_hash(payload.installed_programs)
             if machine_row.get("installed_programs_hash") != current_programs_hash:
                 update_machine_installed_programs(
-                    connection,
                     machine_row["id"],
                     payload.installed_programs,
                     current_programs_hash,
+                    connection=connection,
                 )
 
             connection.execute(

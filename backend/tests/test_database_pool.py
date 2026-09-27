@@ -1,4 +1,7 @@
+import pytest
 from app.database import close_connection_pool, get_connection, get_connection_pool
+import app.database as db_mod
+from app.main import app, lifespan
 
 
 def test_connection_pool_reuses_connections():
@@ -18,3 +21,16 @@ def test_connection_pool_reuses_connections():
     # Verifica que o pool continua ativo e funcional
     assert pool.get_stats()["pool_available"] >= 1
     close_connection_pool()
+
+
+@pytest.mark.anyio
+async def test_lifespan_closes_connection_pool():
+    # Initialize pool
+    pool = get_connection_pool()
+    assert not pool.closed
+
+    async with lifespan(app):
+        assert not pool.closed
+
+    assert db_mod._pool is None
+
