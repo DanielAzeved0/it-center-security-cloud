@@ -1,11 +1,13 @@
 import pytest
 
 from app.database import get_connection
+from app.repositories.machines import reset_stale_throttle_for_testing
 from app.services.auth import create_access_token, hash_password
 
 
 @pytest.fixture(autouse=True)
 def clean_database():
+    reset_stale_throttle_for_testing()
     with get_connection() as connection:
         with connection.transaction():
             connection.execute(

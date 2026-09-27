@@ -1,6 +1,8 @@
 import hashlib
 import hmac
 import secrets
+import threading
+import time
 
 from app.schemas.agent import AgentCheckinRequest
 from app.schemas.machine import MachineDetail, MachineLocalAdmin, MachineMetric, MachineProgram, MachineSummary
@@ -316,7 +318,27 @@ def machine_exists(machine_id: int) -> bool:
     return row is not None
 
 
+_last_global_stale_sweep: float = 0.0
+_stale_sweep_lock = threading.Lock()
+STALE_THROTTLE_SECONDS = 30.0
+
+
+def reset_stale_throttle_for_testing() -> None:
+    global _last_global_stale_sweep
+    with _stale_sweep_lock:
+        _last_global_stale_sweep = 0.0
+
+
 def mark_stale_machines_offline(machine_id: int | None = None) -> None:
+    global _last_global_stale_sweep
+
+    if machine_id is None:
+        now = time.time()
+        with _stale_sweep_lock:
+            if now - _last_global_stale_sweep < STALE_THROTTLE_SECONDS:
+                return
+            _last_global_stale_sweep = now
+
     query = """
         UPDATE machines
         SET status = 'offline'
