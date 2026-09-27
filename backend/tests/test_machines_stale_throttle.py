@@ -29,7 +29,7 @@ def test_mark_stale_machines_offline_runs_after_throttle_interval():
     reset_stale_throttle_for_testing()
 
     with patch("app.repositories.machines.get_connection") as mock_conn, \
-         patch("app.repositories.machines.time.time") as mock_time:
+         patch("app.repositories.machines.time.monotonic") as mock_time:
         mock_time.return_value = 1000.0
         mark_stale_machines_offline(machine_id=None)
         assert mock_conn.call_count == 1

@@ -333,8 +333,8 @@ def mark_stale_machines_offline(machine_id: int | None = None) -> None:
     global _last_global_stale_sweep
 
     if machine_id is None:
-        now = time.time()
         with _stale_sweep_lock:
+            now = time.monotonic()
             if now - _last_global_stale_sweep < STALE_THROTTLE_SECONDS:
                 return
             _last_global_stale_sweep = now
