@@ -28,22 +28,27 @@ def sync_machine_local_admins(machine_id: int, admin_names: list[str]) -> list[s
                 if admin.lower() not in existing_admins
             ]
 
-            for admin in normalized_admins:
-                connection.execute(
-                    """
-                    INSERT INTO machine_local_admins (
-                        machine_id,
-                        admin_name,
-                        last_seen_at
+            if normalized_admins:
+                with connection.cursor() as cursor:
+                    cursor.executemany(
+                        """
+                        INSERT INTO machine_local_admins (
+                            machine_id,
+                            admin_name,
+                            last_seen_at
+                        )
+                        VALUES (%s, %s, now())
+                        ON CONFLICT (machine_id, lower(admin_name))
+                        DO UPDATE SET last_seen_at = now()
+                        """,
+                        [(machine_id, admin) for admin in normalized_admins],
                     )
-                    VALUES (%s, %s, now())
-                    ON CONFLICT (machine_id, lower(admin_name))
-                    DO UPDATE SET last_seen_at = now()
-                    """,
-                    (machine_id, admin),
-                )
 
     if not existing_rows:
         return []
 
     return new_admins
+
+
+replace_machine_local_admins = sync_machine_local_admins
+
